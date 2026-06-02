@@ -1,0 +1,19 @@
+{
+  "_comment": "Kopiere diese Datei zu models.json und trage deine Zugangsdaten ein. models.json ist gitignored.",
+
+  "ollama_base_url": "https://ollama.com",
+  "ollama_api_key":  "DEIN_API_KEY_HIER",
+
+  "models": {
+    "analysis":  "gpt-oss:120b",
+    "code":      "devstral-2:123b",
+    "research":  "gpt-oss:20b",
+    "embed":     "nomic-embed-text"
+  },
+
+  "local_fallback_models": {
+    "analysis": "qwen2.5-coder:14b",
+    "code":     "qwen2.5-coder:14b",
+    "research": "qwen2.5:7b"
+  }
+}

@@ -1,0 +1,20 @@
+# AgentScanIT – Python-Abhängigkeiten
+# Erstellt via: pip freeze (2026-05-18)
+# Installieren: pip install -r requirements.txt
+
+crewai==1.14.4
+ollama==0.6.2
+pydantic==2.12.5
+pydantic-settings==2.10.1
+ddgs
+lancedb==0.30.0
+requests==2.33.1
+httpx==0.28.1
+httpx-sse==0.4.3
+langchain-ollama==1.1.0
+openai==2.33.0
+rich==14.3.4
+typer==0.23.1
+tenacity==9.1.4
+python-dotenv==1.2.2
+PyYAML==6.0.3
