@@ -179,7 +179,17 @@ def run(target: str, objective: str = "", scope: str = "full") -> object:
     console.print(f"  [dim]Running {len(scanner._active_tasks)} phases — this may take several minutes...[/]")
     console.print()
 
-    result = crew_obj.kickoff(inputs=scanner.inputs)
+    for _attempt in range(3):
+        try:
+            result = crew_obj.kickoff(inputs=scanner.inputs)
+            break
+        except Exception as _exc:
+            if "json_invalid" in str(_exc) and _attempt < 2:
+                console.print(f"  [yellow]⚠[/]  LLM JSON error — retry {_attempt + 2}/3...")
+                crew_obj = scanner.crew(task_callback=_on_task_done)
+                _reset_task_progress(scanner.pipeline, time.time())
+            else:
+                raise
 
     total_time = time.time() - run_start
     console.print()
