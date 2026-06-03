@@ -73,6 +73,50 @@ class FindingsOutput(BaseModel):
     cve_references: List[str]
     risk_summary: str
 
+    @field_validator("cve_references")
+    @classmethod
+    def validate_cve_references(cls, v: List[str]) -> List[str]:
+        import re, logging
+        log = logging.getLogger(__name__)
+
+        # Step 1: format check — CVE-YYYY-NNNNN, year 1999–2030, 4–7 digits
+        fmt = re.compile(r'^CVE-(\d{4})-(\d{4,7})$', re.IGNORECASE)
+        formatted = []
+        for cid in v:
+            m = fmt.match(cid.strip())
+            if m and 1999 <= int(m.group(1)) <= 2030:
+                formatted.append(cid.strip().upper())
+        if not formatted:
+            return []
+
+        # Step 2: trace cross-check — only allow IDs that appeared in a tool's raw output.
+        # This is the primary hallucination filter: if the LLM invented a CVE that no tool
+        # returned, it will not appear in any raw_output and is dropped here.
+        try:
+            from tools.trace import run_trace
+            if run_trace.is_active:
+                all_outputs = run_trace.get_all_raw_outputs()
+                trace_confirmed = [cid for cid in formatted if cid in all_outputs]
+                removed = [cid for cid in formatted if cid not in trace_confirmed]
+                if removed:
+                    log.warning("CVE hallucination filter (trace): removed %s", removed)
+                return trace_confirmed
+        except Exception:
+            pass
+
+        # Step 3: NVD fallback — used when trace is unavailable (unit tests, direct invocation).
+        # Confirms the ID exists in NVD; does NOT confirm relevance to the target.
+        try:
+            from tools.nvd import fetch_cves
+            results  = fetch_cves(formatted)
+            confirmed = [r["id"] for r in results if "error" not in r]
+            removed   = [cid for cid in formatted if cid not in confirmed]
+            if removed:
+                log.warning("CVE hallucination filter (NVD): removed %s", removed)
+            return confirmed
+        except Exception:
+            return formatted
+
 
 class RedScanOutput(BaseModel):
     targeted_findings: List[str]        # CVEs/Versionen die diesen Scan ausgelöst haben
