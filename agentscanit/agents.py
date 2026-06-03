@@ -23,6 +23,8 @@ from tools import (
     ddg_search_tool, theharvester_tool, sublist3r_tool, subfinder_tool,
     dnsrecon_tool, dig_tool, whois_tool, amass_tool, assetfinder_tool,
     dnsx_tool, katana_tool, waybackurls_tool, gau_tool, searchsploit_tool,
+    # nvd
+    nvd_tool,
 )
 
 _console = Console()
@@ -139,7 +141,7 @@ research_agent = Agent(
         ddg_search_tool, theharvester_tool, whois_tool, dig_tool,
         dnsrecon_tool, subfinder_tool, sublist3r_tool, amass_tool,
         assetfinder_tool, dnsx_tool, katana_tool, waybackurls_tool,
-        gau_tool, searchsploit_tool,
+        gau_tool, searchsploit_tool, nvd_tool,
     ],
     llm=llm_research,
     function_calling_llm=llm_research,
@@ -199,7 +201,7 @@ red_agent = Agent(
         "Du dokumentierst Angriffspfade präzise und nachvollziehbar – "
         "als Grundlage für Remediation, nicht für aktive Exploitation."
     ),
-    tools=[searchsploit_tool, ddg_search_tool],
+    tools=[searchsploit_tool, ddg_search_tool, nvd_tool],
     llm=llm_analysis,
     function_calling_llm=llm_analysis,
     verbose=False,

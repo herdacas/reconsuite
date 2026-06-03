@@ -18,6 +18,8 @@ from tools.passive_recon import (
     dnsx_tool, katana_tool, waybackurls_tool, gau_tool, searchsploit_tool,
 )
 
+from tools.nvd import nvd_tool
+
 __all__ = [
     # active scanning
     "nmap_tool", "nikto_tool", "whatweb_tool", "sslscan_tool", "testssl_tool",
@@ -27,4 +29,6 @@ __all__ = [
     "ddg_search_tool", "theharvester_tool", "sublist3r_tool", "subfinder_tool",
     "dnsrecon_tool", "dig_tool", "whois_tool", "amass_tool", "assetfinder_tool",
     "dnsx_tool", "katana_tool", "waybackurls_tool", "gau_tool", "searchsploit_tool",
+    # nvd
+    "nvd_tool",
 ]
