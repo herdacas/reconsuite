@@ -184,8 +184,14 @@ def run(target: str, objective: str = "", scope: str = "full") -> object:
             result = crew_obj.kickoff(inputs=scanner.inputs)
             break
         except Exception as _exc:
-            if "json_invalid" in str(_exc) and _attempt < 2:
-                console.print(f"  [yellow]⚠[/]  LLM JSON error — retry {_attempt + 2}/3...")
+            exc_str = str(_exc)
+            _is_schema_err = (
+                "json_invalid"    in exc_str or
+                "ValidationError" in exc_str or
+                "Field required"  in exc_str
+            )
+            if _is_schema_err and _attempt < 2:
+                console.print(f"  [yellow]⚠[/]  LLM schema error — retry {_attempt + 2}/3...")
                 crew_obj = scanner.crew(task_callback=_on_task_done)
                 _reset_task_progress(scanner.pipeline, time.time())
             else:
