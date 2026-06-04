@@ -12,7 +12,7 @@ Mehrere spezialisierte Agents arbeiten sequenziell: Passive Recon → Aktiver Sc
 ```
 recon-suite/
 ├── agentscanit/          ← Haupt-Package (Team 1: Scanner)
-│   ├── main.py           ← CLI-Einstiegspunkt + Memory-Patching
+│   ├── main.py           ← CLI-Einstiegspunkt + Memory-Patching + Retry-Logik
 │   ├── crew.py           ← AgentScanITCrew, Planner, Pipeline-Logik
 │   ├── agents.py         ← CrewAI Agent-Definitionen (5 Agents)
 │   ├── tasks.py          ← Task-Definitionen + Pydantic Output-Schemas + CVE-Validator
@@ -21,13 +21,13 @@ recon-suite/
 │   │   ├── _base.py      ← Subprocess-Helper + run_trace-Integration
 │   │   ├── active_scanning.py   ← nmap, nikto, nuclei, sslscan, etc.
 │   │   ├── passive_recon.py     ← subfinder, dnsrecon, whois, ddg, etc.
-│   │   ├── nvd.py               ← NVD API v2 Client + NvdSearchTool (CrewAI BaseTool)
-│   │   └── trace.py             ← Tool-Call-Trace für JSON-Logs
+│   │   ├── nvd.py               ← NVD API v2 Client + NvdSearchTool (CrewAI BaseTool) — Single Source of Truth
+│   │   └── trace.py             ← Tool-Call-Trace für JSON-Logs + get_all_raw_outputs()
 │   ├── scan_summary.py   ← Hilfsskript für Report-Ausgabe
 │   └── toolinfo.md       ← Detaillierte Tool-Dokumentation (26 Tools)
 ├── interpret_agent/      ← Team 2: NVD-Enrichment
 │   ├── interpret_flow.py ← CrewAI Flow für CVE-Lookup + Interpretation
-│   └── nvd.py            ← NVD API v2 Client (standalone — Duplikat, TODO konsolidieren)
+│   └── nvd.py            ← Thin shim → agentscanit.tools.nvd
 ├── reporting/            ← Team 3: Final Report
 │   └── reporting_flow.py ← Merge scan-report + NVD data → final_report_*.md
 ├── flow.py               ← Top-Level: orchestriert alle 3 Teams
@@ -42,11 +42,11 @@ recon-suite/
 
 | Agent | Rolle | Tools |
 |---|---|---|
-| `research_agent` | Passive OSINT / Recon | 15 (subfinder, dnsrecon, dig, whois, ..., **nvd_tool**) |
+| `research_agent` | Passive OSINT / Recon | 15 (subfinder, dnsrecon, dig, whois, ..., nvd_tool) |
 | `blue_agent` | Active Scanning | 12 (nmap, nikto, nuclei, sslscan, ...) |
-| `research_agent` | CVE-Analyse (findings_task) | searchsploit, ddg, **nvd_tool** |
+| `research_agent` | CVE-Analyse (findings_task) | searchsploit, ddg, nvd_tool |
 | `blue_agent` | Targeted Follow-up (red_scan_task) | nuclei, nikto |
-| `red_agent` | Exploitability-Analyse | searchsploit, ddg, **nvd_tool** |
+| `red_agent` | Exploitability-Analyse | searchsploit, ddg, nvd_tool |
 | `coding_agent` | Script-Generierung | keine Tools |
 | `reporter_agent` | Report-Erstellung | keine Tools |
 
@@ -58,22 +58,23 @@ Der LLM-Planner wählt anhand von Scope + Objective eine Teilmenge aus.
 
 ## CVE-Validierungs-Architektur
 
-CVE-IDs durchlaufen zwei Validierungsebenen bevor sie in den Report eingehen:
+CVE-IDs durchlaufen zwei Ebenen bevor sie in den Report eingehen:
 
-**1. Pydantic-Validator (`tasks.py` — `FindingsOutput` + `RedOutput`)**
+**1. Pydantic-Validator auf `FindingsOutput` + `RedOutput` (`tasks.py`)**
 - Format-Check: `CVE-YYYY-NNNNN`, Jahr 1999–2030
-- **Trace-Kreuzvalidierung (primär):** ID muss im Raw-Output eines Tool-Calls der aktuellen Session vorkommen. Verhindert LLM-Halluzinationen — auch solche die formal korrekten CVE-IDs entsprechen.
-- NVD-Fallback: wenn Trace inaktiv (Unit-Tests), NVD-Existenz-Check als Netz.
+- **Trace-Kreuzvalidierung (primär):** ID muss im Raw-Output eines Tool-Calls dieser Session vorkommen. Filtert LLM-Halluzinationen auch wenn die ID formal korrekt ist (z.B. `CVE-2024-1234` existiert, ist aber für WordPress — nicht für das gescannte Target).
+- NVD-Fallback: wenn Trace inaktiv (Unit-Tests), NVD-Existenz-Check.
 
-**2. interpret_flow.py**
-- Liest ausschließlich strukturierte `cve_references`-Felder aus `findings`- und `red`-Task-Output.
+**2. `interpret_flow.py`**
+- Liest ausschließlich strukturierte `cve_references`-Felder aus `findings`- und `red`-Task.
 - Kein Regex-Fallback auf Preview-Text (war Halluzinations-Vektor via reporter_agent-Markdown).
 
-**CVE-Suche-Reihenfolge in findings_task:**
-1. `searchsploit '<service> <version>'`
-2. `nvd_cve_search '<service> <version>'` (Fallback wenn searchsploit leer)
-3. `nvd_cve_search '<service>'` (wenn keine Version bekannt)
-4. DDG `'<CVE-ID> PoC'` zur Bestätigung
+**CVE-Suche-Reihenfolge in `findings_task`:**
+1. Service-Normalisierung: `Apache-Coyote` → `Apache Tomcat`, `Jetty` → `Eclipse Jetty`
+2. `searchsploit '<service> <version>'`
+3. `nvd_cve_search '<service> <version>'` (Fallback / Ergänzung)
+4. `nvd_cve_search '<service>'` (wenn keine Version bekannt)
+5. DDG `'<CVE-ID> PoC'` zur Bestätigung
 
 ---
 
@@ -118,7 +119,7 @@ Outputs in `logs/`:
 | Variable | Bedeutung |
 |---|---|
 | `OLLAMA_BASE_URL` | Ollama API-URL (default: http://localhost:11434) |
-| `OLLAMA_API_KEY` | API-Key für remote Ollama (aktiviert auch `think: False` für Qwen3) |
+| `OLLAMA_API_KEY` | API-Key für remote Ollama |
 | `MODEL_ANALYSIS` | Modell für Analyse-Agents (default aus models.json) |
 | `MODEL_RESEARCH` | Modell für Research-Agent |
 | `MODEL_CODE` | Modell für Coding-Agent |
@@ -129,20 +130,19 @@ Modell-Auswahl via `models.json` (aus `models.json.example` ableiten).
 
 ---
 
-## Offene Punkte
+## Bekannte Probleme / Offene Punkte
 
-### NVD-Client dupliziert (TODO P1)
-- `agentscanit/tools/nvd.py` (mit CrewAI-Wrapper + `search_nvd()`)
-- `interpret_agent/nvd.py` (standalone, nur `lookup_cve()` + `fetch_cves()`)
-- Ziel: `interpret_agent/nvd.py` soll auf `agentscanit/tools/nvd.py` umgeleitet werden (oder gemeinsamer `shared/nvd.py`).
+### Report-Task-Laufzeit (scope=full)
+- Bei scope=full mit großem Kontext (alle 6 Phasen) kann `report_task` >400s dauern.
+- Ursache: Reporter-Agent erhält sehr langen Kontext aus allen vorangehenden Tasks.
+- Mögliche Abhilfe: Context-Summarization vor dem Report-Task oder max_iter reduzieren.
 
 ### think: False (agents.py)
-- Für Ollama-Modelle mit Chain-of-Thought (`extra_body={"think": False}`) — verhindert dass Reasoning-Text in JSON-Responses fließt.
-- Nur aktiv wenn `OLLAMA_API_KEY` gesetzt ist (Remote-Modelle).
+- `extra_body={"think": False}` wird bedingungslos gesetzt — lokales Ollama ignoriert es für nicht-thinking-Modelle, remote-Modelle (Qwen3, gpt-oss) benötigen es.
 
-### JSON-Retry-Logik (main.py)
-- Bei `json_invalid`-Fehlern des LLM wird die Crew bis zu 3× neu gestartet.
-- Die Crew-Instanz wird jedesmal neu erstellt (inkl. Planner-Aufruf).
+### JSON/Schema-Retry-Logik (main.py)
+- Crew wird bis zu 3× neu gestartet bei `json_invalid`, `ValidationError` oder `Field required`-Fehlern.
+- Crew-Instanz wird jedesmal neu erstellt (inkl. Planner-Aufruf).
 
 ### Memory-Patching (main.py)
 - CrewAI's Memory-Analyse-LLM-Calls werden monkey-gepatcht (keine LLM-Calls bei save/recall).
@@ -161,9 +161,10 @@ Modell-Auswahl via `models.json` (aus `models.json.example` ableiten).
 
 ## Wichtige Patterns
 
-- **`_run()` in tools/_base.py** ist der Subprocess-Helper (mit Trace-Integration) — nicht `self._run()` (das ist CrewAI's BaseTool-Interface).
-- **CVE-Validator**: `FindingsOutput.validate_cve_references` und `RedOutput.validate_cve_references` — beide nutzen Trace-Kreuzvalidierung. Kein CVE ohne Tool-Bestätigung im Raw-Output.
-- **`run_trace.get_all_raw_outputs()`**: gibt alle Tool-Raw-Outputs der laufenden Session zurück — genutzt vom CVE-Validator während Pydantic-Parsing.
-- **Strict factual outputs**: Task-Prompts verlangen explizit "nur tool-bestätigte Fakten".
-- **Planner-Fallback**: Wenn LLM-Planner kein valides JSON liefert, wird die scope-ceiling als Fallback genutzt (alle erlaubten Tasks für den Scope).
-- **Memory**: LanceDB vector storage, shallow recall erzwungen (`_ShallowMemory`). Warme Runs (gleicher Target) nutzen Prior-Run-Daten.
+- **`_run()` in tools/_base.py** — Subprocess-Helper mit Trace-Integration. Nicht `self._run()` (das ist CrewAI's BaseTool-Interface).
+- **CVE-Validator** — `FindingsOutput.validate_cve_references` und `RedOutput.validate_cve_references` nutzen Trace-Kreuzvalidierung. Kein CVE ohne Tool-Bestätigung im Raw-Output.
+- **`run_trace.get_all_raw_outputs()`** — gibt alle Tool-Raw-Outputs der laufenden Session zurück (closed phases + pending). Genutzt vom CVE-Validator während Pydantic-Parsing.
+- **`interpret_agent/nvd.py`** — Thin Shim, re-exportiert aus `agentscanit.tools.nvd`. Nie direkt editieren.
+- **Strict factual outputs** — Task-Prompts verlangen "nur tool-bestätigte Fakten". CVEs nur wenn Tool-Bestätigung im Trace vorhanden.
+- **Planner-Fallback** — Wenn LLM-Planner kein valides JSON liefert, wird scope-ceiling als Fallback genutzt.
+- **Memory** — LanceDB vector storage, shallow recall erzwungen (`_ShallowMemory`). Warme Runs nutzen Prior-Run-Daten.
