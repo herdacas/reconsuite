@@ -110,10 +110,11 @@ def _llm(model: str, temperature: float) -> LLM:
         temperature=temperature,
     )
     if OLLAMA_API_KEY:
-        kwargs["api_key"]    = OLLAMA_API_KEY
-        # Disable chain-of-thought for thinking models (Qwen3, gpt-oss, etc.)
-        # Prevents reasoning text from bleeding into structured JSON responses.
-        kwargs["extra_body"] = {"think": False}
+        kwargs["api_key"] = OLLAMA_API_KEY
+    # Disable chain-of-thought for thinking models (Qwen3, gpt-oss, etc.)
+    # Applied unconditionally — local Ollama ignores it for non-thinking models,
+    # remote thinking models need it to prevent reasoning bleed into JSON outputs.
+    kwargs["extra_body"] = {"think": False}
     return LLM(**kwargs)
 
 llm_analysis = _llm(ACTIVE_ANALYSIS, TEMP_ANALYSIS)
