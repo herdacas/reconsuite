@@ -129,6 +129,15 @@ class RedScanOutput(BaseModel):
 class RedOutput(BaseModel):
     confirmed_attack_surface: List[str]  # only findings confirmed by tool output
     exploitable_findings: List[str]
+    cve_references: List[str] = Field(
+        default_factory=list,
+        description="CVE IDs confirmed by searchsploit or DDG tool output in this task.",
+    )
+
+    # Reuse the same trace + NVD validator as FindingsOutput.
+    validate_cve_references = field_validator("cve_references", mode="before")(
+        FindingsOutput.__dict__["validate_cve_references"].__func__
+    )
 
 
 class CodingOutput(BaseModel):
@@ -330,6 +339,9 @@ red_task = Task(
         "Kein 'may', kein 'could', kein 'potential'. Format: '<service>:<port> — <was das Tool meldete>'\n"
         "- 'exploitable_findings': Nur Findings für die searchsploit einen Exploit-Eintrag "
         "oder DDG einen publizierten PoC zurückgegeben hat.\n"
+        "- 'cve_references': Liste der CVE-IDs die searchsploit oder DDG in diesem Task "
+        "zurückgegeben haben — exakt so wie sie im Tool-Output stehen (Format: CVE-YYYY-NNNNN). "
+        "Keine CVE-IDs aus LLM-Trainingswissen.\n"
         "Keine Einträge aus LLM-Trainingswissen ohne Tool-Bestätigung."
     ),
     expected_output=(

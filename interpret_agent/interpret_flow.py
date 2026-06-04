@@ -62,17 +62,14 @@ class InterpretFlow(Flow[InterpretState]):
         self.state.scan_timestamp  = summary.get("timestamp", "")
         self.state.scan_report_path = summary.get("report", "")
 
+        # Collect only from structured cve_references fields (findings + red tasks).
+        # The regex-on-preview fallback was removed: scanning preview text included
+        # reporter_agent markdown which contained hallucinated CVE IDs from LLM training.
         cve_ids: list[str] = []
         for task_data in summary.get("tasks", {}).values():
             for cve_id in task_data.get("cve_references", []):
                 if cve_id not in cve_ids:
                     cve_ids.append(cve_id)
-        if not cve_ids:
-            for task_data in summary.get("tasks", {}).values():
-                for m in re.finditer(r'CVE-\d{4}-\d{4,7}',
-                                     " ".join(task_data.get("preview", []))):
-                    if m.group() not in cve_ids:
-                        cve_ids.append(m.group())
 
         self.state.cve_ids = cve_ids
 
