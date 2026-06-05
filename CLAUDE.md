@@ -48,7 +48,7 @@ recon-suite/
 | `blue_agent` | Targeted Follow-up (red_scan_task) | nuclei, nikto |
 | `red_agent` | Exploitability-Analyse | searchsploit, ddg, nvd_tool |
 | `coding_agent` | Script-Generierung | keine Tools |
-| `reporter_agent` | Report-Erstellung | keine Tools |
+| `reporter_agent` | Report-Erstellung | keine Tools, max_iter=3 |
 
 Pipeline-Reihenfolge: `research → blue → findings → red_scan → red → coding → report`
 
@@ -96,7 +96,8 @@ CVE-IDs durchlaufen zwei Ebenen bevor sie in den Report eingehen:
 ```bash
 # Über den Top-Level-Flow (empfohlen — startet alle 3 Teams)
 python3 main.py example.com
-python3 main.py example.com "CVE-Suche" web
+python3 main.py example.com web               # Scope als 2. Arg (ohne Objective)
+python3 main.py example.com "CVE-Suche" web   # Objective + Scope
 python3 main.py example.com "SSL/TLS prüfen" ssl
 python3 main.py          # interaktiv
 
@@ -132,11 +133,6 @@ Modell-Auswahl via `models.json` (aus `models.json.example` ableiten).
 
 ## Bekannte Probleme / Offene Punkte
 
-### Report-Task-Laufzeit (scope=full)
-- Bei scope=full mit großem Kontext (alle 6 Phasen) kann `report_task` >400s dauern.
-- Ursache: Reporter-Agent erhält sehr langen Kontext aus allen vorangehenden Tasks.
-- Mögliche Abhilfe: Context-Summarization vor dem Report-Task oder max_iter reduzieren.
-
 ### think: False (agents.py)
 - `extra_body={"think": False}` wird bedingungslos gesetzt — lokales Ollama ignoriert es für nicht-thinking-Modelle, remote-Modelle (Qwen3, gpt-oss) benötigen es.
 
@@ -147,6 +143,10 @@ Modell-Auswahl via `models.json` (aus `models.json.example` ableiten).
 ### Memory-Patching (main.py)
 - CrewAI's Memory-Analyse-LLM-Calls werden monkey-gepatcht (keine LLM-Calls bei save/recall).
 - Grund: Pydantic-Validation-Errors + Rate-Limit-Probleme bei gleichzeitigen async-Requests.
+- Patch-Targets nach CrewAI-Update immer prüfen: `crewai.memory.analyze`, `encoding_flow`, `recall_flow`.
+
+### CVE-Trefferquote bei Cloudflare/CDN-Targets
+- Bremen.de etc. liefern keine CVEs weil Dienste hinter Cloudflare versteckt sind — kein Bug.
 
 ---
 
@@ -168,3 +168,4 @@ Modell-Auswahl via `models.json` (aus `models.json.example` ableiten).
 - **Strict factual outputs** — Task-Prompts verlangen "nur tool-bestätigte Fakten". CVEs nur wenn Tool-Bestätigung im Trace vorhanden.
 - **Planner-Fallback** — Wenn LLM-Planner kein valides JSON liefert, wird scope-ceiling als Fallback genutzt.
 - **Memory** — LanceDB vector storage, shallow recall erzwungen (`_ShallowMemory`). Warme Runs nutzen Prior-Run-Daten.
+- **reporter_agent max_iter=3** — bewusst niedrig gehalten; der Reporter nutzt keine Tools und soll den Report in einem Durchgang schreiben. Höhere Werte führen zu 400s+ Laufzeiten bei großem Kontext.
