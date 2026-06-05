@@ -258,7 +258,7 @@ reporter_agent = Agent(
     verbose=False,
     memory=False,
     allow_delegation=False,
-    max_iter=5,
+    max_iter=3,
     step_callback=_step_callback,
     respect_context_window=True,
 )

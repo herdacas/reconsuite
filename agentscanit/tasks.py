@@ -386,11 +386,14 @@ coding_task = Task(
 report_task = Task(
     description=(
         "Ziel: {target} | Objective: {objective} | Scope: {scope}\n\n"
-        "Erstelle einen Recon-Report als Markdown. "
+        "Erstelle einen kompakten Recon-Report als Markdown. "
         "Der Report ist Rohdaten-Dokumentation — er dient als Input für nachgelagerte Analyse-Agents.\n\n"
-        "PFLICHT-REGEL: Jede Aussage im Report muss direkt aus einem Tool-Output ableitbar sein. "
+        "KOMPAKT-PFLICHT: Schreibe den Report IN EINEM DURCHGANG ohne Iteration. "
+        "Jede Sektion max. 5 Zeilen. Keine Raw-Tool-Outputs kopieren — nur extrahierte Fakten. "
+        "Wenn ein Fakt unklar ist: weglassen statt iterieren.\n\n"
+        "FAKTEN-PFLICHT: Jede Aussage muss direkt aus einem Tool-Output ableitbar sein. "
         "Keine Einschätzungen, keine Wahrscheinlichkeiten, kein 'may', 'could', 'potential'. "
-        "Wenn ein Tool nichts gefunden hat: das sauber dokumentieren, nicht spekulieren.\n\n"
+        "Wenn ein Tool nichts gefunden hat: eine Zeile dokumentieren, nicht spekulieren.\n\n"
         "Struktur:\n"
         "# Recon Report: {target}\n"
         "## Reconnaissance Summary\n"
