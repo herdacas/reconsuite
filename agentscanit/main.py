@@ -397,8 +397,14 @@ if __name__ == "__main__":
         if _err:
             console.print(f"[red]✗[/]  {_err}")
             sys.exit(1)
-        _objective = args[1] if len(args) >= 2 else ""
-        _scope     = args[2] if len(args) >= 3 else "full"
+        # Allow `main.py target scope` without an explicit objective:
+        # if the second arg is a known scope, treat it as scope not objective.
+        if len(args) == 2 and args[1].lower() in VALID_SCOPES:
+            _objective = ""
+            _scope     = args[1].lower()
+        else:
+            _objective = args[1] if len(args) >= 2 else ""
+            _scope     = args[2] if len(args) >= 3 else "full"
     else:
         console.print()
         console.print(Panel(
