@@ -4,6 +4,7 @@ Jeder Agent hat eine klar abgegrenzte Rolle im Vulnerability Assessment Workflow
 """
 
 from crewai import Agent, LLM
+from crewai.agent.planning_config import PlanningConfig
 from rich.console import Console
 
 from config import (
@@ -149,6 +150,8 @@ research_agent = Agent(
     verbose=False,
     memory=False,
     allow_delegation=False,
+    planning=True,
+    planning_config=PlanningConfig(max_attempts=2, max_steps=5),
     max_iter=12,
     step_callback=_step_callback,
     respect_context_window=True,
@@ -208,6 +211,8 @@ red_agent = Agent(
     verbose=False,
     memory=False,
     allow_delegation=False,
+    planning=True,
+    planning_config=PlanningConfig(max_attempts=2, max_steps=5),
     max_iter=8,
     step_callback=_step_callback,
     respect_context_window=True,
