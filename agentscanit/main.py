@@ -21,69 +21,15 @@ Als Flow-Crew importieren:
 
 import sys
 import json
-import logging
 import re
 import os
 import time
 import textwrap
 from datetime import datetime
 
-# ─── CrewAI memory-analysis: eliminate LLM calls, keep vector storage ────────
-# CrewAI fires async LLM calls (analyze_for_save, analyze_for_consolidation,
-# analyze_query) for every memory save/recall to enrich metadata. Our models
-# return JSON with extra/wrong fields → Pydantic validation errors + 429 rate-
-# limit errors because many concurrent requests hit the remote server at once.
-# The embedding (vector storage/recall) works fine without this enrichment.
-#
-# Fix: monkey-patch the functions in the modules where they are locally imported
-# so they return defaults immediately without any LLM call.
-try:
-    import crewai.memory.analyze as _cma
-    import crewai.memory.encoding_flow as _cef
-    import crewai.memory.recall_flow as _crf
-
-    _cef.analyze_for_save = lambda content, existing_scopes, existing_categories, llm: _cma._SAVE_DEFAULTS
-    _cef.analyze_for_consolidation = lambda new_content, existing_records, llm: (
-        _cma.ConsolidationPlan(actions=[], insert_new=True)
-    )
-    _crf.analyze_query = lambda query, available_scopes, scope_info, llm: _cma.QueryAnalysis(
-        keywords=[],
-        suggested_scopes=(available_scopes or ["/"])[:5],
-        complexity="simple",
-        recall_queries=[query],
-    )
-except Exception:
-    pass
-
-# Belt-and-suspenders: suppress any remaining memory-analysis log noise
-logging.getLogger("crewai.memory.analyze").setLevel(logging.CRITICAL)
-logging.getLogger("crewai.memory").setLevel(logging.CRITICAL)
-
-
-class _MemoryAnalysisFilter(logging.Filter):
-    """Drop root-logger ERROR messages that originate from memory LLM analysis."""
-    _MARKERS = (
-        "MemoryAnalysis", "ConsolidationPlan", "QueryAnalysis",
-        # Memory extraction LLM call failures — non-fatal, happen when context is large
-        # or LLM returns a dict instead of string for ExtractedMemories.
-        "OpenAI API call failed",
-        "ExtractedMemories",
-    )
-
-    def filter(self, record: logging.LogRecord) -> bool:
-        msg = record.getMessage()
-        return not any(m in msg for m in self._MARKERS)
-
-
-logging.getLogger().addFilter(_MemoryAnalysisFilter())
-
-# Suppress "[CrewAIEventsBus] Warning: Event pairing mismatch" Rich prints.
-try:
-    import crewai.events.event_context as _evc
-    from rich.console import Console as _RichConsole
-    _evc._console = _RichConsole(file=open(os.devnull, "w"))
-except Exception:
-    pass
+# Memory patches (suppress LLM-analysis calls + log noise) are applied in
+# crew.py via _apply_memory_patches() at import time — co-located with the
+# Memory configuration that needs them.
 
 from rich.console import Console
 from rich.panel import Panel
@@ -92,7 +38,7 @@ from rich.rule import Rule
 from rich.table import Table
 
 from config import LOG_DIR, MODEL_ANALYSIS, SCAN_DIR
-from crew import AgentScanITCrew, MEMORY_DIR, PHASE_LABEL, TASK_LABEL, VALID_SCOPES, _crew_memory
+from crew import AgentScanITCrew, MEMORY_DIR, PHASE_LABEL, VALID_SCOPES, _crew_memory
 from tools.trace import run_trace
 
 console = Console()
@@ -201,7 +147,7 @@ def run(target: str, objective: str = "", scope: str = "full") -> object:
     console.print()
     console.print(Rule(style="dim"))
 
-    _save_outputs(result, target, objective, scope, scanner._active_tasks, total_time, has_prior_data)
+    _save_outputs(result, target, objective, scope, scanner._active_tasks, scanner.task_label, total_time, has_prior_data)
     return result
 
 
@@ -213,6 +159,7 @@ def _save_outputs(
     objective: str,
     scope: str,
     active_tasks: list,
+    task_label: dict,
     total_time: float = 0.0,
     has_prior_data: bool = False,
 ) -> None:
@@ -223,7 +170,7 @@ def _save_outputs(
     task_outputs: dict = {}
     if hasattr(result, "tasks_output") and result.tasks_output:
         for i, task_out in enumerate(result.tasks_output):
-            label = TASK_LABEL.get(id(active_tasks[i]), f"task_{i}") if i < len(active_tasks) else f"task_{i}"
+            label = task_label.get(id(active_tasks[i]), f"task_{i}") if i < len(active_tasks) else f"task_{i}"
             task_outputs[label] = task_out
 
     # ── Markdown-Bericht ─────────────────────────────────────────────────────
@@ -281,7 +228,7 @@ def _save_outputs(
             run_trace.set_phase_output(name, pd.model_dump())
         task_summaries[name] = entry
 
-    pipeline = [TASK_LABEL.get(id(t), "?") for t in active_tasks]
+    pipeline = [task_label.get(id(t), "?") for t in active_tasks]
     summary  = {
         "target":    target,
         "objective": objective,
