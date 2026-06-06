@@ -40,7 +40,15 @@ EMBED_MODEL     = _m("embed",    "nomic-embed-text")
 EMBED_BASE_URL  = _models_cfg.get("embed_base_url", "http://localhost:11434")
 
 OLLAMA_BASE_URL = _models_cfg.get("ollama_base_url", "http://localhost:11434")
-OLLAMA_API_KEY  = _models_cfg.get("ollama_api_key",  "")
+
+# API-Key normalisieren: Whitespace strippen und bekannte Platzhalter als
+# "kein Key" behandeln. Verhindert dass ein kopierter Example-Platzhalter
+# versehentlich Remote-Mode aktiviert (führt sonst zu HTTP 401 unauthorized).
+_PLACEHOLDER_KEYS = {"", "DEIN_API_KEY_HIER", "YOUR_API_KEY_HERE", "CHANGE_ME"}
+_raw_api_key    = (_models_cfg.get("ollama_api_key", "") or "").strip()
+OLLAMA_API_KEY  = "" if _raw_api_key in _PLACEHOLDER_KEYS else _raw_api_key
+if _raw_api_key in _PLACEHOLDER_KEYS and _raw_api_key != "":
+    print(f"[config] ollama_api_key ist Platzhalter ('{_raw_api_key}') → Local-Mode")
 
 # Temperaturen je Agent-Typ
 TEMP_ANALYSIS   = 0.3   # Blue Agent, Red Agent, Reporter

@@ -17,3 +17,8 @@ agentscanit/testssl.sh/
 agentscanit/enum4linux-ng/
 *.egg-info/
 .DS_Store
+
+# Lokale Arbeitsdokumente & Tools (nicht ins Repo)
+benchmark.py
+bericht.md
+roadmap.md

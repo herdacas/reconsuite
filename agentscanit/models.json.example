@@ -4,6 +4,9 @@
   "ollama_base_url": "https://ollama.com",
   "ollama_api_key":  "DEIN_API_KEY_HIER",
 
+  "_comment_embed": "Das Embedding-Modell (LanceDB-Memory) laeuft IMMER lokal, unabhaengig vom Remote/Local-LLM-Switch. 'embed_base_url' ist optional (Default: http://localhost:11434) und nur noetig, wenn das Embedding auf einem anderen Host als localhost laufen soll. 'models.embed' gilt fuer beide Modi — es gibt bewusst keinen embed-Eintrag in local_fallback_models.",
+  "embed_base_url": "http://localhost:11434",
+
   "models": {
     "analysis":  "gpt-oss:120b",
     "code":      "devstral-2:123b",

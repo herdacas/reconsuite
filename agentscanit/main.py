@@ -37,7 +37,11 @@ from rich.prompt import Prompt
 from rich.rule import Rule
 from rich.table import Table
 
-from config import LOG_DIR, MODEL_ANALYSIS, SCAN_DIR
+from config import (
+    LOG_DIR, SCAN_DIR,
+    ACTIVE_ANALYSIS, ACTIVE_CODE, ACTIVE_RESEARCH, ACTIVE_BASE_URL,
+    OLLAMA_API_KEY, EMBED_MODEL, EMBED_BASE_URL,
+)
 from crew import AgentScanITCrew, MEMORY_DIR, PHASE_LABEL, VALID_SCOPES, _crew_memory
 from tools.trace import run_trace
 
@@ -68,6 +72,44 @@ def _on_task_done(output) -> None:
     _tp_idx[0]   += 1
     run_trace.close_phase(label)
     console.print(f"  [green]✓[/]  [bold]{PHASE_LABEL.get(label, label):<26}[/] [dim]{elapsed:>5.0f}s[/]")
+
+
+# ─── Modell-Warmup (nur Local-Mode) ──────────────────────────────────────────
+# Lokales Ollama lädt ein Modell erst beim ersten Request in den VRAM. Ohne
+# Vorladen verlängert sich die erste Phase (Planner-Call) erheblich oder läuft
+# in einen Timeout. Ein /api/generate mit leerem Prompt zwingt Ollama das Modell
+# zu laden ohne Tokens zu generieren. Im Remote-Mode (OLLAMA_API_KEY gesetzt)
+# entfällt dieser Schritt — der Server hält die Modelle bereits vor.
+
+def _warmup_models() -> None:
+    """Lädt die aktiven lokalen LLMs + das Embedding-Modell in den VRAM."""
+    import requests
+
+    # Eindeutige LLM-Modelle (Analysis/Code/Research können identisch sein)
+    llm_models = list(dict.fromkeys([ACTIVE_ANALYSIS, ACTIVE_CODE, ACTIVE_RESEARCH]))
+
+    console.print(f"  [dim]Warming up {len(llm_models) + 1} local model(s)...[/]", end="")
+    for model in llm_models:
+        try:
+            requests.post(
+                f"{ACTIVE_BASE_URL.rstrip('/')}/api/generate",
+                json={"model": model, "prompt": "", "keep_alive": "30m"},
+                timeout=300,
+            )
+        except Exception as exc:
+            console.print(f"\n  [yellow]⚠[/]  Warmup '{model}' fehlgeschlagen: {exc}")
+
+    # Embedding-Modell (für LanceDB-Memory) separat über /api/embeddings
+    try:
+        requests.post(
+            f"{EMBED_BASE_URL.rstrip('/')}/api/embeddings",
+            json={"model": EMBED_MODEL, "prompt": "warmup", "keep_alive": "30m"},
+            timeout=120,
+        )
+    except Exception as exc:
+        console.print(f"\n  [yellow]⚠[/]  Warmup embed '{EMBED_MODEL}' fehlgeschlagen: {exc}")
+
+    console.print("  [green]ready[/]")
 
 
 # ─── run() ───────────────────────────────────────────────────────────────────
@@ -101,13 +143,18 @@ def run(target: str, objective: str = "", scope: str = "full") -> object:
         f"[bold cyan]AgentScanIT[/]  ·  Agentic Vulnerability Assessment Framework\n\n"
         f"  [dim]Target:[/]     [bold white]{target}[/]\n"
         f"  [dim]Objective:[/]  {objective}\n"
-        f"  [dim]Scope:[/]      [yellow]{scope}[/]   [dim]Model:[/] {MODEL_ANALYSIS}\n"
+        f"  [dim]Scope:[/]      [yellow]{scope}[/]   [dim]Model:[/] {ACTIVE_ANALYSIS}\n"
         f"  [dim]Memory DB:[/]   {db_status}   [dim]Cache:[/] [green]on[/]",
         border_style="cyan",
         expand=False,
         padding=(0, 2),
     ))
     console.print()
+
+    # Local-Mode: Modelle vor dem ersten LLM-Call (Planner) in den VRAM laden.
+    if not OLLAMA_API_KEY:
+        _warmup_models()
+        console.print()
 
     run_start = time.time()
     crew_obj  = scanner.crew(task_callback=_on_task_done)
