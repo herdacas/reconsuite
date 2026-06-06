@@ -13,6 +13,6 @@ _dir = os.path.dirname(os.path.abspath(__file__))
 if _dir not in sys.path:
     sys.path.insert(0, _dir)
 
-from crew import AgentScanITCrew, VALID_SCOPES, PHASE_LABEL, TASK_LABEL, MEMORY_DIR  # noqa: E402
+from crew import AgentScanITCrew, VALID_SCOPES, PHASE_LABEL, MEMORY_DIR  # noqa: E402
 
-__all__ = ["AgentScanITCrew", "VALID_SCOPES", "PHASE_LABEL", "TASK_LABEL", "MEMORY_DIR"]
+__all__ = ["AgentScanITCrew", "VALID_SCOPES", "PHASE_LABEL", "MEMORY_DIR"]
