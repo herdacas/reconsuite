@@ -61,11 +61,14 @@ Pipeline-Reihenfolge: `research → blue → findings → red_scan → red → c
 CVE-IDs durchlaufen zwei Ebenen bevor sie in den Report eingehen:
 
 **1. Pydantic-Validator auf `FindingsOutput` + `RedOutput` (`tasks.py`)**
-- Format-Check: `CVE-YYYY-NNNNN`, Jahr 1999–2030
-- **Trace-Kreuzvalidierung (primär):** ID muss im Raw-Output eines Tool-Calls dieser Session vorkommen. Filtert LLM-Halluzinationen auch wenn die ID formal korrekt ist (z.B. `CVE-2024-1234` existiert, ist aber für WordPress — nicht für das gescannte Target).
-- NVD-Fallback: wenn Trace inaktiv (Unit-Tests), NVD-Existenz-Check.
+- Format-Check only: `CVE-YYYY-NNNNN`, Jahr 1999–2030. Kein Trace/NVD hier.
 
-**2. `interpret_flow.py`**
+**2. Task-Guardrail `_cve_trace_guardrail` auf `findings_task` + `red_task` (`tasks.py`)**
+- **Trace-Kreuzvalidierung (primär):** ID muss im Raw-Output eines Tool-Calls dieser Session vorkommen.
+- NVD-Fallback: wenn Trace inaktiv (Unit-Tests), NVD-Existenz-Check.
+- Bei Failure: Agent bekommt explizites Feedback (`"Halluzinierte CVE-IDs: [...]"`) und kann die Task korrigiert wiederholen (`guardrail_max_retries=2`). Unterschied zum alten Pydantic-Validator: keine stille Verwerfung mehr — der Agent lernt warum IDs abgelehnt werden.
+
+**3. `interpret_flow.py`**
 - Liest ausschließlich strukturierte `cve_references`-Felder aus `findings`- und `red`-Task.
 - Kein Regex-Fallback auf Preview-Text (war Halluzinations-Vektor via reporter_agent-Markdown).
 
