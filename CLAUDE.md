@@ -52,7 +52,7 @@ recon-suite/
 
 Pipeline-Reihenfolge: `research → blue → findings → red_scan → red → coding → report`
 
-Der LLM-Planner wählt anhand von Scope + Objective eine Teilmenge aus.
+`_SCOPE_CEILING` bestimmt welche Tasks verfügbar sind. `Crew(planning=True)` optimiert wie diese Tasks ausgeführt werden (AgentPlanner).
 
 ---
 
@@ -140,9 +140,10 @@ Modell-Auswahl via `models.json` (aus `models.json.example` ableiten).
 - Crew wird bis zu 3× neu gestartet bei `json_invalid`, `ValidationError` oder `Field required`-Fehlern.
 - Crew-Instanz wird jedesmal neu erstellt (inkl. Planner-Aufruf).
 
-### Memory-Patching (main.py)
+### Memory-Patching (crew.py)
 - CrewAI's Memory-Analyse-LLM-Calls werden monkey-gepatcht (keine LLM-Calls bei save/recall).
 - Grund: Pydantic-Validation-Errors + Rate-Limit-Probleme bei gleichzeitigen async-Requests.
+- Patch sitzt in `crew.py:_apply_memory_patches()` — co-located mit der Memory-Konfiguration.
 - Patch-Targets nach CrewAI-Update immer prüfen: `crewai.memory.analyze`, `encoding_flow`, `recall_flow`.
 
 ### CVE-Trefferquote bei Cloudflare/CDN-Targets
@@ -166,6 +167,6 @@ Modell-Auswahl via `models.json` (aus `models.json.example` ableiten).
 - **`run_trace.get_all_raw_outputs()`** — gibt alle Tool-Raw-Outputs der laufenden Session zurück (closed phases + pending). Genutzt vom CVE-Validator während Pydantic-Parsing.
 - **`interpret_agent/nvd.py`** — Thin Shim, re-exportiert aus `agentscanit.tools.nvd`. Nie direkt editieren.
 - **Strict factual outputs** — Task-Prompts verlangen "nur tool-bestätigte Fakten". CVEs nur wenn Tool-Bestätigung im Trace vorhanden.
-- **Planner-Fallback** — Wenn LLM-Planner kein valides JSON liefert, wird scope-ceiling als Fallback genutzt.
+- **`Crew(planning=True, planning_llm=llm_planner)`** — AgentPlanner erstellt vor der ersten Task einen Ausführungsplan. `planning_llm` (`llm_planner`) läuft IMMER lokal (`localhost:11434`, z.B. `qwen2.5:7b-instruct`) — remote Modelle unterstützen Ollama's native function-calling API nicht zuverlässig. `_SCOPE_CEILING` bleibt der Gate-Keeper für welche Tasks überhaupt laufen.
 - **Memory** — LanceDB vector storage, shallow recall erzwungen (`_ShallowMemory`). Warme Runs nutzen Prior-Run-Daten.
 - **reporter_agent max_iter=3** — bewusst niedrig gehalten; der Reporter nutzt keine Tools und soll den Report in einem Durchgang schreiben. Höhere Werte führen zu 400s+ Laufzeiten bei großem Kontext.

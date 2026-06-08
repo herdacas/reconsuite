@@ -40,7 +40,15 @@ EMBED_MODEL     = _m("embed",    "nomic-embed-text")
 EMBED_BASE_URL  = _models_cfg.get("embed_base_url", "http://localhost:11434")
 
 OLLAMA_BASE_URL = _models_cfg.get("ollama_base_url", "http://localhost:11434")
-OLLAMA_API_KEY  = _models_cfg.get("ollama_api_key",  "")
+
+# API-Key normalisieren: Whitespace strippen und bekannte Platzhalter als
+# "kein Key" behandeln. Verhindert dass ein kopierter Example-Platzhalter
+# versehentlich Remote-Mode aktiviert (führt sonst zu HTTP 401 unauthorized).
+_PLACEHOLDER_KEYS = {"", "DEIN_API_KEY_HIER", "YOUR_API_KEY_HERE", "CHANGE_ME"}
+_raw_api_key    = (_models_cfg.get("ollama_api_key", "") or "").strip()
+OLLAMA_API_KEY  = "" if _raw_api_key in _PLACEHOLDER_KEYS else _raw_api_key
+if _raw_api_key in _PLACEHOLDER_KEYS and _raw_api_key != "":
+    print(f"[config] ollama_api_key ist Platzhalter ('{_raw_api_key}') → Local-Mode")
 
 # Temperaturen je Agent-Typ
 TEMP_ANALYSIS   = 0.3   # Blue Agent, Red Agent, Reporter
@@ -52,6 +60,14 @@ TEMP_RESEARCH   = 0.1   # Research Agent, Tool-Selektion
 LOCAL_MODEL_ANALYSIS = _ml("analysis", "qwen2.5-coder:14b")
 LOCAL_MODEL_CODE     = _ml("code",     "qwen2.5-coder:14b")
 LOCAL_MODEL_RESEARCH = _ml("research", "qwen2.5:7b")
+# Planner braucht kein großes Modell — Task-Reihenfolge/Parameter, keine Analyse.
+# Default: gleiches Modell wie Research (7B lokal), überschreibbar via models.json.
+LOCAL_MODEL_PLANNER  = _ml("planner",  LOCAL_MODEL_RESEARCH)
+# Planning LLM always runs locally — Ollama's native tool-calling API works reliably
+# with local qwen2.5:7b. Remote models (gpt-oss) return None/empty from the
+# experimental executor's call_llm_native_tools (native function-calling not supported
+# reliably via the remote Ollama endpoint).
+PLANNER_BASE_URL     = "http://localhost:11434"
 
 # ─── Aktive LLM-Konfiguration (Remote oder Local) ─────────────────────────────
 
@@ -60,11 +76,13 @@ if OLLAMA_API_KEY:
     ACTIVE_ANALYSIS  = MODEL_ANALYSIS
     ACTIVE_CODE      = MODEL_CODE
     ACTIVE_RESEARCH  = MODEL_RESEARCH
+    ACTIVE_PLANNER   = _m("planner", MODEL_ANALYSIS)   # Remote: Default = Analysis
 else:
     ACTIVE_BASE_URL  = "http://localhost:11434"
     ACTIVE_ANALYSIS  = LOCAL_MODEL_ANALYSIS
     ACTIVE_CODE      = LOCAL_MODEL_CODE
     ACTIVE_RESEARCH  = LOCAL_MODEL_RESEARCH
+    ACTIVE_PLANNER   = LOCAL_MODEL_PLANNER              # Local: Default = 7B
 
 # ─── Pfade ────────────────────────────────────────────────────────────────────
 

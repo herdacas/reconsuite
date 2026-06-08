@@ -13,6 +13,7 @@ API docs: https://nvd.nist.gov/developers/vulnerabilities
 import os
 import time
 import requests
+from requests import Session
 from typing import Optional, Type
 
 from crewai.tools import BaseTool
@@ -21,6 +22,16 @@ from pydantic import BaseModel, Field
 NVD_API_URL   = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 _DELAY_NO_KEY  = 6.5   # 5 req / 30s → safe margin between calls
 _DELAY_API_KEY = 0.7   # 50 req / 30s
+
+_SESSION: Optional[Session] = None
+
+
+def _get_session() -> Session:
+    """Return a shared requests.Session for NVD API calls (connection reuse)."""
+    global _SESSION
+    if _SESSION is None:
+        _SESSION = Session()
+    return _SESSION
 
 
 def _api_key() -> Optional[str]:
@@ -85,7 +96,7 @@ def lookup_cve(cve_id: str, api_key: Optional[str] = None) -> dict:
     """
     hdrs = {"apiKey": api_key} if api_key else _headers()
     try:
-        resp = requests.get(
+        resp = _get_session().get(
             NVD_API_URL,
             params={"cveId": cve_id.strip()},
             headers=hdrs,
@@ -122,7 +133,7 @@ def search_nvd(keyword: str, max_results: int = 5) -> list[dict]:
     Returns up to max_results entries sorted by CVSS score descending.
     """
     try:
-        resp = requests.get(
+        resp = _get_session().get(
             NVD_API_URL,
             params={"keywordSearch": keyword, "resultsPerPage": min(max_results, 20)},
             headers=_headers(),

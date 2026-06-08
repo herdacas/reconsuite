@@ -10,6 +10,7 @@ from config import (
     ACTIVE_ANALYSIS, ACTIVE_CODE, ACTIVE_RESEARCH,
     ACTIVE_BASE_URL, OLLAMA_API_KEY,
     TEMP_ANALYSIS, TEMP_CODE, TEMP_RESEARCH,
+    LOCAL_MODEL_PLANNER, PLANNER_BASE_URL,
 )
 # Note: `_run` in tools/_base.py is the subprocess helper. Within tool classes, bare
 # `_run(cmd)` calls that helper; `self._run` is the BaseTool interface method (CrewAI).
@@ -41,7 +42,7 @@ def _step_callback(step_output) -> None:
       → parsed for Rich console summary output only; trace phase is closed in _on_task_done.
     """
     from tools.trace import run_trace
-    import json, re
+    import json
     try:
         # AgentAction: LLM decided to call a tool — store intent for trace merging
         if hasattr(step_output, "tool") and not hasattr(step_output, "return_values"):
@@ -60,10 +61,14 @@ def _step_callback(step_output) -> None:
         try:
             data = json.loads(raw)
         except Exception:
-            match = re.search(r"\{.+\}", raw, re.DOTALL)
-            if match:
+            # Suche erstes { ... letztes } ohne Backtracking-Regex.
+            # Begrenzung auf 4000 chars verhindert CPU-Spike bei großen Outputs.
+            snippet = raw[:4000]
+            j_start = snippet.find("{")
+            j_end   = snippet.rfind("}")
+            if j_start != -1 and j_end > j_start:
                 try:
-                    data = json.loads(match.group())
+                    data = json.loads(snippet[j_start:j_end + 1])
                 except Exception:
                     pass
 
@@ -114,12 +119,26 @@ def _llm(model: str, temperature: float) -> LLM:
     # Disable chain-of-thought for thinking models (Qwen3, gpt-oss, etc.)
     # Applied unconditionally — local Ollama ignores it for non-thinking models,
     # remote thinking models need it to prevent reasoning bleed into JSON outputs.
-    kwargs["extra_body"] = {"think": False}
+    kwargs["extra_body"] = {
+        "think":      False,
+        "keep_alive": "30m",
+        "num_ctx":    8192,
+    }
     return LLM(**kwargs)
 
 llm_analysis = _llm(ACTIVE_ANALYSIS, TEMP_ANALYSIS)
 llm_code     = _llm(ACTIVE_CODE,     TEMP_CODE)
 llm_research = _llm(ACTIVE_RESEARCH, TEMP_RESEARCH)
+
+# Planning LLM is always local — remote models (gpt-oss) don't support Ollama's
+# native function-calling format that CrewPlanner's experimental executor needs.
+# No API key, no think=False: qwen2.5:7b-instruct handles plain JSON generation.
+llm_planner = LLM(
+    model=f"ollama/{LOCAL_MODEL_PLANNER}",
+    base_url=PLANNER_BASE_URL,
+    temperature=0.1,
+    extra_body={"keep_alive": "30m", "num_ctx": 8192},
+)
 
 
 # ─── Agents ───────────────────────────────────────────────────────────────────
