@@ -104,6 +104,10 @@ python3 main.py example.com "CVE-Suche" web   # Objective + Scope
 python3 main.py example.com "SSL/TLS prüfen" ssl
 python3 main.py          # interaktiv
 
+# Flow-Persistence (Phase 4b)
+python3 main.py --list                        # gespeicherte Flow-Runs auflisten
+python3 main.py --resume <flow-id>            # unterbrochenen Run fortsetzen
+
 # Nur Team 1 (Scanner ohne NVD-Enrichment)
 cd agentscanit && python3 main.py example.com
 ```
@@ -116,6 +120,7 @@ Outputs in `logs/`:
 - `final_report_<target>_<ts>.md` — Merged Final Report (Team 3)
 - `workflow_last.json` — letzter Run (überschrieben)
 - `checkpoints/<target>_<ts>/main/*.json` — Checkpoint-Files pro Task (max 3 kept)
+- `flow_state.db` — SQLite-DB mit persistierten Flow-States (alle Runs, `--list`/`--resume`)
 
 ---
 
@@ -154,6 +159,13 @@ Modell-Auswahl via `models.json` (aus `models.json.example` ableiten).
 - Patch sitzt in `crew.py:_apply_memory_patches()` — co-located mit der Memory-Konfiguration.
 - Patch-Targets nach CrewAI-Update immer prüfen: `crewai.memory.analyze`, `encoding_flow`, `recall_flow`.
 
+### Flow-Persistence (`@persist`, flow.py)
+- `ReconSuiteFlow` trägt `@persist(SQLiteFlowPersistence(_FLOW_DB), verbose=False)` — nach jedem abgeschlossenen Flow-Schritt wird der State in `logs/flow_state.db` gespeichert.
+- `ScanState.id` (uuid4) ist der `flow_uuid`-Key in der DB. Wird beim Flow-Start angezeigt und am Ende erneut gedruckt.
+- `--resume <flow-id>`: erstellt neue `ReconSuiteFlow`-Instanz, ruft `flow.kickoff(restore_from_state_id=...)` — Flow lädt State aus DB und überspringt bereits abgeschlossene Schritte.
+- `--list`: liest `flow_states`-Tabelle direkt per `sqlite3` — zeigt letzten Snapshot pro `flow_uuid` sortiert nach Zeitstempel.
+- **Limitation**: Nur Flow-Level-Persistence (zwischen den drei Teams). Intra-Crew-Persistence (zwischen Tasks) läuft weiterhin über `CheckpointConfig` in `crew.py`.
+
 ### CVE-Trefferquote bei Cloudflare/CDN-Targets
 - Bremen.de etc. liefern keine CVEs weil Dienste hinter Cloudflare versteckt sind — kein Bug.
 
@@ -179,3 +191,4 @@ Modell-Auswahl via `models.json` (aus `models.json.example` ableiten).
 - **Memory** — LanceDB vector storage, shallow recall erzwungen (`_ShallowMemory`). Warme Runs nutzen Prior-Run-Daten.
 - **reporter_agent max_iter=3** — bewusst niedrig gehalten; der Reporter nutzt keine Tools und soll den Report in einem Durchgang schreiben. Höhere Werte führen zu 400s+ Laufzeiten bei großem Kontext.
 - **Checkpoint-Resume** — Nach `Crew.from_checkpoint()`: `_guardrails` (PrivateAttr) werden via `object.__setattr__()` re-attached, weil Pydantic validators bei direktem Field-Setzen nicht erneut laufen. `task_callback` wird sowohl auf Crew als auch auf jedem Task gesetzt.
+- **Flow-Persistence** — `@persist(SQLiteFlowPersistence(_FLOW_DB))` als Klassen-Dekorator auf `ReconSuiteFlow` speichert nach jedem Schritt in `logs/flow_state.db`. `ScanState` braucht `id: str = Field(default_factory=lambda: str(uuid4()))`. Resume via `flow.kickoff(restore_from_state_id=state_id)` — lädt State aus DB und überspringt fertige Schritte. `_FLOW_DB` muss vor der Klassendefinition stehen (Dekorator evaluiert bei Import).
