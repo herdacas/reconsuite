@@ -17,6 +17,8 @@
   "local_fallback_models": {
     "analysis": "qwen2.5-coder:14b",
     "code":     "qwen2.5-coder:14b",
-    "research": "qwen2.5:7b"
+    "research": "qwen2.5:7b",
+    "_comment_planner": "Planner laeuft IMMER lokal (localhost:11434), unabhaengig vom Remote/Local-Switch. Benoetigt native Ollama tool-calling API. Default = research-Modell (qwen2.5:7b). Instruct-Variante empfohlen.",
+    "planner":  "qwen2.5:7b-instruct"
   }
 }

@@ -7,9 +7,10 @@ from crewai import Agent, LLM
 from rich.console import Console
 
 from config import (
-    ACTIVE_ANALYSIS, ACTIVE_CODE, ACTIVE_RESEARCH, ACTIVE_PLANNER,
+    ACTIVE_ANALYSIS, ACTIVE_CODE, ACTIVE_RESEARCH,
     ACTIVE_BASE_URL, OLLAMA_API_KEY,
     TEMP_ANALYSIS, TEMP_CODE, TEMP_RESEARCH,
+    LOCAL_MODEL_PLANNER, PLANNER_BASE_URL,
 )
 # Note: `_run` in tools/_base.py is the subprocess helper. Within tool classes, bare
 # `_run(cmd)` calls that helper; `self._run` is the BaseTool interface method (CrewAI).
@@ -128,7 +129,16 @@ def _llm(model: str, temperature: float) -> LLM:
 llm_analysis = _llm(ACTIVE_ANALYSIS, TEMP_ANALYSIS)
 llm_code     = _llm(ACTIVE_CODE,     TEMP_CODE)
 llm_research = _llm(ACTIVE_RESEARCH, TEMP_RESEARCH)
-llm_planner  = _llm(ACTIVE_PLANNER,  0.1)            # niedrige Temp: Planung ist deterministisch
+
+# Planning LLM is always local — remote models (gpt-oss) don't support Ollama's
+# native function-calling format that CrewPlanner's experimental executor needs.
+# No API key, no think=False: qwen2.5:7b-instruct handles plain JSON generation.
+llm_planner = LLM(
+    model=f"ollama/{LOCAL_MODEL_PLANNER}",
+    base_url=PLANNER_BASE_URL,
+    temperature=0.1,
+    extra_body={"keep_alive": "30m", "num_ctx": 8192},
+)
 
 
 # ─── Agents ───────────────────────────────────────────────────────────────────

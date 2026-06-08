@@ -158,10 +158,10 @@ class RunTrace:
         self._phases[phase]["structured_output"] = output
 
     def get_all_raw_outputs(self) -> str:
-        """Return all captured tool raw_outputs as one string — used for CVE trace-validation.
+        """Return all captured tool raw_outputs as one string — used for JSON export.
 
-        Includes both closed phases and pending (current phase) calls so the validator
-        can run during task output parsing (before close_phase is called).
+        Includes both closed phases and pending (current phase) calls.
+        For CVE validation use cve_in_raw_outputs() — it short-circuits on first match.
         """
         parts = []
         for phase_data in self._phases.values():
@@ -170,6 +170,21 @@ class RunTrace:
         for call in self._pending:
             parts.append(call.get("raw_output", ""))
         return "\n".join(parts)
+
+    def cve_in_raw_outputs(self, cve_id: str) -> bool:
+        """Check if a CVE ID appears in any tool's raw output.
+
+        Short-circuits on first match — O(1) typical vs O(N) full-join.
+        Includes both closed phases and pending calls (same coverage as get_all_raw_outputs).
+        """
+        for phase_data in self._phases.values():
+            for call in phase_data["tool_calls"]:
+                if cve_id in call.get("raw_output", ""):
+                    return True
+        for call in self._pending:
+            if cve_id in call.get("raw_output", ""):
+                return True
+        return False
 
     # ── Serialisation ─────────────────────────────────────────────────────────
 

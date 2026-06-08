@@ -29,6 +29,7 @@ from typing import Any
 from config import OLLAMA_API_KEY, ACTIVE_ANALYSIS, ACTIVE_BASE_URL, EMBED_MODEL, EMBED_BASE_URL
 from agents import (
     research_agent, blue_agent, red_agent, coding_agent, reporter_agent,
+    llm_planner,
 )
 from tasks import make_tasks
 
@@ -221,6 +222,8 @@ class AgentScanITCrew:
             agents=self._active_agents,
             tasks=self._active_tasks,
             process=Process.sequential,
+            planning=True,
+            planning_llm=llm_planner,
             memory=_crew_memory,
             cache=True,
             verbose=False,
