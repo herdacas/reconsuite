@@ -20,11 +20,12 @@ Als Flow-Crew:
 import logging
 import os
 from pathlib import Path
+from typing import Any
 
 from crewai import Crew, Process
 from crewai.memory import Memory
 from crewai.memory.storage.lancedb_storage import LanceDBStorage
-from typing import Any
+from crewai.state.checkpoint_config import CheckpointConfig
 
 from config import OLLAMA_API_KEY, ACTIVE_ANALYSIS, ACTIVE_BASE_URL, EMBED_MODEL, EMBED_BASE_URL
 from agents import (
@@ -207,18 +208,31 @@ class AgentScanITCrew:
         self.objective   = objective or f"Full vulnerability assessment of {target}"
         self._active_tasks:  list = []
         self._active_agents: list = []
-        self._task_label: dict = {}   # id(task) → name, built per-run in crew()
+        self._task_label:    dict  = {}   # id(task) → name, built per-run in crew()
+        self._checkpoint_dir: Path | None = None
 
-    def crew(self, task_callback=None) -> Crew:
+    def crew(self, task_callback=None, checkpoint_dir: Path | None = None) -> Crew:
         """Ruft den Planner auf, assembliert die Crew und gibt sie zurück.
 
-        task_callback: optionale Funktion die nach jeder Phase aufgerufen wird.
+        task_callback:   optionale Funktion die nach jeder Phase aufgerufen wird.
+        checkpoint_dir:  Verzeichnis für Checkpoint-Files; None = kein Checkpointing.
         Nach dem Aufruf sind self.pipeline und self.task_label verfügbar.
         """
         self._active_tasks, self._active_agents, self._task_label = plan_tasks(
             self.target, self.objective, self.scope
         )
-        return Crew(
+        self._checkpoint_dir = checkpoint_dir
+
+        checkpoint = None
+        if checkpoint_dir is not None:
+            checkpoint_dir.mkdir(parents=True, exist_ok=True)
+            checkpoint = CheckpointConfig(
+                location=str(checkpoint_dir),
+                on_events=["task_completed"],
+                max_checkpoints=3,
+            )
+
+        crew_kwargs: dict = dict(
             agents=self._active_agents,
             tasks=self._active_tasks,
             process=Process.sequential,
@@ -229,6 +243,10 @@ class AgentScanITCrew:
             verbose=False,
             task_callback=task_callback,
         )
+        if checkpoint is not None:
+            crew_kwargs["checkpoint"] = checkpoint
+
+        return Crew(**crew_kwargs)
 
     @property
     def pipeline(self) -> list[str]:

@@ -115,6 +115,7 @@ Outputs in `logs/`:
 - `interpret_<target>_<ts>.md` — NVD-Enrichment-Report (Team 2)
 - `final_report_<target>_<ts>.md` — Merged Final Report (Team 3)
 - `workflow_last.json` — letzter Run (überschrieben)
+- `checkpoints/<target>_<ts>/main/*.json` — Checkpoint-Files pro Task (max 3 kept)
 
 ---
 
@@ -139,9 +140,12 @@ Modell-Auswahl via `models.json` (aus `models.json.example` ableiten).
 ### think: False (agents.py)
 - `extra_body={"think": False}` wird bedingungslos gesetzt — lokales Ollama ignoriert es für nicht-thinking-Modelle, remote-Modelle (Qwen3, gpt-oss) benötigen es.
 
-### JSON/Schema-Retry-Logik (main.py)
-- Crew wird bis zu 3× neu gestartet bei `json_invalid`, `ValidationError` oder `Field required`-Fehlern.
-- Crew-Instanz wird jedesmal neu erstellt (inkl. Planner-Aufruf).
+### Checkpoint + Retry-Logik (main.py / crew.py)
+- `Crew(checkpoint=CheckpointConfig(...))` speichert nach jeder abgeschlossenen Task einen Snapshot unter `logs/checkpoints/<target>_<ts>/main/*.json` (max 3 behalten).
+- Bei `json_invalid`, `ValidationError` oder `Field required`-Fehlern: bis zu 3 Retries.
+  - Wenn ≥1 Phase abgeschlossen: Checkpoint-Resume via `Crew.from_checkpoint()` — überspringt bereits erledigte Phasen.
+  - Callables (guardrails, task_callback) werden beim Checkpoint-Serialisieren gedroppt und nach dem Restore manuell re-attached.
+  - Fallback bei fehlgeschlagenem Restore: Vollneustart mit frischer Crew-Instanz.
 
 ### Memory-Patching (crew.py)
 - CrewAI's Memory-Analyse-LLM-Calls werden monkey-gepatcht (keine LLM-Calls bei save/recall).
@@ -173,3 +177,4 @@ Modell-Auswahl via `models.json` (aus `models.json.example` ableiten).
 - **`Crew(planning=True, planning_llm=llm_planner)`** — AgentPlanner erstellt vor der ersten Task einen Ausführungsplan. `planning_llm` (`llm_planner`) läuft IMMER lokal (`localhost:11434`, z.B. `qwen2.5:7b-instruct`) — remote Modelle unterstützen Ollama's native function-calling API nicht zuverlässig. `_SCOPE_CEILING` bleibt der Gate-Keeper für welche Tasks überhaupt laufen.
 - **Memory** — LanceDB vector storage, shallow recall erzwungen (`_ShallowMemory`). Warme Runs nutzen Prior-Run-Daten.
 - **reporter_agent max_iter=3** — bewusst niedrig gehalten; der Reporter nutzt keine Tools und soll den Report in einem Durchgang schreiben. Höhere Werte führen zu 400s+ Laufzeiten bei großem Kontext.
+- **Checkpoint-Resume** — Nach `Crew.from_checkpoint()`: `_guardrails` (PrivateAttr) werden via `object.__setattr__()` re-attached, weil Pydantic validators bei direktem Field-Setzen nicht erneut laufen. `task_callback` wird sowohl auf Crew als auch auf jedem Task gesetzt.

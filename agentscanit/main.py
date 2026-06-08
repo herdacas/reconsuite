@@ -26,6 +26,7 @@ import os
 import time
 import textwrap
 from datetime import datetime
+from pathlib import Path
 
 # Memory patches (suppress LLM-analysis calls + log noise) are applied in
 # crew.py via _apply_memory_patches() at import time — co-located with the
@@ -52,15 +53,17 @@ console = Console()
 # Modulebene erforderlich — Pydantic serialisiert task_callback und akzeptiert
 # keine Lambdas oder nested functions.
 
-_tp_pipeline: list[str]   = []
-_tp_timing:   list[float] = []
-_tp_idx:      list[int]   = [0]
+_tp_pipeline:      list[str]   = []
+_tp_timing:        list[float] = []
+_tp_idx:           list[int]   = [0]
+_completed_labels: set[str]    = set()   # task-Namen die in dieser Session abgeschlossen sind
 
 
 def _reset_task_progress(pipeline: list[str], start_time: float) -> None:
     _tp_pipeline.clear();  _tp_pipeline.extend(pipeline)
     _tp_timing.clear();    _tp_timing.append(start_time)
     _tp_idx.clear();       _tp_idx.append(0)
+    _completed_labels.clear()
 
 
 def _on_task_done(output) -> None:
@@ -70,6 +73,7 @@ def _on_task_done(output) -> None:
     elapsed = now - _tp_timing[0]
     _tp_timing[0] = now
     _tp_idx[0]   += 1
+    _completed_labels.add(label)
     run_trace.close_phase(label)
     console.print(f"  [green]✓[/]  [bold]{PHASE_LABEL.get(label, label):<26}[/] [dim]{elapsed:>5.0f}s[/]")
 
@@ -161,8 +165,12 @@ def run(target: str, objective: str = "", scope: str = "full") -> object:
         _warmup_models()
         console.print()
 
+    _run_ts      = datetime.now().strftime("%Y%m%d_%H%M%S")
+    _safe_target = re.sub(r"[^\w.-]", "_", target)
+    checkpoint_dir = Path(LOG_DIR) / "checkpoints" / f"{_safe_target}_{_run_ts}"
+
     run_start = time.time()
-    crew_obj  = scanner.crew(task_callback=_on_task_done)
+    crew_obj  = scanner.crew(task_callback=_on_task_done, checkpoint_dir=checkpoint_dir)
     pipeline  = scanner.pipeline
     run_trace.activate(target, objective, scope, pipeline)
 
@@ -189,9 +197,57 @@ def run(target: str, objective: str = "", scope: str = "full") -> object:
                 "Field required"  in exc_str
             )
             if _is_schema_err and _attempt < 2:
-                console.print(f"  [yellow]⚠[/]  LLM schema error — retry {_attempt + 2}/3...")
-                crew_obj = scanner.crew(task_callback=_on_task_done)
-                _reset_task_progress(scanner.pipeline, time.time())
+                _n_done  = len(_completed_labels)
+                _resumed = False
+
+                # Checkpoint-Resume: wenn mindestens eine Phase abgeschlossen ist,
+                # versuche die Crew aus dem letzten Checkpoint wiederherzustellen.
+                if _n_done > 0:
+                    _ckpt_main = checkpoint_dir / "main"
+                    if _ckpt_main.exists():
+                        _ckpt_files = sorted(
+                            _ckpt_main.glob("*.json"),
+                            key=lambda p: p.stat().st_mtime,
+                        )
+                        if _ckpt_files:
+                            try:
+                                from crewai import Crew as _CrewCls
+                                from crewai.state.checkpoint_config import CheckpointConfig as _CC
+                                from tasks import FindingsOutput, RedOutput, _cve_trace_guardrail
+                                _restored = _CrewCls.from_checkpoint(
+                                    _CC(restore_from=str(_ckpt_files[-1]))
+                                )
+                                # Re-attach callbacks — non-serializable, dropped by checkpoint
+                                _restored.task_callback = _on_task_done
+                                for _t in _restored.tasks:
+                                    _t.callback = _on_task_done
+                                # Re-attach CVE guardrails — callables dropped by checkpoint
+                                for _t in _restored.tasks:
+                                    _op = getattr(_t, "output_pydantic", None)
+                                    if _op in (FindingsOutput, RedOutput):
+                                        _t.guardrails = [_cve_trace_guardrail]
+                                        object.__setattr__(_t, "_guardrails", [_cve_trace_guardrail])
+                                        object.__setattr__(_t, "_guardrail",  None)
+                                crew_obj = _restored
+                                _resumed = True
+                                console.print(
+                                    f"  [cyan]↻[/]  Checkpoint-Resume — "
+                                    f"{_n_done}/{len(scanner.pipeline)} Phase(n) übersprungen, "
+                                    f"weiter ab Fehlerphase... (Versuch {_attempt + 2}/3)"
+                                )
+                                _reset_task_progress(scanner.pipeline, time.time())
+                            except Exception as _ckpt_err:
+                                console.print(
+                                    f"  [yellow]⚠[/]  Checkpoint-Resume fehlgeschlagen "
+                                    f"({type(_ckpt_err).__name__}) — Vollneustart"
+                                )
+
+                if not _resumed:
+                    console.print(
+                        f"  [yellow]⚠[/]  LLM schema error — retry {_attempt + 2}/3 (Vollneustart)..."
+                    )
+                    crew_obj = scanner.crew(task_callback=_on_task_done, checkpoint_dir=checkpoint_dir)
+                    _reset_task_progress(scanner.pipeline, time.time())
             else:
                 raise
 
@@ -199,7 +255,12 @@ def run(target: str, objective: str = "", scope: str = "full") -> object:
     console.print()
     console.print(Rule(style="dim"))
 
-    _save_outputs(result, target, objective, scope, scanner._active_tasks, scanner.task_label, total_time, has_prior_data)
+    _save_outputs(
+        result, target, objective, scope,
+        scanner._active_tasks, scanner.task_label,
+        total_time, has_prior_data,
+        checkpoint_dir=checkpoint_dir,
+    )
     return result
 
 
@@ -214,6 +275,7 @@ def _save_outputs(
     task_label: dict,
     total_time: float = 0.0,
     has_prior_data: bool = False,
+    checkpoint_dir: Path | None = None,
 ) -> None:
     _now        = datetime.now()
     ts          = _now.strftime("%Y%m%d_%H%M%S")
@@ -355,6 +417,10 @@ def _save_outputs(
     if trace_path:
         table.add_row("Trace",     f"[dim]{trace_path}[/]  [dim](tool calls + raw output)[/]")
     table.add_row("Memory DB", f"[dim]{MEMORY_DIR / 'lancedb'}[/]  [dim](persisted — reused on next run)[/]")
+    if checkpoint_dir is not None:
+        _ckpt_main = checkpoint_dir / "main"
+        if _ckpt_main.exists() and any(_ckpt_main.glob("*.json")):
+            table.add_row("Checkpoints", f"[dim]{checkpoint_dir}[/]  [dim](per-task recovery files)[/]")
     hit_label = (
         "[green]hit[/] [dim](prior run data was available for this target)[/]"
         if memory_hit else
