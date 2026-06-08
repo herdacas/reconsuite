@@ -218,12 +218,15 @@ class AgentScanITCrew:
         self._active_tasks, self._active_agents, self._task_label = plan_tasks(
             self.target, self.objective, self.scope
         )
+        # AgentPlanner works reliably only with remote capable models.
+        # Local Ollama models can't produce the structured plan format it expects.
+        _planning = bool(OLLAMA_API_KEY)
         return Crew(
             agents=self._active_agents,
             tasks=self._active_tasks,
             process=Process.sequential,
-            planning=True,
-            planning_llm=llm_analysis,
+            planning=_planning,
+            planning_llm=llm_analysis if _planning else None,
             memory=_crew_memory,
             cache=True,
             verbose=False,
