@@ -19,9 +19,71 @@ Inputs für kickoff():
                 full    → alle verfügbaren Tools (vollständiges Assessment)
 """
 
+import re as _re
+
 from crewai import Task
 from pydantic import BaseModel, Field, field_validator
 from typing import Any, List, Dict, Optional
+
+# ─── CVE-Format-Validator + Guardrail ─────────────────────────────────────────
+
+_CVE_FMT = _re.compile(r'^CVE-(\d{4})-(\d{4,7})$', _re.IGNORECASE)
+
+
+def _filter_cve_format(cves: List[str]) -> List[str]:
+    """Format-only check: CVE-YYYY-NNNNN, year 1999–2030. No trace/NVD checks."""
+    return [
+        c.strip().upper() for c in cves
+        if (m := _CVE_FMT.match(c.strip())) and 1999 <= int(m.group(1)) <= 2030
+    ]
+
+
+def _cve_trace_guardrail(output: Any) -> tuple[bool, Any]:
+    """Guardrail: CVE-IDs gegen Session-Trace validieren — Agent erhält Feedback.
+
+    Trace cross-check (primär): ID muss im Raw-Output eines Tool-Calls erscheinen.
+    NVD-Fallback: wenn Trace inaktiv (Unit-Tests), prüft NVD-Existenz.
+    Bei Failure bekommt der Agent die halluzinierten IDs explizit zurückgemeldet
+    und kann die Task korrigiert wiederholen (guardrail_max_retries=2).
+    """
+    pydantic_out = getattr(output, "pydantic", None)
+    if not pydantic_out:
+        return True, output
+    cves = getattr(pydantic_out, "cve_references", None)
+    if not cves:
+        return True, output
+
+    # 1 — Trace cross-check
+    try:
+        from tools.trace import run_trace
+        if run_trace.is_active:
+            confirmed    = [c for c in cves if run_trace.cve_in_raw_outputs(c)]
+            hallucinated = [c for c in cves if c not in confirmed]
+            if hallucinated:
+                return False, (
+                    f"Halluzinierte CVE-IDs: {hallucinated} erscheinen in keinem "
+                    f"Tool-Output dieser Session. Entferne sie aus 'cve_references'. "
+                    f"Tool-bestätigt: {confirmed if confirmed else 'keine'}"
+                )
+            return True, output
+    except Exception:
+        pass
+
+    # 2 — NVD-Fallback (Trace inaktiv, z.B. Unit-Tests)
+    try:
+        from tools.nvd import fetch_cves
+        results      = fetch_cves(cves)
+        confirmed    = [r["id"] for r in results if "error" not in r]
+        hallucinated = [c for c in cves if c not in confirmed]
+        if hallucinated:
+            return False, (
+                f"NVD-Fallback: {hallucinated} nicht in NVD gefunden. "
+                f"Entferne diese IDs aus 'cve_references'."
+            )
+    except Exception:
+        pass
+
+    return True, output
 
 
 # ─── Output-Modelle ───────────────────────────────────────────────────────────
@@ -66,44 +128,8 @@ class FindingsOutput(BaseModel):
 
     @field_validator("cve_references")
     @classmethod
-    def validate_cve_references(cls, v: List[str]) -> List[str]:
-        import re, logging
-        log = logging.getLogger(__name__)
-
-        # Step 1: format check — CVE-YYYY-NNNNN, year 1999–2030, 4–7 digits
-        fmt = re.compile(r'^CVE-(\d{4})-(\d{4,7})$', re.IGNORECASE)
-        formatted = []
-        for cid in v:
-            m = fmt.match(cid.strip())
-            if m and 1999 <= int(m.group(1)) <= 2030:
-                formatted.append(cid.strip().upper())
-        if not formatted:
-            return []
-
-        # Step 2: trace cross-check — only allow IDs that appeared in a tool's raw output.
-        # Uses cve_in_raw_outputs() for per-CVE early-exit instead of full string join.
-        try:
-            from tools.trace import run_trace
-            if run_trace.is_active:
-                trace_confirmed = [cid for cid in formatted if run_trace.cve_in_raw_outputs(cid)]
-                removed = [cid for cid in formatted if cid not in trace_confirmed]
-                if removed:
-                    log.warning("CVE hallucination filter (trace): removed %s", removed)
-                return trace_confirmed
-        except Exception:
-            pass
-
-        # Step 3: NVD fallback — used when trace is unavailable (unit tests, direct invocation).
-        try:
-            from tools.nvd import fetch_cves
-            results  = fetch_cves(formatted)
-            confirmed = [r["id"] for r in results if "error" not in r]
-            removed   = [cid for cid in formatted if cid not in confirmed]
-            if removed:
-                log.warning("CVE hallucination filter (NVD): removed %s", removed)
-            return confirmed
-        except Exception:
-            return formatted
+    def validate_cve_format(cls, v: List[str]) -> List[str]:
+        return _filter_cve_format(v)
 
 
 class RedScanOutput(BaseModel):
@@ -122,10 +148,10 @@ class RedOutput(BaseModel):
         description="CVE IDs confirmed by searchsploit or DDG tool output in this task.",
     )
 
-    # Reuse the same trace + NVD validator as FindingsOutput.
-    validate_cve_references = field_validator("cve_references", mode="before")(
-        FindingsOutput.__dict__["validate_cve_references"].__func__
-    )
+    @field_validator("cve_references")
+    @classmethod
+    def validate_cve_format(cls, v: List[str]) -> List[str]:
+        return _filter_cve_format(v)
 
 
 class CodingOutput(BaseModel):
@@ -283,6 +309,8 @@ def make_tasks() -> dict:
             "faktische Zusammenfassung der beobachteten Findings."
         ),
         output_pydantic=FindingsOutput,
+        guardrails=[_cve_trace_guardrail],
+        guardrail_max_retries=2,
         agent=research_agent,
         context=[blue],
     )
@@ -345,6 +373,8 @@ def make_tasks() -> dict:
             "welche PoCs DDG zurückgegeben hat — nichts darüber hinaus."
         ),
         output_pydantic=RedOutput,
+        guardrails=[_cve_trace_guardrail],
+        guardrail_max_retries=2,
         agent=red_agent,
         context=[blue, findings],
     )
