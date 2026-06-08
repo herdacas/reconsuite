@@ -26,6 +26,7 @@ from crewai import Crew, Process
 from crewai.memory import Memory
 from crewai.memory.storage.lancedb_storage import LanceDBStorage
 from crewai.state.checkpoint_config import CheckpointConfig
+from pydantic import model_serializer
 
 from config import OLLAMA_API_KEY, ACTIVE_ANALYSIS, ACTIVE_BASE_URL, EMBED_MODEL, EMBED_BASE_URL
 from agents import (
@@ -102,7 +103,19 @@ class _ShallowMemory(Memory):
     finds the rare '/security' sub-scope, so the WHERE filter excludes almost
     all rows. Shallow recall skips list_scopes entirely and does a direct
     vector search over all rows — which is exactly what we need.
+
+    Checkpoint-safe: JSON serialization returns False (a valid Memory | bool value)
+    so that checkpoint writes succeed despite LanceDBStorage being non-serializable.
+    The restored Crew has memory=False (cold memory, no storage) — task outputs are
+    still fully restored; only warm-start recall is unavailable in the retried run.
     """
+
+    @model_serializer(mode='plain', when_used='json')
+    def _serialize_for_checkpoint(self) -> bool:
+        # LanceDBStorage is not JSON-serializable.
+        # Return False so Crew.checkpoint writes succeed; on restore the Crew field
+        # `memory: Memory | bool` accepts False, giving a cold-memory retry run.
+        return False
 
     def recall(self, query: str, **kwargs: Any) -> list:
         kwargs["depth"] = "shallow"

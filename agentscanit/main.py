@@ -191,12 +191,13 @@ def run(target: str, objective: str = "", scope: str = "full") -> object:
             break
         except Exception as _exc:
             exc_str = str(_exc)
-            _is_schema_err = (
-                "json_invalid"    in exc_str or
-                "ValidationError" in exc_str or
-                "Field required"  in exc_str
+            _is_retryable = (
+                "json_invalid"                          in exc_str or
+                "ValidationError"                       in exc_str or
+                "Field required"                        in exc_str or
+                "ended without reaching a final answer" in exc_str
             )
-            if _is_schema_err and _attempt < 2:
+            if _is_retryable and _attempt < 2:
                 _n_done  = len(_completed_labels)
                 _resumed = False
 
@@ -244,7 +245,7 @@ def run(target: str, objective: str = "", scope: str = "full") -> object:
 
                 if not _resumed:
                     console.print(
-                        f"  [yellow]⚠[/]  LLM schema error — retry {_attempt + 2}/3 (Vollneustart)..."
+                        f"  [yellow]⚠[/]  LLM error — retry {_attempt + 2}/3 (Vollneustart)..."
                     )
                     crew_obj = scanner.crew(task_callback=_on_task_done, checkpoint_dir=checkpoint_dir)
                     _reset_task_progress(scanner.pipeline, time.time())
