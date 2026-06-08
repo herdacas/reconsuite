@@ -10,6 +10,7 @@ Set NVD_API_KEY env var for 50 req/30s.
 API docs: https://nvd.nist.gov/developers/vulnerabilities
 """
 
+import asyncio
 import os
 import time
 import requests
@@ -181,6 +182,35 @@ class NvdSearchTool(BaseTool):
         t0 = _time.time()
 
         results = search_nvd(keyword, max_results=max_results)
+
+        if not results or "error" in results[0]:
+            err = results[0].get("error", "no results") if results else "no results"
+            out = f"[NVD] Keine CVEs gefunden für '{keyword}': {err}"
+            run_trace.record_execution(["nvd_cve_search", keyword], out, _time.time() - t0)
+            return out
+
+        lines = [f"[NVD] CVEs für '{keyword}' ({len(results)} Treffer):"]
+        for r in results:
+            sev   = r.get("cvss_severity") or "N/A"
+            score = r.get("cvss_score") or "N/A"
+            desc  = (r.get("description") or "")[:200]
+            lines.append(
+                f"\n{r['id']} — CVSS {score} ({sev})\n"
+                f"  Published: {r.get('published', 'N/A')}\n"
+                f"  {desc}"
+            )
+
+        out = "\n".join(lines)
+        run_trace.record_execution(["nvd_cve_search", keyword], out, _time.time() - t0)
+        return out
+
+    async def _arun(self, keyword: str, max_results: int = 5) -> str:
+        import time as _time
+        from tools.trace import run_trace
+        t0 = _time.time()
+
+        # Run blocking HTTP call in thread pool — non-blocking for async callers
+        results = await asyncio.to_thread(search_nvd, keyword, max_results)
 
         if not results or "error" in results[0]:
             err = results[0].get("error", "no results") if results else "no results"
