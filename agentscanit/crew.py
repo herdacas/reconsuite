@@ -80,6 +80,26 @@ def _apply_memory_patches() -> None:
     except Exception:
         pass
 
+    # Patch checkpoint_listener._do_checkpoint to catch PyO3 PanicException.
+    # CrewAI's event_record dict is mutated concurrently while the checkpoint
+    # serializer iterates it → "dictionary changed size during iteration" Rust
+    # panic → pyo3_runtime.PanicException(BaseException). CrewAI's handler only
+    # catches Exception, so the panic propagates and crashes the checkpoint thread.
+    # Our patch swallows it as a no-op (checkpoint skipped, not fatal).
+    try:
+        from crewai.state import checkpoint_listener as _cl
+        _orig_do_ckpt = _cl._do_checkpoint
+
+        def _safe_do_checkpoint(state: Any, cfg: Any, event: Any = None) -> None:
+            try:
+                _orig_do_ckpt(state, cfg, event)
+            except BaseException:
+                pass  # PanicException from PyO3/Rust race condition — skip this checkpoint
+
+        _cl._do_checkpoint = _safe_do_checkpoint
+    except Exception:
+        pass
+
 
 _apply_memory_patches()
 
