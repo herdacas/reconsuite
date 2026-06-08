@@ -82,14 +82,14 @@ def _on_task_done(output) -> None:
 # entfällt dieser Schritt — der Server hält die Modelle bereits vor.
 
 def _warmup_models() -> None:
-    """Lädt die aktiven lokalen LLMs + das Embedding-Modell in den VRAM."""
+    """Lädt die aktiven lokalen LLMs + das Embedding-Modell parallel in den VRAM."""
     import requests
+    import concurrent.futures
 
-    # Eindeutige LLM-Modelle (Analysis/Code/Research können identisch sein)
     llm_models = list(dict.fromkeys([ACTIVE_ANALYSIS, ACTIVE_CODE, ACTIVE_RESEARCH]))
+    console.print(f"  [dim]Warming up {len(llm_models) + 1} local model(s) (parallel)...[/]", end="")
 
-    console.print(f"  [dim]Warming up {len(llm_models) + 1} local model(s)...[/]", end="")
-    for model in llm_models:
+    def _load_llm(model: str) -> None:
         try:
             requests.post(
                 f"{ACTIVE_BASE_URL.rstrip('/')}/api/generate",
@@ -99,15 +99,20 @@ def _warmup_models() -> None:
         except Exception as exc:
             console.print(f"\n  [yellow]⚠[/]  Warmup '{model}' fehlgeschlagen: {exc}")
 
-    # Embedding-Modell (für LanceDB-Memory) separat über /api/embeddings
-    try:
-        requests.post(
-            f"{EMBED_BASE_URL.rstrip('/')}/api/embeddings",
-            json={"model": EMBED_MODEL, "prompt": "warmup", "keep_alive": "30m"},
-            timeout=120,
-        )
-    except Exception as exc:
-        console.print(f"\n  [yellow]⚠[/]  Warmup embed '{EMBED_MODEL}' fehlgeschlagen: {exc}")
+    def _load_embed() -> None:
+        try:
+            requests.post(
+                f"{EMBED_BASE_URL.rstrip('/')}/api/embeddings",
+                json={"model": EMBED_MODEL, "prompt": "warmup", "keep_alive": "30m"},
+                timeout=120,
+            )
+        except Exception as exc:
+            console.print(f"\n  [yellow]⚠[/]  Warmup embed '{EMBED_MODEL}' fehlgeschlagen: {exc}")
+
+    with concurrent.futures.ThreadPoolExecutor() as pool:
+        futs = [pool.submit(_load_llm, m) for m in llm_models]
+        futs.append(pool.submit(_load_embed))
+        concurrent.futures.wait(futs)
 
     console.print("  [green]ready[/]")
 
@@ -210,8 +215,9 @@ def _save_outputs(
     total_time: float = 0.0,
     has_prior_data: bool = False,
 ) -> None:
-    ts          = datetime.now().strftime("%Y%m%d_%H%M%S")
-    ts_readable = datetime.now().strftime("%Y-%m-%d %H:%M")
+    _now        = datetime.now()
+    ts          = _now.strftime("%Y%m%d_%H%M%S")
+    ts_readable = _now.strftime("%Y-%m-%d %H:%M")
     safe_target = re.sub(r"[^\w.-]", "_", target)
 
     task_outputs: dict = {}
@@ -244,12 +250,18 @@ def _save_outputs(
         if hasattr(t, "pydantic") and t.pydantic and hasattr(t.pydantic, "code"):
             code_raw = t.pydantic.code or ""
         if not code_raw and hasattr(t, "raw"):
-            code_raw = t.raw or ""
+            raw = (t.raw or "").strip()
+            # Model often wraps JSON in ```json...``` fences — strip and parse
+            stripped = re.sub(r"^```(?:json)?\s*\n?", "", raw)
+            stripped = re.sub(r"\n?```\s*$", "", stripped).strip()
+            try:
+                code_raw = json.loads(stripped).get("code", "") or ""
+            except Exception:
+                code_raw = raw
     if code_raw:
+        # Strip Python code fences if the code field itself contains them
         code_raw = re.sub(r"^```(?:python)?\n?", "", code_raw.strip())
         code_raw = re.sub(r"\n?```$", "", code_raw).strip()
-        if code_raw.startswith("{") and '"code"' not in code_raw[:50]:
-            code_raw = ""
     if code_raw:
         py_path = os.path.join(SCAN_DIR, f"scan_{safe_target}_{ts}.py")
         with open(py_path, "w", encoding="utf-8") as f:

@@ -81,11 +81,11 @@ class FindingsOutput(BaseModel):
             return []
 
         # Step 2: trace cross-check — only allow IDs that appeared in a tool's raw output.
+        # Uses cve_in_raw_outputs() for per-CVE early-exit instead of full string join.
         try:
             from tools.trace import run_trace
             if run_trace.is_active:
-                all_outputs = run_trace.get_all_raw_outputs()
-                trace_confirmed = [cid for cid in formatted if cid in all_outputs]
+                trace_confirmed = [cid for cid in formatted if run_trace.cve_in_raw_outputs(cid)]
                 removed = [cid for cid in formatted if cid not in trace_confirmed]
                 if removed:
                     log.warning("CVE hallucination filter (trace): removed %s", removed)
@@ -356,17 +356,18 @@ def make_tasks() -> dict:
             "die der Blue Agent ausgeführt hat.\n"
             "NUR die tatsächlich verwendeten Tools abbilden – kein generisches Template.\n"
             "Fehlerbehandlung und Logging hinzufügen.\n\n"
-            "WICHTIG für das Output-Schema:\n"
-            "- 'filename': z.B. 'scan_ssl_rastede.py'\n"
-            "- 'code': der VOLLSTÄNDIGE Python-Code als String (kein Markdown, keine Backticks)\n"
+            "AUSGABE-FORMAT: Antworte mit einem einzigen rohen JSON-Objekt.\n"
+            "KEIN ```json ... ``` drumherum. KEIN Markdown. Nur das JSON-Objekt selbst.\n\n"
+            "Schema:\n"
+            "- 'filename': z.B. 'scan_heise.py'\n"
+            "- 'code': der VOLLSTÄNDIGE Python-Code als String (kein Markdown, keine Backticks im Code)\n"
             "- 'code_plan': Liste der Schritte die der Code abbildet\n"
             "- 'syntax_valid': true wenn der Code syntaktisch korrekt ist"
         ),
         expected_output=(
-            "CodingOutput mit vollständigem Python-Code im 'code'-Feld, "
+            "Rohes JSON-Objekt (KEIN Markdown-Wrapper) mit vollständigem Python-Code im 'code'-Feld, "
             "Dateiname und Schritt-Liste."
         ),
-        output_pydantic=CodingOutput,
         agent=coding_agent,
         context=[blue, red],
     )
