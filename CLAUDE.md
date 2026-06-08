@@ -142,10 +142,11 @@ Modell-Auswahl via `models.json` (aus `models.json.example` ableiten).
 
 ### Checkpoint + Retry-Logik (main.py / crew.py)
 - `Crew(checkpoint=CheckpointConfig(...))` speichert nach jeder abgeschlossenen Task einen Snapshot unter `logs/checkpoints/<target>_<ts>/main/*.json` (max 3 behalten).
-- Bei `json_invalid`, `ValidationError` oder `Field required`-Fehlern: bis zu 3 Retries.
+- Bei `json_invalid`, `ValidationError`, `Field required` oder `ended without reaching a final answer`-Fehlern: bis zu 3 Retries.
   - Wenn ≥1 Phase abgeschlossen: Checkpoint-Resume via `Crew.from_checkpoint()` — überspringt bereits erledigte Phasen.
   - Callables (guardrails, task_callback) werden beim Checkpoint-Serialisieren gedroppt und nach dem Restore manuell re-attached.
   - Fallback bei fehlgeschlagenem Restore: Vollneustart mit frischer Crew-Instanz.
+- **CrewAI-Checkpoint-Limitation**: Checkpoint-Writes schlagen silently fehl wenn die event_record-Serialisierung in eine PyO3 Race-Condition läuft (concurrent Dict-Mutation während der Serializer iteriert → `PanicException(BaseException)`). Der Panic wird von unserem Patch in `_apply_memory_patches()` abgefangen — Scan läuft weiter, Checkpoint wird für diese Task übersprungen. Phasen mit wenigen Tool-Calls (z.B. Report) schreiben trotzdem zuverlässig Checkpoints.
 
 ### Memory-Patching (crew.py)
 - CrewAI's Memory-Analyse-LLM-Calls werden monkey-gepatcht (keine LLM-Calls bei save/recall).
