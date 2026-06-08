@@ -13,12 +13,13 @@ Routing nach dem Scan:
 
 Usage:
     python3 flow.py example.com "full assessment" full
-    from flow import run_flow
+    from flow import run_flow, resume_flow
 """
 
 import sys
 import os
 import json
+from uuid import uuid4
 
 # ── Teams registrieren ─────────────────────────────────────────────────────────
 _SUITE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -31,16 +32,22 @@ import reporting as _reporting             # Verzeichnis: reporting/
 
 from pydantic import BaseModel, Field
 from crewai.flow.flow import Flow, start, listen, router
+from crewai.flow.persistence import persist, SQLiteFlowPersistence
 from rich.console import Console
 from rich.prompt import Prompt
 
 LOG_DIR = os.path.join(_SUITE_DIR, "logs")
+os.makedirs(LOG_DIR, exist_ok=True)
+
+_FLOW_DB = os.path.join(LOG_DIR, "flow_state.db")
+
 console = Console()
 
 
 # ─── State ────────────────────────────────────────────────────────────────────
 
 class ScanState(BaseModel):
+    id:                str        = Field(default_factory=lambda: str(uuid4()))
     target:            str        = ""
     objective:         str        = ""
     scope:             str        = "full"
@@ -55,6 +62,7 @@ class ScanState(BaseModel):
 
 # ─── Flow ─────────────────────────────────────────────────────────────────────
 
+@persist(SQLiteFlowPersistence(_FLOW_DB), verbose=False)
 class ReconSuiteFlow(Flow[ScanState]):
     """Master-Flow: agentscanit → interpret-agent → reporting."""
 
@@ -128,23 +136,39 @@ class ReconSuiteFlow(Flow[ScanState]):
         self.state.final_report_path = flow.state.final_report_path
 
 
-# ─── Entry point ──────────────────────────────────────────────────────────────
+# ─── Entry points ─────────────────────────────────────────────────────────────
 
 def run_flow(target: str, objective: str = "", scope: str = "full") -> ReconSuiteFlow:
     flow = ReconSuiteFlow()
     flow.state.target    = target
     flow.state.objective = objective
     flow.state.scope     = scope
+    console.print(f"\n  [dim]Flow ID:[/]  [cyan]{flow.state.id}[/]  [dim](--resume to resume)[/]")
     flow.kickoff()
+    console.print(f"\n  [dim]Flow ID:[/]  [cyan]{flow.state.id}[/]")
+    return flow
+
+
+def resume_flow(state_id: str) -> ReconSuiteFlow:
+    """Resumes a previously persisted flow run from its last saved state."""
+    flow = ReconSuiteFlow()
+    console.print(f"\n  [dim]Resuming flow:[/]  [cyan]{state_id}[/]")
+    flow.kickoff(restore_from_state_id=state_id)
     return flow
 
 
 if __name__ == "__main__":
     args = sys.argv[1:]
-    if len(args) >= 1:
+    if args and args[0] == "--resume":
+        if len(args) < 2:
+            console.print("[red]✗[/]  --resume requires a flow ID")
+            sys.exit(1)
+        resume_flow(args[1])
+    elif len(args) >= 1:
         _target    = args[0]
         _objective = args[1] if len(args) >= 2 else ""
         _scope     = args[2] if len(args) >= 3 else "full"
+        run_flow(_target, _objective, _scope)
     else:
         console.print()
         _target    = Prompt.ask("[bold]Target[/] [dim](domain or IP)[/]")
@@ -157,5 +181,4 @@ if __name__ == "__main__":
             "[cyan]web[/] · [cyan]network[/] · [cyan]full[/]"
         )
         _scope = Prompt.ask("[bold]Scope[/]", default="full")
-
-    run_flow(_target, _objective, _scope)
+        run_flow(_target, _objective, _scope)
