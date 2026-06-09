@@ -27,7 +27,7 @@ Abweichungen werden begründet dokumentiert.
 |---|---|---|
 | 5.1 | `allow_delegation=True` auf research_agent + red_agent | Reverted — inkompatibel mit Sequential Process + lokalen Ollama-Modellen (Delegation-Tools triggern native FC auf Regular-Agents). Manager-Delegation (5.3) ist der korrekte Weg. |
 | 5.2 | `_arun()` auf `NvdSearchTool` (async NVD-Lookup) | ✅ Erledigt |
-| 5.3 | Hierarchical Process Option (`scope=hierarchical`) | 🔄 In Arbeit |
+| 5.3 | Hierarchical Process Option (`scope=hierarchical`) | ✅ Erledigt |
 | 5.4 | `context=[]` Review auf `findings_task` + `red_scan_task` | ✅ Erledigt |
 
 ---
