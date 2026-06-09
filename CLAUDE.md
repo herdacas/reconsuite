@@ -32,6 +32,20 @@ Abweichungen werden begründet dokumentiert.
 
 ---
 
+### Phase 6 — Knowledge Sources (Branch: phase/6-knowledge)
+
+| Schritt | Beschreibung | Status |
+|---|---|---|
+| 6.1 | Service Normalization Knowledge (`agentscanit/knowledge/service_normalization.py`) | ✅ Erledigt |
+| 6.2 | OWASP Top 10 Knowledge | Vorbereitet (deferred → Phase 7 Compliance Mapper) |
+| 6.3 | Knowledge auf Agents setzen (`research_agent`, `red_agent`) | ✅ Erledigt |
+| 6.4 | `Crew(embedder=...)` für Ollama-Embedding + `KNOWLEDGE_DIR` in `config.py` | ✅ Erledigt |
+| 6.5 | Task-Prompt in `findings_task` auf Knowledge Source umgestellt | ✅ Erledigt |
+
+**Technische Anmerkung:** `KnowledgeStorage` darf nicht direkt auf `StringKnowledgeSource` gesetzt werden — `Knowledge.__init__` überschreibt `source.storage` immer mit einer neuen Instanz. Embedder muss über `Crew(embedder=...)` gesetzt werden, wird via `setup_agents()` → `agent.set_knowledge(crew_embedder=...)` korrekt weitergereicht.
+
+---
+
 ## Was ist das?
 
 Agentic Vulnerability Assessment Framework auf Basis von CrewAI + lokalen Ollama-Modellen.

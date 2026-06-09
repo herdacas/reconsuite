@@ -12,6 +12,7 @@ from config import (
     TEMP_ANALYSIS, TEMP_CODE, TEMP_RESEARCH,
     LOCAL_MODEL_PLANNER, PLANNER_BASE_URL,
 )
+from knowledge import service_normalization_knowledge
 # Note: `_run` in tools/_base.py is the subprocess helper. Within tool classes, bare
 # `_run(cmd)` calls that helper; `self._run` is the BaseTool interface method (CrewAI).
 # The names are distinct in Python's scoping rules but look identical at a glance.
@@ -163,6 +164,7 @@ research_agent = Agent(
         assetfinder_tool, dnsx_tool, katana_tool, waybackurls_tool,
         gau_tool, searchsploit_tool, nvd_tool,
     ],
+    knowledge_sources=[service_normalization_knowledge],
     llm=llm_research,
     function_calling_llm=llm_research,
     verbose=False,
@@ -222,6 +224,7 @@ red_agent = Agent(
         "als Grundlage für Remediation, nicht für aktive Exploitation."
     ),
     tools=[searchsploit_tool, ddg_search_tool, nvd_tool],
+    knowledge_sources=[service_normalization_knowledge],
     llm=llm_analysis,
     function_calling_llm=llm_analysis,
     verbose=False,
