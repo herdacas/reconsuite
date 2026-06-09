@@ -106,9 +106,25 @@ def _apply_memory_patches() -> None:
     # schema format. The remote Ollama endpoint returns empty responses for this path,
     # crashing every scan with "Invalid response from LLM call - None or empty."
     # The ReAct text-based path (use_native_tools=False) works reliably.
+    #
+    # IMPORTANT: agent_executor.py uses `from crewai.utilities.agent_utils import
+    # check_native_tool_support` — a local binding in the agent_executor module
+    # namespace. Patching agent_utils.check_native_tool_support has no effect on
+    # that local binding. We must patch the reference in agent_executor directly,
+    # AND patch the AgentExecutor class method for belt-and-suspenders safety.
     try:
         from crewai.utilities import agent_utils as _au
         _au.check_native_tool_support = lambda _llm, _tools: False
+    except Exception:
+        pass
+    try:
+        from crewai.experimental import agent_executor as _aem
+        _aem.check_native_tool_support = lambda _llm, _tools: False
+    except Exception:
+        pass
+    try:
+        from crewai.experimental.agent_executor import AgentExecutor as _AE
+        _AE._check_native_tool_support = lambda self: False
     except Exception:
         pass
 
