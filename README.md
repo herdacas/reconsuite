@@ -1,41 +1,70 @@
 # AgentScanIT — Agentic Vulnerability Assessment Framework
 
-Multi-agent security recon suite auf Basis von [CrewAI](https://crewai.com) und lokalen LLMs via [Ollama](https://ollama.com).
+Multi-Agent Security Assessment auf Basis von [CrewAI](https://crewai.com) und lokalen LLMs via [Ollama](https://ollama.com). Sechs spezialisierte Teams arbeiten sequenziell: vom passiven OSINT-Scan bis zum priorisierten Risk-Score mit OWASP-Compliance-Mapping.
 
 ---
 
 ## Was es macht
 
-Führt einen vollständigen Recon- und Vulnerability-Assessment-Workflow durch:
-
 ```
-Passive Recon  →  Active Scan  →  CVE-Analyse  →  Exploitability  →  Report
+Passive Recon  →  Active Scan  →  CVE-Analyse  →  NVD-Enrichment
+      ↓
+Threat Intel  →  Compliance-Mapping  →  Risk-Scoring  →  Final Report
 ```
 
-Jede Phase ist ein spezialisierter CrewAI-Agent. Ein LLM-Planner wählt anhand von Scope und Objective nur die relevanten Phasen aus.
+Jede Phase ist ein eigenständiger CrewAI-Flow oder deterministischer Prozess. Ein LLM-Planner wählt anhand von Scope und Objective die relevanten Phasen aus. Das Routing nach dem Scan entscheidet dynamisch welche Teams aktiv werden.
 
 ---
 
 ## Architektur
 
+### 6-Team-System
+
+| Team | Package | Technologie | Aufgabe |
+|---|---|---|---|
+| 1 | `agentscanit/` | CrewAI Crew · 5 Agents · 26 Tools | Passive Recon + Active Scan + CVE-Analyse |
+| 2 | `interpret_agent/` | CrewAI Flow | NVD API v2 — CVE-Details, CVSS, Severity |
+| 3 | `reporting/` | CrewAI Flow | Merge aller Reports → `final_report_*.md` |
+| 4 | `threatintel_agent/` | CrewAI Flow (kein LLM) | OTX · Shodan · VirusTotal — In-the-Wild-Status |
+| 5 | `compliance_agent/` | CrewAI Crew · LLM · OWASP Knowledge | OWASP Top 10 Mapping |
+| 6 | `risk_scorer/` | CrewAI Flow (kein LLM) | Deterministisches Risk-Scoring |
+
+### Flow-Routing
+
+Nach dem Scan entscheidet der Router welche Teams laufen:
+
 ```
-agentscanit/   — Team 1: Scanner (Haupt-Package)
-interpret_agent/ — Team 2: NVD-Enrichment (CVE-Details via NVD API v2)
-reporting/     — Team 3: Final Report (Merge scan + NVD → Markdown)
-flow.py        — Orchestrierung aller 3 Teams
+Kein CVE gefunden   →  CLEAN         →  Team 3 (direkt)
+CVEs, kein Exploit  →  CVA_ANALYSIS  →  Teams 2 → 5 → 6 → 3
+CVEs + Exploit      →  FULL_ANALYSIS →  Teams 2 → 4 → 5 → 6 → 3
 ```
 
-### Agents
+### Kommunikation zwischen Teams
 
-| Agent | Aufgabe |
-|---|---|
-| `research_agent` | Passive OSINT: Subdomains, DNS, WHOIS, theHarvester |
-| `blue_agent` | Active Scanning: nmap, nikto, nuclei, sslscan, httpx |
-| `research_agent` | CVE-Analyse: searchsploit + DuckDuckGo (findings_task) |
-| `blue_agent` | Targeted Follow-up: nuclei/nikto mit CVE-Tags (red_scan_task) |
-| `red_agent` | Exploitability-Analyse: searchsploit + DDG PoC-Check |
-| `coding_agent` | Python-Automatisierungs-Skript aus den Scan-Schritten |
-| `reporter_agent` | Finaler Markdown-Recon-Report |
+Teams kommunizieren **nicht direkt**. Alle Übergaben laufen über `ScanState` — ein Pydantic-Modell im CrewAI Flow:
+
+```
+Team 1  →  scan_json_path, has_cve_findings, has_exploitable
+Team 2  →  nvd_results (CVSS, Severity pro CVE)
+Team 4  →  threat_intel_output (In-the-Wild-Summary)
+Team 5  →  compliance_output (OWASP-Mapping-Text)
+Team 6  →  risk_score_output ("Score: 7.8 / 10 — HIGH")
+Team 3  →  final_report_path
+```
+
+Innerhalb von Team 1 kommunizieren die 5 Agents über den CrewAI Task-Kontext (Pydantic-Output einer Task als Kontext der nächsten).
+
+### Agents in Team 1
+
+| Agent | Aufgabe | Tools |
+|---|---|---|
+| `research_agent` | Passive OSINT: Subdomains, DNS, WHOIS, theHarvester | 15 |
+| `blue_agent` | Active Scanning: nmap, nikto, nuclei, sslscan, httpx | 12 |
+| `research_agent` | CVE-Analyse (findings_task) | searchsploit, DDG, nvd_tool |
+| `blue_agent` | Targeted Follow-up (red_scan_task) | nuclei, nikto |
+| `red_agent` | Exploitability-Analyse: PoC-Check, Attack-Surface | searchsploit, DDG, nvd_tool |
+| `coding_agent` | Automatisierungs-Skript aus Scan-Schritten | — |
+| `reporter_agent` | Markdown-Report aus allen Phasen | — |
 
 ---
 
@@ -43,10 +72,9 @@ flow.py        — Orchestrierung aller 3 Teams
 
 - Python 3.11+
 - Ollama lokal oder remote (API-kompatibler Endpunkt)
-- System-Tools: `nmap`, `nikto`, `whatweb`, `sslscan`, `subfinder`, `nuclei`, `httpx`, `ffuf`, u.a.
+- System-Tools: `nmap`, `nikto`, `whatweb`, `sslscan`, `subfinder`, `nuclei`, `httpx`, `ffuf`, `dnsrecon`, u.a.
 
 ```bash
-cd agentscanit
 pip install -r requirements.txt
 cp models.json.example models.json   # Modelle konfigurieren
 ```
@@ -56,27 +84,30 @@ cp models.json.example models.json   # Modelle konfigurieren
 ## Schnellstart
 
 ```bash
-cd agentscanit
-
-# Interaktiv
-python3 main.py
-
-# Mit Argumenten
+# Top-Level-Flow (empfohlen — alle 6 Teams)
 python3 main.py example.com
-python3 main.py example.com "CVE-Suche" full
-python3 main.py example.com "SSL/TLS prüfen" ssl
+python3 main.py example.com web                  # Scope als Argument
+python3 main.py example.com "CVE-Suche" web      # Objective + Scope
+python3 main.py                                  # interaktiv
+
+# Flow-Resume nach Unterbrechung
+python3 main.py --list                           # gespeicherte Runs anzeigen
+python3 main.py --resume <flow-id>               # fortsetzen
+
+# Nur Team 1 (Scanner ohne NVD + Reporting)
+cd agentscanit && python3 main.py example.com
 ```
 
 ### Scopes
 
-| Scope | Was läuft |
-|---|---|
-| `osint` | Nur passive Recon (kein aktiver Scan) |
-| `ssl` | sslscan + testssl |
-| `quick` | ping + nmap Top-100 + httpx |
-| `web` | httpx, whatweb, nikto, nuclei |
-| `network` | nmap + naabu + httpx |
-| `full` | Alle Tools + CVE-Analyse + Exploitability |
+| Scope | Was läuft | Teams aktiv |
+|---|---|---|
+| `osint` | Passive Recon (kein aktiver Scan) | 1 → 3 |
+| `ssl` | sslscan + testssl | 1 → 3 |
+| `quick` | nmap Top-100 + httpx + CVE-Analyse | 1 → routing → 3 |
+| `web` | httpx · whatweb · nikto · nuclei + CVE + Exploit | 1 → routing → 2–6 → 3 |
+| `network` | nmap · naabu · httpx + CVE + Exploit | 1 → routing → 2–6 → 3 |
+| `full` | Alle Tools + alle Phasen | 1 → routing → 2–6 → 3 |
 
 ---
 
@@ -84,34 +115,66 @@ python3 main.py example.com "SSL/TLS prüfen" ssl
 
 Alle Outputs landen in `logs/`:
 
-| Datei | Inhalt |
-|---|---|
-| `recon_report_<target>_<ts>.md` | Markdown-Recon-Report |
-| `crew_<target>_<ts>.json` | Strukturierter JSON-Log (Ports, CVEs, Phasen) |
-| `trace_<target>_<ts>.json` | Tool-Calls mit Raw-Output + Timings |
-| `final_report_<target>_<ts>.md` | Merged Report mit NVD-CVE-Details (via reporting_flow) |
+| Datei | Erzeugt von | Inhalt |
+|---|---|---|
+| `recon_report_*.md` | Team 1 | Recon-Report mit Ports, Services, CVEs |
+| `crew_*.json` | Team 1 | Strukturierter JSON-Log (Tasks, CVE-Refs, Ports) |
+| `trace_*.json` | Team 1 | Tool-Calls mit Raw-Output + Timings |
+| `interpret_*.md` | Team 2 | NVD-Detaildaten pro CVE (CVSS, CWE, References) |
+| `final_report_*.md` | Team 3 | Merged Final Report |
+| `threatintel_*.md` | Team 4 | OTX/Shodan/VT — In-the-Wild-Status pro CVE + IP-Reputation |
+| `risk_score_*.md` | Team 6 | Risk Score + Level + Top-Findings + Next Steps |
+| `risk_score_*.json` | Team 6 | Maschinenlesbarer Risk-Score (für Weiterverarbeitung) |
+| `compliance_*.md` | Team 5 | OWASP Top 10 Mapping der Findings |
+| `workflow_last.json` | Team 1 | Letzter Scan (überschrieben) — Eingabe für Teams 2–6 |
+| `flow_state.db` | Flow | SQLite — Flow-State pro Run (für `--resume`) |
+| `checkpoints/*/` | Team 1 | Per-Task Checkpoint-Files (max 3 behalten) |
 
 ---
 
 ## Konfiguration
 
-Umgebungsvariablen (oder `.env`):
+`.env` oder Umgebungsvariablen:
 
-| Variable | Bedeutung |
-|---|---|
-| `OLLAMA_BASE_URL` | Ollama-Endpunkt (default: `http://localhost:11434`) |
-| `OLLAMA_API_KEY` | API-Key für remote Ollama |
-| `NVD_API_KEY` | NVD API-Key (optional, erhöht Rate-Limit) |
+| Variable | Bedeutung | Default |
+|---|---|---|
+| `OLLAMA_BASE_URL` | Ollama-Endpunkt | `http://localhost:11434` |
+| `OLLAMA_API_KEY` | API-Key für remote Ollama | — |
+| `MODEL_ANALYSIS` | Modell für Analyse-Agents | aus `models.json` |
+| `MODEL_RESEARCH` | Modell für Research-Agent | aus `models.json` |
+| `MODEL_CODE` | Modell für Coding-Agent | aus `models.json` |
+| `EMBED_MODEL` | Embedding-Modell (LanceDB + ChromaDB) | aus `models.json` |
+| `NVD_API_KEY` | NVD API-Key (erhöht Rate-Limit 5→50 req/30s) | — |
+| `OTX_API_KEY` | AlienVault OTX (kostenlos) | — |
+| `SHODAN_API_KEY` | Shodan (paid-tier) | — |
+| `VT_API_KEY` | VirusTotal (free-tier verfügbar) | — |
 
-Modell-Auswahl über `agentscanit/models.json`.
+Teams 4–6 degradieren **graceful** ohne API-Keys — kein Crash, kein Timeout, nur `"no_key"`-Status im Output.
+
+Modell-Auswahl über `models.json` (von `models.json.example` ableiten).
 
 ---
 
-## Bekannte Einschränkungen
+## Einschränkungen
 
-- **CVE-Erkennung**: Die Pipeline findet aktuell keine CVEs für Cloud-Infrastruktur (Cloudflare, CDNs) da searchsploit keine generischen Dienste trifft. `tools/nvd.py` (NVD API v2) ist implementiert aber noch nicht in die Agent-Pipeline integriert.
-- **EyeWitness**: Entfernt (Selenium-Abhängigkeit fehlt auf Server-Systemen ohne Display).
-- **Thinking-Modelle (Qwen3)**: `think: False` via `extra_body` verhindert Reasoning-Text in strukturierten JSON-Responses.
+**Erkennungsrate:**
+- Targets hinter **Cloudflare / CDN / WAF** liefern keine CVEs — Banner-Informationen sind generisch. Kein Bug, korrektes Verhalten.
+- CVE-Erkennung ist **banner-basiert** (HTTP-Header, Service-Fingerprint) — keine aktive Exploitation, keine Authentifizierung.
+
+**Laufzeiten:**
+- `quick`-Scan: 20–60 Minuten je nach Modell
+- `full`-Scan (FULL_ANALYSIS-Route): 90–180 Minuten
+- Teams 4+6 (ohne LLM): +2–5 Minuten pro CVA/FULL-Route
+- Team 5 (LLM): +5–15 Minuten
+
+**Modell-Abhängigkeiten:**
+- Planning-LLM läuft immer lokal via Ollama — remote Modelle unterstützen Ollama's native FC-API nicht
+- `allow_delegation=False` auf allen Agents — Delegation triggert native Function-Calling auf lokalen Modellen die das Schema nicht zuverlässig ausführen
+
+**Bekannte CrewAI-Eigenheiten (dokumentiert in CLAUDE.md):**
+- `@listen` Stacking überschreibt Trigger — `or_()` verwenden wenn eine Methode auf mehrere Quellen hören soll
+- `Knowledge.__init__` überschreibt immer `source.storage` — Embedder muss über `Crew(embedder=...)` gesetzt werden
+- Flow-State-DB-Einträge sind nach Breaking Changes am Flow-Graphen nicht mehr resumable
 
 ---
 

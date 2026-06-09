@@ -1,15 +1,18 @@
 """
 recon-suite/flow.py — Master-Flow
 
-Orchestriert die drei Teams sequentiell:
-    1. agentscanit     → Active Recon & Enumeration
-    2. interpret-agent → CVE Enrichment (NVD API v2)
-    3. reporting       → Final Report (Merge)
+Orchestriert alle Teams sequentiell:
+    1. agentscanit       → Active Recon & Enumeration
+    2. interpret-agent   → CVE Enrichment (NVD API v2)
+    3. threatintel_agent → Threat Intelligence (OTX, Shodan, VT)
+    4. compliance_agent  → Compliance Mapping (OWASP, CIS)
+    5. risk_scorer       → Asset Risk Scoring
+    6. reporting         → Final Report (Merge)
 
 Routing nach dem Scan:
-    exploitable  → interpret + reporting
-    cve_found    → interpret + reporting
-    clean        → nur reporting (kein NVD-Lookup nötig)
+    full_analysis → interpret + threat_intel + compliance + risk + reporting
+    cve_analysis  → interpret + compliance + risk + reporting
+    clean         → nur reporting (kein NVD-Lookup nötig)
 
 Usage:
     python3 flow.py example.com "full assessment" full
@@ -27,11 +30,14 @@ sys.path.insert(0, _SUITE_DIR)
 
 import agentscanit.main as _scan_main       # lädt CrewAI-Patches als Seiteneffekt
 from agentscanit import AgentScanITCrew
-import interpret_agent as _interpret        # Verzeichnis: interpret_agent/
-import reporting as _reporting             # Verzeichnis: reporting/
+import interpret_agent as _interpret        # Team 2: NVD-Enrichment
+import reporting as _reporting             # Team 3: Final Report
+import threatintel_agent as _threatintel   # Team 4: Threat Intelligence
+import compliance_agent as _compliance     # Team 5: Compliance Mapper
+import risk_scorer as _risk                # Team 6: Risk Scorer
 
 from pydantic import BaseModel, Field
-from crewai.flow.flow import Flow, start, listen, router
+from crewai.flow.flow import Flow, start, listen, router, or_
 from crewai.flow.persistence import persist, SQLiteFlowPersistence
 from rich.console import Console
 from rich.prompt import Prompt
@@ -47,17 +53,21 @@ console = Console()
 # ─── State ────────────────────────────────────────────────────────────────────
 
 class ScanState(BaseModel):
-    id:                str        = Field(default_factory=lambda: str(uuid4()))
-    target:            str        = ""
-    objective:         str        = ""
-    scope:             str        = "full"
-    pipeline:          list[str]  = Field(default_factory=list)
-    has_cve_findings:  bool       = False
-    has_exploitable:   bool       = False
-    scan_report_path:  str        = ""
-    scan_json_path:    str        = ""
-    nvd_results:       list[dict] = Field(default_factory=list)
-    final_report_path: str        = ""
+    id:                   str        = Field(default_factory=lambda: str(uuid4()))
+    target:               str        = ""
+    objective:            str        = ""
+    scope:                str        = "full"
+    pipeline:             list[str]  = Field(default_factory=list)
+    has_cve_findings:     bool       = False
+    has_exploitable:      bool       = False
+    scan_report_path:     str        = ""
+    scan_json_path:       str        = ""
+    nvd_results:          list[dict] = Field(default_factory=list)
+    final_report_path:    str        = ""
+    # Phase 7 — neue Team-Outputs
+    threat_intel_output:  str        = ""
+    compliance_output:    str        = ""
+    risk_score_output:    str        = ""
 
 
 # ─── Flow ─────────────────────────────────────────────────────────────────────
@@ -107,24 +117,59 @@ class ReconSuiteFlow(Flow[ScanState]):
 
     @router(run_scan)
     def route_results(self) -> str:
-        if self.state.has_exploitable or self.state.has_cve_findings:
-            return "needs_interpret"
-        return "clean"
+        if self.state.has_exploitable:
+            return "full_analysis"     # interpret + threat_intel + compliance + risk
+        if self.state.has_cve_findings:
+            return "cve_analysis"      # interpret + compliance + risk
+        return "clean"                 # direkt reporting
 
-    @listen("needs_interpret")
+    @listen("full_analysis")
+    @listen("cve_analysis")
     def run_interpret(self):
         console.print()
         console.print("  [bold yellow]→ interpret-agent[/]  CVE Enrichment läuft...")
         flow = _interpret.run_interpret_flow(self.state.scan_json_path)
         self.state.nvd_results = flow.state.nvd_results
 
-    @listen("clean")
-    def skip_interpret(self):
-        console.print()
-        console.print("  [bold green]→ Route: CLEAN[/]  Keine CVEs — kein NVD-Lookup nötig.")
-
     @listen(run_interpret)
-    @listen(skip_interpret)
+    def run_threat_intel(self):
+        # Aktiv nur bei full_analysis (has_exploitable); no-op bei cve_analysis.
+        if not self.state.has_exploitable:
+            return
+        console.print()
+        console.print("  [bold red]→ threatintel-agent[/]  Threat Intelligence läuft...")
+        flow = _threatintel.run_threatintel_flow(self.state.scan_json_path)
+        self.state.threat_intel_output = flow.state.threat_summary
+
+    @listen(run_threat_intel)
+    def run_compliance(self):
+        console.print()
+        console.print("  [bold magenta]→ compliance-agent[/]  OWASP Mapping läuft...")
+        flow = _compliance.run_compliance_flow(self.state.scan_json_path)
+        self.state.compliance_output = flow.state.mapping_result
+
+    @listen(run_compliance)
+    def run_risk_scorer(self):
+        console.print()
+        console.print("  [bold blue]→ risk-scorer[/]  Risk Score wird berechnet...")
+        flow = _risk.run_risk_flow(
+            scan_json_path      = self.state.scan_json_path,
+            nvd_results         = self.state.nvd_results,
+            threat_intel_output = self.state.threat_intel_output,
+            compliance_output   = self.state.compliance_output,
+            has_exploitable     = self.state.has_exploitable,
+        )
+        self.state.risk_score_output = (
+            f"Score: {flow.state.risk_score} / 10 — {flow.state.risk_level}"
+        )
+
+    @listen("clean")
+    def skip_teams(self):
+        """CLEAN-Route — keine CVEs, Teams 4+5+6 werden übersprungen."""
+        console.print()
+        console.print("  [bold green]→ Route: CLEAN[/]  Keine CVEs — Teams 4+5+6 übersprungen.")
+
+    @listen(or_(run_risk_scorer, skip_teams))
     def run_reporting(self):
         console.print()
         console.print("  [bold cyan]→ reporting[/]  Final Report wird erstellt...")
