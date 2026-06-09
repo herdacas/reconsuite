@@ -49,6 +49,11 @@ class RunTrace:
         self._current_agent_call:  Optional[dict]  = None
         self._run_start:           float           = 0.0
         self._call_seq:            int             = 0
+        # Counts how many times _tool_call_guardrail has fired for the current task.
+        # Reset by close_phase() when a task succeeds. Used to break the warm-memory
+        # loop: first rejection teaches the agent; second rejection passes to avoid
+        # an infinite retry spiral with unresolvable guardrail failures.
+        self._guardrail_reject_count: int          = 0
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -63,6 +68,7 @@ class RunTrace:
         self._current_agent_call = None
         self._run_start    = time.time()
         self._call_seq     = 0
+        self._guardrail_reject_count = 0
 
     @property
     def is_active(self) -> bool:
@@ -146,6 +152,7 @@ class RunTrace:
             self._phases[phase] = {"tool_calls": [], "structured_output": None}
         self._phases[phase]["tool_calls"].extend(self._pending)
         self._pending.clear()
+        self._guardrail_reject_count = 0
 
     def set_phase_output(self, phase: str, output: dict) -> None:
         """Store the Pydantic-structured output for a phase.

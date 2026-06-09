@@ -209,18 +209,27 @@ def run(target: str, objective: str = "", scope: str = "full") -> object:
             result = crew_obj.kickoff(inputs=scanner.inputs)
             break
         except Exception as _exc:
-            exc_str = str(_exc)
+            exc_str      = str(_exc)
+            exc_type     = type(_exc).__name__
             _is_retryable = (
                 "json_invalid"                          in exc_str or
-                "ValidationError"                       in exc_str or
+                "validation error for"                  in exc_str or  # pydantic ValidationError string
+                "ValidationError"                       in exc_type or  # pydantic/crewai class name
+                "ConverterError"                        in exc_type or
+                "Failed to convert"                     in exc_str or
+                "Agent must be provided"                in exc_str or
                 "Field required"                        in exc_str or
-                "ended without reaching a final answer" in exc_str
+                "ended without reaching a final answer" in exc_str or
+                "Invalid response from LLM call"        in exc_str or
+                "guardrail validation after"            in exc_str
             )
             if _is_retryable and _attempt < 2:
+                import traceback as _tb
                 console.print(
                     f"  [yellow]⚠[/]  Retryable error ({type(_exc).__name__}): "
                     f"{str(_exc)[:120]}"
                 )
+                console.print(f"  [dim]{_tb.format_exc()[-600:]}[/]")
                 _n_done  = len(_completed_labels)
                 _resumed = False
 
@@ -237,7 +246,10 @@ def run(target: str, objective: str = "", scope: str = "full") -> object:
                             try:
                                 from crewai import Crew as _CrewCls
                                 from crewai.state.checkpoint_config import CheckpointConfig as _CC
-                                from tasks import FindingsOutput, RedOutput, _cve_trace_guardrail
+                                from tasks import (
+                                    FindingsOutput, RedOutput, _cve_trace_guardrail,
+                                    ResearchOutput, BlueOutput, _tool_call_guardrail,
+                                )
                                 _restored = _CrewCls.from_checkpoint(
                                     _CC(restore_from=str(_ckpt_files[-1]))
                                 )
@@ -245,12 +257,16 @@ def run(target: str, objective: str = "", scope: str = "full") -> object:
                                 _restored.task_callback = _on_task_done
                                 for _t in _restored.tasks:
                                     _t.callback = _on_task_done
-                                # Re-attach CVE guardrails — callables dropped by checkpoint
+                                # Re-attach guardrails — callables dropped by checkpoint
                                 for _t in _restored.tasks:
                                     _op = getattr(_t, "output_pydantic", None)
                                     if _op in (FindingsOutput, RedOutput):
                                         _t.guardrails = [_cve_trace_guardrail]
                                         object.__setattr__(_t, "_guardrails", [_cve_trace_guardrail])
+                                        object.__setattr__(_t, "_guardrail",  None)
+                                    elif _op in (ResearchOutput, BlueOutput):
+                                        _t.guardrails = [_tool_call_guardrail]
+                                        object.__setattr__(_t, "_guardrails", [_tool_call_guardrail])
                                         object.__setattr__(_t, "_guardrail",  None)
                                 crew_obj = _restored
                                 _resumed = True

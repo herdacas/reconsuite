@@ -117,7 +117,7 @@ recon-suite/
 |---|---|---|
 | `research_agent` | Passive OSINT / Recon | 15 (subfinder, dnsrecon, dig, whois, ..., nvd_tool) |
 | `blue_agent` | Active Scanning | 12 (nmap, nikto, nuclei, sslscan, ...) |
-| `research_agent` | CVE-Analyse (findings_task) | searchsploit, ddg, nvd_tool |
+| `research_agent` | CVE-Analyse (findings_task) | searchsploit, ddg, nvd_tool — max_iter=20 (erhöht von 12: 5-10 Services × 2-3 Calls = bis 30 Iterations) |
 | `blue_agent` | Targeted Follow-up (red_scan_task) | nuclei, nikto |
 | `red_agent` | Exploitability-Analyse | searchsploit, ddg, nvd_tool |
 | `coding_agent` | Script-Generierung | keine Tools |
@@ -221,13 +221,19 @@ Modell-Auswahl via `models.json` (aus `models.json.example` ableiten).
 ### think: False (agents.py)
 - `extra_body={"think": False}` wird bedingungslos gesetzt — lokales Ollama ignoriert es für nicht-thinking-Modelle, remote-Modelle (Qwen3, gpt-oss) benötigen es.
 
+### Warm-Memory + `_tool_call_guardrail` Loop (tasks.py / trace.py)
+- Bei wiederholten Scans desselben Targets nutzt der Agent LanceDB-Memory und überspringt Tools → `_tool_call_guardrail` lehnt ab (korrekt).
+- Im Guardrail-Retry kann das Modell (gpt-oss:20b) `None` oder leeren String zurückgeben → Crash oder ConverterError.
+- **Fix**: `run_trace._guardrail_reject_count` — wird beim ersten Reject hochgezählt, beim zweiten Aufruf (count≥1) wird der Output akzeptiert (Warm-Memory-Fallback). Reset in `close_phase()`. Verhindert endlose Retry-Schleifen; CVE-Guardrail bleibt der entscheidende Fakten-Check.
+- `_EXECUTOR_CLASS` ist einheitlich `AgentExecutor` (experimental, native FC) für alle Modi — kein OLLAMA_API_KEY-bedingtes Umschalten auf `CrewAgentExecutor` mehr.
+
 ### Checkpoint + Retry-Logik (main.py / crew.py)
 - `Crew(checkpoint=CheckpointConfig(...))` speichert nach jeder abgeschlossenen Task einen Snapshot unter `logs/checkpoints/<target>_<ts>/main/*.json` (max 3 behalten).
-- Bei `json_invalid`, `ValidationError`, `Field required` oder `ended without reaching a final answer`-Fehlern: bis zu 3 Retries.
+- Retryable Errors: `json_invalid`, pydantic `ValidationError` (Klassen- UND String-Check), `ConverterError`, `Failed to convert`, `Agent must be provided`, `Field required`, `ended without reaching a final answer`, `Invalid response from LLM call`, `guardrail validation after`.
   - Wenn ≥1 Phase abgeschlossen: Checkpoint-Resume via `Crew.from_checkpoint()` — überspringt bereits erledigte Phasen.
-  - Callables (guardrails, task_callback) werden beim Checkpoint-Serialisieren gedroppt und nach dem Restore manuell re-attached.
+  - Callables (guardrails, task_callback) werden beim Checkpoint-Serialisieren gedroppt und nach dem Restore manuell re-attached: `_cve_trace_guardrail` auf `FindingsOutput`/`RedOutput`-Tasks, `_tool_call_guardrail` auf `ResearchOutput`/`BlueOutput`-Tasks.
   - Fallback bei fehlgeschlagenem Restore: Vollneustart mit frischer Crew-Instanz.
-- **CrewAI-Checkpoint-Limitation**: Checkpoint-Writes schlagen silently fehl wenn die event_record-Serialisierung in eine PyO3 Race-Condition läuft (concurrent Dict-Mutation während der Serializer iteriert → `PanicException(BaseException)`). Der Panic wird von unserem Patch in `_apply_memory_patches()` abgefangen — Scan läuft weiter, Checkpoint wird für diese Task übersprungen. Phasen mit wenigen Tool-Calls (z.B. Report) schreiben trotzdem zuverlässig Checkpoints.
+- **Checkpoint Race-Condition Fix (crew.py)**: `EventRecord._serialize()` ruft `_event_record.model_dump()` auf ohne den `_lock` zu halten. Der Pydantic-v2-Rust-Serializer iteriert `nodes` auf Rust-Ebene (außerhalb des GIL) — wenn der Main-Thread gleichzeitig `add()` aufruft (Write-Lock), entsteht `dict changed size during iteration` → PyO3-Rust-Panic → `PanicException`. PyO3 "resumt" den Rust-Panic nach dem Python-Catch, was Thread-Local-State korruptieren kann → nächster LLM-Call in findings_task schlägt sofort fehl mit `"ended without reaching a final answer"`. **Fix**: `_safe_do_checkpoint()` in `_apply_memory_patches()` acquiert `state._event_record._lock.r_locked()` vor dem Checkpoint-Write. Concurrent `add()` (Write-Lock) blockiert kurz bis die Serialisierung fertig ist — kein Dict-Mutation während Rust iteriert. `BaseException`-Catch als Fallback bleibt.
 
 ### Memory-Patching (crew.py)
 - CrewAI's Memory-Analyse-LLM-Calls werden monkey-gepatcht (keine LLM-Calls bei save/recall).
@@ -263,10 +269,10 @@ Modell-Auswahl via `models.json` (aus `models.json.example` ableiten).
 - **`run_trace.get_all_raw_outputs()`** — gibt alle Tool-Raw-Outputs der laufenden Session zurück (closed phases + pending). Genutzt vom CVE-Validator während Pydantic-Parsing.
 - **`interpret_agent/nvd.py`** — Thin Shim, re-exportiert aus `agentscanit.tools.nvd`. Nie direkt editieren.
 - **Strict factual outputs** — Task-Prompts verlangen "nur tool-bestätigte Fakten". CVEs nur wenn Tool-Bestätigung im Trace vorhanden.
-- **`Crew(planning=True, planning_llm=llm_planner)`** — AgentPlanner erstellt vor der ersten Task einen Ausführungsplan. `planning_llm` (`llm_planner`) läuft IMMER lokal (`localhost:11434`, z.B. `qwen2.5:7b-instruct`) — remote Modelle unterstützen Ollama's native function-calling API nicht zuverlässig. `_SCOPE_CEILING` bleibt der Gate-Keeper für welche Tasks überhaupt laufen.
+- **`Crew(planning=True, planning_llm=llm_planner)`** — AgentPlanner erstellt vor der ersten Task einen Ausführungsplan. `planning_llm` (`llm_planner`) läuft IMMER lokal (`localhost:11434`, z.B. `qwen2.5:7b-instruct`) — remote Modelle unterstützen Ollama's native function-calling API nicht zuverlässig. `_SCOPE_CEILING` bleibt der Gate-Keeper für welche Tasks überhaupt laufen. **`max_tokens=2000` auf `llm_planner`** — begrenzt Plan-Output auf ~2000 Tokens, damit combined input+output im 4096-Token-Kontext des lokalen Servers bleibt. Ohne diese Begrenzung kann `--context-shift` im Server eine endlose Generierung auslösen (>20 Minuten für 7-Phasen-Plan).
 - **Memory** — LanceDB vector storage, shallow recall erzwungen (`_ShallowMemory`). Warme Runs nutzen Prior-Run-Daten.
 - **reporter_agent max_iter=3** — bewusst niedrig gehalten; der Reporter nutzt keine Tools und soll den Report in einem Durchgang schreiben. Höhere Werte führen zu 400s+ Laufzeiten bei großem Kontext.
 - **Checkpoint-Resume** — Nach `Crew.from_checkpoint()`: `_guardrails` (PrivateAttr) werden via `object.__setattr__()` re-attached, weil Pydantic validators bei direktem Field-Setzen nicht erneut laufen. `task_callback` wird sowohl auf Crew als auch auf jedem Task gesetzt.
 - **Flow-Persistence** — `@persist(SQLiteFlowPersistence(_FLOW_DB))` als Klassen-Dekorator auf `ReconSuiteFlow` speichert nach jedem Schritt in `logs/flow_state.db`. `ScanState` braucht `id: str = Field(default_factory=lambda: str(uuid4()))`. Resume via `flow.kickoff(restore_from_state_id=state_id)` — lädt State aus DB und überspringt fertige Schritte. `_FLOW_DB` muss vor der Klassendefinition stehen (Dekorator evaluiert bei Import).
 - **`@listen` Stacking — BROKEN** — `@listen(A)` + `@listen(B)` auf derselben Methode registriert NUR den äußersten Trigger. Jeder `@listen`-Aufruf erstellt einen neuen `ListenMethod`-Wrapper und setzt `__trigger_methods__` neu — die innere Registration wird überschrieben. Immer `@listen(or_(A, B))` verwenden wenn eine Methode auf mehrere Quellen hören soll. Import: `from crewai.flow.flow import or_`.
-- **`_tool_call_guardrail` — Halluzinations-Blocker** — `research` und `blue` Tasks haben `guardrails=[_tool_call_guardrail]`. Prüft `run_trace._pending` bei Task-Abschluss: wenn leer (kein Subprocess aufgerufen), wird der Agent mit explizitem Feedback zurückgewiesen (`guardrail_max_retries=2`). Timing: Guardrail läuft VOR `task_callback`/`close_phase()` — `_pending` enthält exakt die Calls der aktuellen Task. Fallback-safe: wenn `run_trace.is_active == False` (Unit-Tests, Standalone), gibt der Guardrail immer `True` zurück.
+- **`_tool_call_guardrail` — Halluzinations-Blocker** — `research` und `blue` Tasks haben `guardrails=[_tool_call_guardrail]`. Prüft `run_trace._pending` bei Task-Abschluss: wenn leer (kein Subprocess aufgerufen), lehnt der Guardrail beim ERSTEN Auftreten ab (Agent bekommt Feedback). Beim ZWEITEN Auftreten (count≥1 in `run_trace._guardrail_reject_count`) wird der Output akzeptiert — Warm-Memory-Fallback um endlose Retry-Schleifen zu verhindern. `close_phase()` setzt den Counter zurück. Timing: Guardrail läuft VOR `task_callback`/`close_phase()` — `_pending` enthält exakt die Calls der aktuellen Task. Fallback-safe: wenn `run_trace.is_active == False` (Unit-Tests, Standalone), gibt der Guardrail immer `True` zurück.

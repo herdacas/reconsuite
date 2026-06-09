@@ -123,8 +123,7 @@ class ReconSuiteFlow(Flow[ScanState]):
             return "cve_analysis"      # interpret + compliance + risk
         return "clean"                 # direkt reporting
 
-    @listen("full_analysis")
-    @listen("cve_analysis")
+    @listen(or_("full_analysis", "cve_analysis"))
     def run_interpret(self):
         console.print()
         console.print("  [bold yellow]→ interpret-agent[/]  CVE Enrichment läuft...")

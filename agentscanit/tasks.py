@@ -41,6 +41,14 @@ def _tool_call_guardrail(output: Any) -> tuple[bool, Any]:
     try:
         from tools.trace import run_trace
         if run_trace.is_active and len(run_trace._pending) == 0:
+            if run_trace._guardrail_reject_count >= 1:
+                # Agent already received one rejection and still produced no tool calls.
+                # This typically means warm memory provided cached context that the agent
+                # used instead of running tools. Accept the output here to break the
+                # warm-memory loop — the CVE trace guardrail downstream enforces
+                # fact-checking at the findings level.
+                return True, output
+            run_trace._guardrail_reject_count += 1
             return (
                 False,
                 "FEHLER: Kein Tool wurde aufgerufen. Du hast eine vollständige "

@@ -109,21 +109,32 @@ def _apply_memory_patches() -> None:
     except Exception:
         pass
 
-    # Patch checkpoint_listener._do_checkpoint to catch PyO3 PanicException.
-    # CrewAI's event_record dict is mutated concurrently while the checkpoint
-    # serializer iterates it → "dictionary changed size during iteration" Rust
-    # panic → pyo3_runtime.PanicException(BaseException). CrewAI's handler only
-    # catches Exception, so the panic propagates and crashes the checkpoint thread.
-    # Our patch swallows it as a no-op (checkpoint skipped, not fatal).
+    # Patch checkpoint_listener._do_checkpoint to eliminate the PyO3 PanicException.
+    # Root cause: EventRecord._serialize() calls _event_record.model_dump() without
+    # holding _event_record._lock, while the main thread concurrently adds events via
+    # add() (write lock). The Pydantic v2 Rust serializer iterates nodes at the Rust
+    # level — outside GIL protection — so a concurrent Python dict mutation causes:
+    # "dictionary changed size during iteration" → PyO3 Rust panic → PanicException.
+    # PyO3 "resumes" the Rust panic after Python catches it, which can corrupt thread-
+    # local state accessed by the next LLM call → "ended without reaching a final answer".
+    # Fix: acquire the event_record read lock before invoking _do_checkpoint so that
+    # concurrent add() (write lock) blocks until serialization finishes — no dict mutation
+    # during Rust iteration. Falls back to catch-and-skip on any remaining BaseException.
     try:
         from crewai.state import checkpoint_listener as _cl
         _orig_do_ckpt = _cl._do_checkpoint
 
         def _safe_do_checkpoint(state: Any, cfg: Any, event: Any = None) -> None:
             try:
-                _orig_do_ckpt(state, cfg, event)
+                event_record = getattr(state, "_event_record", None)
+                rw_lock = getattr(event_record, "_lock", None) if event_record is not None else None
+                if rw_lock is not None:
+                    with rw_lock.r_locked():
+                        _orig_do_ckpt(state, cfg, event)
+                else:
+                    _orig_do_ckpt(state, cfg, event)
             except BaseException:
-                pass  # PanicException from PyO3/Rust race condition — skip this checkpoint
+                pass  # fallback: skip checkpoint on any unrecoverable error
 
         _cl._do_checkpoint = _safe_do_checkpoint
     except Exception:

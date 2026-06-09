@@ -15,19 +15,9 @@ from config import (
     LOCAL_MODEL_PLANNER, PLANNER_BASE_URL,
 )
 
-# Remote-Mode: gpt-oss models via ollama.com don't support Ollama's native
-# function-calling API (call_llm_native_tools returns None → ValueError).
-# The experimental AgentExecutor uses native FC; CrewAgentExecutor (legacy ReAct)
-# does not — it sends tool descriptions as text and parses text responses.
-# Local-Mode: experimental executor works reliably with local Ollama native FC.
-if OLLAMA_API_KEY:
-    from crewai.agents.crew_agent_executor import CrewAgentExecutor as _ExecutorClass
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", DeprecationWarning)
-        _EXECUTOR_CLASS = _ExecutorClass
-else:
-    from crewai.experimental.agent_executor import AgentExecutor as _ExecutorClass
-    _EXECUTOR_CLASS = _ExecutorClass
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", DeprecationWarning)
+    from crewai.experimental.agent_executor import AgentExecutor as _EXECUTOR_CLASS
 from knowledge import service_normalization_knowledge
 # Note: `_run` in tools/_base.py is the subprocess helper. Within tool classes, bare
 # `_run(cmd)` calls that helper; `self._run` is the BaseTool interface method (CrewAI).
@@ -136,10 +126,14 @@ def _llm(model: str, temperature: float) -> LLM:
     # Disable chain-of-thought for thinking models (Qwen3, gpt-oss, etc.)
     # Applied unconditionally — local Ollama ignores it for non-thinking models,
     # remote thinking models need it to prevent reasoning bleed into JSON outputs.
+    # Remote-Mode: 16384 tokens — guardrail retry context (task prompt + previous
+    # agent response + guardrail feedback + tool definitions) can exceed 8192 tokens,
+    # causing gpt-oss to return None → ValueError crash.
+    # Local-Mode: keep 8192 — RAM constrained (64GB, no GPU, multiple models loaded).
     kwargs["extra_body"] = {
         "think":      False,
         "keep_alive": "30m",
-        "num_ctx":    8192,
+        "num_ctx":    16384 if OLLAMA_API_KEY else 8192,
     }
     return LLM(**kwargs)
 
@@ -150,11 +144,15 @@ llm_research = _llm(ACTIVE_RESEARCH, TEMP_RESEARCH)
 # Planning LLM is always local — remote models (gpt-oss) don't support Ollama's
 # native function-calling format that CrewPlanner's experimental executor needs.
 # No API key, no think=False: qwen2.5:7b-instruct handles plain JSON generation.
+# max_tokens=2000: caps plan output at ~2000 tokens so combined input+output stays
+# within the local server's 4096-token context. Without this cap, the server's
+# --context-shift would allow indefinite generation (>20 min for a 7-phase plan).
 llm_planner = LLM(
     model=f"ollama/{LOCAL_MODEL_PLANNER}",
     base_url=PLANNER_BASE_URL,
     temperature=0.1,
-    extra_body={"keep_alive": "30m", "num_ctx": 8192},
+    max_tokens=2000,
+    extra_body={"keep_alive": "30m", "num_ctx": 4096},
 )
 
 
@@ -187,7 +185,7 @@ research_agent = Agent(
     verbose=False,
     memory=False,
     allow_delegation=False,
-    max_iter=12,
+    max_iter=20,
     step_callback=_step_callback,
     respect_context_window=True,
 )
