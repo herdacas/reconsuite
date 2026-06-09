@@ -163,15 +163,17 @@ class ReconSuiteFlow(Flow[ScanState]):
             f"Score: {flow.state.risk_score} / 10 — {flow.state.risk_level}"
         )
 
-    @listen(run_risk_scorer)
     @listen("clean")
+    def skip_teams(self):
+        """CLEAN-Route — keine CVEs, Teams 4+5+6 werden übersprungen."""
+        console.print()
+        console.print("  [bold green]→ Route: CLEAN[/]  Keine CVEs — Teams 4+5+6 übersprungen.")
+
+    @listen(run_risk_scorer)
+    @listen(skip_teams)
     def run_reporting(self):
-        if self.state.has_cve_findings or self.state.has_exploitable:
-            console.print()
-            console.print("  [bold cyan]→ reporting[/]  Final Report wird erstellt...")
-        else:
-            console.print()
-            console.print("  [bold green]→ Route: CLEAN[/]  Keine CVEs — kein NVD-Lookup nötig.")
+        console.print()
+        console.print("  [bold cyan]→ reporting[/]  Final Report wird erstellt...")
         flow = _reporting.run_reporting_flow(
             scan_target      = self.state.target,
             scan_report_path = self.state.scan_report_path,
