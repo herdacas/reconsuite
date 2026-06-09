@@ -25,9 +25,33 @@ from crewai import Task
 from pydantic import BaseModel, Field, field_validator
 from typing import Any, List, Dict, Optional
 
-# ─── CVE-Format-Validator + Guardrail ─────────────────────────────────────────
+# ─── CVE-Format-Validator + Guardrails ────────────────────────────────────────
 
 _CVE_FMT = _re.compile(r'^CVE-(\d{4})-(\d{4,7})$', _re.IGNORECASE)
+
+
+def _tool_call_guardrail(output: Any) -> tuple[bool, Any]:
+    """Guardrail: Lehnt Task-Output ab wenn kein echtes Tool aufgerufen wurde.
+
+    Prüft run_trace._pending — enthält bei Guardrail-Auswertung genau die
+    Tool-Calls der aktuellen Task (close_phase() läuft erst im task_callback
+    nach bestandenem Guardrail). _pending == [] bedeutet: kein Subprocess
+    wurde gestartet, der Agent hat halluziniert.
+    """
+    try:
+        from tools.trace import run_trace
+        if run_trace.is_active and len(run_trace._pending) == 0:
+            return (
+                False,
+                "FEHLER: Kein Tool wurde aufgerufen. Du hast eine vollständige "
+                "Antwort ohne jeden Tool-Einsatz generiert — das ist nicht erlaubt. "
+                "Rufe JETZT das erste erforderliche Tool auf (z.B. dig, nmap, httpx) "
+                "und liefere danach ein Ergebnis das ausschließlich auf echten "
+                "Tool-Outputs basiert.",
+            )
+    except Exception:
+        pass
+    return True, output
 
 
 def _filter_cve_format(cves: List[str]) -> List[str]:
@@ -226,6 +250,8 @@ def make_tasks() -> dict:
             "relevante Subdomains (scope-angepasst), DNS-Infos, WHOIS-Infos."
         ),
         output_pydantic=ResearchOutput,
+        guardrails=[_tool_call_guardrail],
+        guardrail_max_retries=2,
         agent=research_agent,
     )
 
@@ -277,6 +303,8 @@ def make_tasks() -> dict:
             "offene Ports, erkannte Services und Versionen, bestätigte Findings aus Tool-Output."
         ),
         output_pydantic=BlueOutput,
+        guardrails=[_tool_call_guardrail],
+        guardrail_max_retries=2,
         agent=blue_agent,
         context=[research],
     )
