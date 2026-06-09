@@ -100,6 +100,18 @@ def _apply_memory_patches() -> None:
     except Exception:
         pass
 
+    # Force ReAct/text tool calling — disable OpenAI-style native function calling.
+    # check_native_tool_support() returns True for our Ollama models (LiteLLM defaults
+    # to True for unknown models), which causes agent_executor to send tools in OpenAI
+    # schema format. The remote Ollama endpoint returns empty responses for this path,
+    # crashing every scan with "Invalid response from LLM call - None or empty."
+    # The ReAct text-based path (use_native_tools=False) works reliably.
+    try:
+        from crewai.utilities import agent_utils as _au
+        _au.check_native_tool_support = lambda _llm, _tools: False
+    except Exception:
+        pass
+
 
 _apply_memory_patches()
 

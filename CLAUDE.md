@@ -142,8 +142,9 @@ Modell-Auswahl via `models.json` (aus `models.json.example` ableiten).
 
 ## Bekannte Probleme / Offene Punkte
 
-### allow_delegation=False (agents.py)
-- Alle Agents haben `allow_delegation=False` — bewusste Entscheidung. `allow_delegation=True` aktiviert in CrewAI's `agent_executor` den `call_llm_native_tools`-Pfad für Delegation-Flows. Dieser Pfad verwendet native function-calling und liefert mit unserem Remote-Ollama-Setup leere LLM-Antworten (`ValueError: Invalid response from LLM call - None or empty`). Solange der Delegation-Pfad nicht mit `extra_body={"think": False}` + Ollama kompatibel ist, bleibt Delegation deaktiviert.
+### allow_delegation=False + native tool calling deaktiviert (agents.py / crew.py)
+- Alle Agents haben `allow_delegation=False`. `allow_delegation=True` wäre möglich wenn native tool calling funktioniert (s.u.).
+- `check_native_tool_support()` in `crewai.utilities.agent_utils` wird in `_apply_memory_patches()` auf `lambda: False` gepatcht. Hintergrund: LiteLLM gibt für unbekannte Ollama-Modelle (`gpt-oss:120b`, `gpt-oss:20b`) `supports_function_calling() = True` zurück. Das aktiviert `use_native_tools = True` im `agent_executor` und sendet Tools im OpenAI-Schema-Format. Der Remote-Ollama-Endpunkt antwortet darauf leer → `ValueError: Invalid response from LLM call - None or empty` bei jedem Scan. Der ReAct/Text-Pfad (`use_native_tools = False`) funktioniert zuverlässig und wird daher erzwungen.
 
 ### think: False (agents.py)
 - `extra_body={"think": False}` wird bedingungslos gesetzt — lokales Ollama ignoriert es für nicht-thinking-Modelle, remote-Modelle (Qwen3, gpt-oss) benötigen es.
@@ -160,7 +161,7 @@ Modell-Auswahl via `models.json` (aus `models.json.example` ableiten).
 - CrewAI's Memory-Analyse-LLM-Calls werden monkey-gepatcht (keine LLM-Calls bei save/recall).
 - Grund: Pydantic-Validation-Errors + Rate-Limit-Probleme bei gleichzeitigen async-Requests.
 - Patch sitzt in `crew.py:_apply_memory_patches()` — co-located mit der Memory-Konfiguration.
-- Patch-Targets nach CrewAI-Update immer prüfen: `crewai.memory.analyze`, `encoding_flow`, `recall_flow`.
+- Patch-Targets nach CrewAI-Update immer prüfen: `crewai.memory.analyze`, `encoding_flow`, `recall_flow`, `crewai.utilities.agent_utils.check_native_tool_support`.
 
 ### Flow-Persistence (`@persist`, flow.py)
 - `ReconSuiteFlow` trägt `@persist(SQLiteFlowPersistence(_FLOW_DB), verbose=False)` — nach jedem abgeschlossenen Flow-Schritt wird der State in `logs/flow_state.db` gespeichert.
