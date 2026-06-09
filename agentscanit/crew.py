@@ -80,6 +80,35 @@ def _apply_memory_patches() -> None:
     except Exception:
         pass
 
+    # Patch JsonProvider.checkpoint + acheckpoint: write pretty-printed JSON.
+    # CrewAI calls model_dump_json() which produces a single-line minified string.
+    # JsonProvider.checkpoint() writes it verbatim → 1 MB single-line files in the IDE.
+    try:
+        import json as _json
+        from crewai.state.provider.json_provider import JsonProvider as _JsonProvider
+
+        _orig_cp  = _JsonProvider.checkpoint
+        _orig_acp = _JsonProvider.acheckpoint
+
+        def _pretty_cp(self: Any, data: str, location: str, **kw: Any) -> str:
+            try:
+                data = _json.dumps(_json.loads(data), indent=2, ensure_ascii=False)
+            except Exception:
+                pass
+            return _orig_cp(self, data, location, **kw)
+
+        async def _pretty_acp(self: Any, data: str, location: str, **kw: Any) -> str:
+            try:
+                data = _json.dumps(_json.loads(data), indent=2, ensure_ascii=False)
+            except Exception:
+                pass
+            return await _orig_acp(self, data, location, **kw)
+
+        _JsonProvider.checkpoint  = _pretty_cp
+        _JsonProvider.acheckpoint = _pretty_acp
+    except Exception:
+        pass
+
     # Patch checkpoint_listener._do_checkpoint to catch PyO3 PanicException.
     # CrewAI's event_record dict is mutated concurrently while the checkpoint
     # serializer iterates it → "dictionary changed size during iteration" Rust
