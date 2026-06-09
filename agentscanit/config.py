@@ -95,6 +95,7 @@ SCAN_DIR         = os.path.join(_SUITE_DIR,  "scans")
 
 # Team-spezifisch → agentscanit level (LanceDB-Memory bleibt beim Team)
 MEMORY_DIR       = os.path.join(PROJECT_DIR, "memory")
+KNOWLEDGE_DIR    = os.path.join(PROJECT_DIR, "knowledge_storage")
 TEMP_DIR         = os.path.join(PROJECT_DIR, "temp")
 THEHARVESTER_DIR = os.path.join(PROJECT_DIR, "theHarvester")
 TESTSSL_DIR      = os.path.join(PROJECT_DIR, "testssl.sh")
@@ -187,7 +188,7 @@ WORDLIST_DEFAULT   = "/usr/share/dirb/wordlists/common.txt"
 
 # ─── Verzeichnisse anlegen ────────────────────────────────────────────────────
 
-for _d in (LOG_DIR, SCAN_DIR, MEMORY_DIR, TEMP_DIR):
+for _d in (LOG_DIR, SCAN_DIR, MEMORY_DIR, KNOWLEDGE_DIR, TEMP_DIR):
     os.makedirs(_d, exist_ok=True)
 
 # ─── Umgebungsvariablen ───────────────────────────────────────────────────────
@@ -195,6 +196,7 @@ for _d in (LOG_DIR, SCAN_DIR, MEMORY_DIR, TEMP_DIR):
 os.environ["CREWAI_DISABLE_TELEMETRY"]       = "true"
 os.environ["OTEL_SDK_DISABLED"]              = "true"
 os.environ["EMBEDDINGS_OLLAMA_MODEL_NAME"]   = EMBED_MODEL
+os.environ["CREWAI_STORAGE_DIR"]             = KNOWLEDGE_DIR
 
 # Route all LLM calls (including CrewAI Memory's internal reconstruction) to
 # the active Ollama endpoint. Memory rebuilds its LLM from a plain model-name

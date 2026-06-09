@@ -297,6 +297,14 @@ class AgentScanITCrew:
                 max_checkpoints=3,
             )
 
+        _knowledge_embedder = {
+            "provider": "ollama",
+            "config": {
+                "url": f"{EMBED_BASE_URL}/api/embeddings",
+                "model_name": EMBED_MODEL,
+            },
+        }
+
         if self.scope == "hierarchical":
             crew_kwargs: dict = dict(
                 agents=self._active_agents,
@@ -304,6 +312,7 @@ class AgentScanITCrew:
                 process=Process.hierarchical,
                 manager_agent=_make_manager_agent(),
                 memory=_crew_memory,
+                embedder=_knowledge_embedder,
                 cache=True,
                 verbose=False,
                 task_callback=task_callback,
@@ -316,6 +325,7 @@ class AgentScanITCrew:
                 planning=True,
                 planning_llm=llm_planner,
                 memory=_crew_memory,
+                embedder=_knowledge_embedder,
                 cache=True,
                 verbose=False,
                 task_callback=task_callback,
