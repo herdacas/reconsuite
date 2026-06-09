@@ -37,7 +37,7 @@ import compliance_agent as _compliance     # Team 5: Compliance Mapper
 import risk_scorer as _risk                # Team 6: Risk Scorer
 
 from pydantic import BaseModel, Field
-from crewai.flow.flow import Flow, start, listen, router
+from crewai.flow.flow import Flow, start, listen, router, or_
 from crewai.flow.persistence import persist, SQLiteFlowPersistence
 from rich.console import Console
 from rich.prompt import Prompt
@@ -169,8 +169,7 @@ class ReconSuiteFlow(Flow[ScanState]):
         console.print()
         console.print("  [bold green]→ Route: CLEAN[/]  Keine CVEs — Teams 4+5+6 übersprungen.")
 
-    @listen(run_risk_scorer)
-    @listen(skip_teams)
+    @listen(or_(run_risk_scorer, skip_teams))
     def run_reporting(self):
         console.print()
         console.print("  [bold cyan]→ reporting[/]  Final Report wird erstellt...")

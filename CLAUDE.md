@@ -61,7 +61,8 @@ Abweichungen werden begründet dokumentiert.
 - `threatintel_agent/tools/` darf nicht via `sys.path.insert(0, _TEAM_DIR)` importiert werden — schattet `agentscanit/tools/` — stattdessen absolute Package-Imports: `from threatintel_agent.tools import ...`
 - `compliance_agent` nutzt `Crew(embedder=ollama)` analog Team 1 — gleiches Pattern wie Phase 6
 - Risk Scorer: `_has_in_the_wild` nutzt Keyword-Matching auf `threat_summary` — Keyword `"aktiv"` war zu breit (matched "aktiven"), ersetzt durch `"aktiv ausgenutzt"`
-- `run_threat_intel` ist no-op auf `cve_analysis`-Route (`has_exploitable=False`) — Team 4 läuft nur bei `full_analysis`
+- `run_threat_intel` ist no-op auf `cva_analysis`-Route (`has_exploitable=False`) — Team 4 läuft nur bei `full_analysis`
+- **`@listen` stacking ist broken** — `@listen(A)` + `@listen(B)` auf derselben Methode registriert nur den äußersten Trigger (A). Grund: jeder `@listen`-Aufruf erstellt einen neuen `ListenMethod`-Wrapper und setzt `__trigger_methods__` neu — der innere Wrapper wird überschrieben. Fix: `@listen(or_(A, B))` aus `crewai.flow.flow`. Gilt für alle Flow-Methoden mit mehr als einem Trigger.
 
 ---
 
@@ -95,7 +96,14 @@ recon-suite/
 │   └── nvd.py            ← Thin shim → agentscanit.tools.nvd
 ├── reporting/            ← Team 3: Final Report
 │   └── reporting_flow.py ← Merge scan-report + NVD data → final_report_*.md
-├── flow.py               ← Top-Level: orchestriert alle 3 Teams
+├── threatintel_agent/    ← Team 4: Threat Intelligence (OTX + Shodan + VT)
+│   ├── threatintel_flow.py ← OTX/Shodan/VT Lookup, graceful ohne API-Key
+│   └── tools/            ← otx_tool.py, shodan_tool.py, virustotal_tool.py
+├── compliance_agent/     ← Team 5: Compliance Mapping (OWASP)
+│   └── compliance_flow.py ← OWASP Top 10 Mapping via LLM + Knowledge Source
+├── risk_scorer/          ← Team 6: Asset Risk Scorer
+│   └── risk_flow.py      ← Deterministisches Risk-Scoring, kein LLM
+├── flow.py               ← Top-Level: orchestriert alle 6 Teams
 ├── main.py               ← Root-Wrapper (ruft flow.py auf)
 ├── logs/                 ← Scan-Outputs (gitignored)
 └── requirements.txt      ← Python-Abhängigkeiten
@@ -260,3 +268,4 @@ Modell-Auswahl via `models.json` (aus `models.json.example` ableiten).
 - **reporter_agent max_iter=3** — bewusst niedrig gehalten; der Reporter nutzt keine Tools und soll den Report in einem Durchgang schreiben. Höhere Werte führen zu 400s+ Laufzeiten bei großem Kontext.
 - **Checkpoint-Resume** — Nach `Crew.from_checkpoint()`: `_guardrails` (PrivateAttr) werden via `object.__setattr__()` re-attached, weil Pydantic validators bei direktem Field-Setzen nicht erneut laufen. `task_callback` wird sowohl auf Crew als auch auf jedem Task gesetzt.
 - **Flow-Persistence** — `@persist(SQLiteFlowPersistence(_FLOW_DB))` als Klassen-Dekorator auf `ReconSuiteFlow` speichert nach jedem Schritt in `logs/flow_state.db`. `ScanState` braucht `id: str = Field(default_factory=lambda: str(uuid4()))`. Resume via `flow.kickoff(restore_from_state_id=state_id)` — lädt State aus DB und überspringt fertige Schritte. `_FLOW_DB` muss vor der Klassendefinition stehen (Dekorator evaluiert bei Import).
+- **`@listen` Stacking — BROKEN** — `@listen(A)` + `@listen(B)` auf derselben Methode registriert NUR den äußersten Trigger. Jeder `@listen`-Aufruf erstellt einen neuen `ListenMethod`-Wrapper und setzt `__trigger_methods__` neu — die innere Registration wird überschrieben. Immer `@listen(or_(A, B))` verwenden wenn eine Methode auf mehrere Quellen hören soll. Import: `from crewai.flow.flow import or_`.
