@@ -1,15 +1,18 @@
 """
 recon-suite/flow.py — Master-Flow
 
-Orchestriert die drei Teams sequentiell:
-    1. agentscanit     → Active Recon & Enumeration
-    2. interpret-agent → CVE Enrichment (NVD API v2)
-    3. reporting       → Final Report (Merge)
+Orchestriert alle Teams sequentiell:
+    1. agentscanit       → Active Recon & Enumeration
+    2. interpret-agent   → CVE Enrichment (NVD API v2)
+    3. threatintel_agent → Threat Intelligence (OTX, Shodan, VT)
+    4. compliance_agent  → Compliance Mapping (OWASP, CIS)
+    5. risk_scorer       → Asset Risk Scoring
+    6. reporting         → Final Report (Merge)
 
 Routing nach dem Scan:
-    exploitable  → interpret + reporting
-    cve_found    → interpret + reporting
-    clean        → nur reporting (kein NVD-Lookup nötig)
+    full_analysis → interpret + threat_intel + compliance + risk + reporting
+    cve_analysis  → interpret + compliance + risk + reporting
+    clean         → nur reporting (kein NVD-Lookup nötig)
 
 Usage:
     python3 flow.py example.com "full assessment" full
@@ -47,17 +50,21 @@ console = Console()
 # ─── State ────────────────────────────────────────────────────────────────────
 
 class ScanState(BaseModel):
-    id:                str        = Field(default_factory=lambda: str(uuid4()))
-    target:            str        = ""
-    objective:         str        = ""
-    scope:             str        = "full"
-    pipeline:          list[str]  = Field(default_factory=list)
-    has_cve_findings:  bool       = False
-    has_exploitable:   bool       = False
-    scan_report_path:  str        = ""
-    scan_json_path:    str        = ""
-    nvd_results:       list[dict] = Field(default_factory=list)
-    final_report_path: str        = ""
+    id:                   str        = Field(default_factory=lambda: str(uuid4()))
+    target:               str        = ""
+    objective:            str        = ""
+    scope:                str        = "full"
+    pipeline:             list[str]  = Field(default_factory=list)
+    has_cve_findings:     bool       = False
+    has_exploitable:      bool       = False
+    scan_report_path:     str        = ""
+    scan_json_path:       str        = ""
+    nvd_results:          list[dict] = Field(default_factory=list)
+    final_report_path:    str        = ""
+    # Phase 7 — neue Team-Outputs
+    threat_intel_output:  str        = ""
+    compliance_output:    str        = ""
+    risk_score_output:    str        = ""
 
 
 # ─── Flow ─────────────────────────────────────────────────────────────────────
@@ -107,27 +114,50 @@ class ReconSuiteFlow(Flow[ScanState]):
 
     @router(run_scan)
     def route_results(self) -> str:
-        if self.state.has_exploitable or self.state.has_cve_findings:
-            return "needs_interpret"
-        return "clean"
+        if self.state.has_exploitable:
+            return "full_analysis"     # interpret + threat_intel + compliance + risk
+        if self.state.has_cve_findings:
+            return "cve_analysis"      # interpret + compliance + risk
+        return "clean"                 # direkt reporting
 
-    @listen("needs_interpret")
+    @listen("full_analysis")
+    @listen("cve_analysis")
     def run_interpret(self):
         console.print()
         console.print("  [bold yellow]→ interpret-agent[/]  CVE Enrichment läuft...")
         flow = _interpret.run_interpret_flow(self.state.scan_json_path)
         self.state.nvd_results = flow.state.nvd_results
 
-    @listen("clean")
-    def skip_interpret(self):
-        console.print()
-        console.print("  [bold green]→ Route: CLEAN[/]  Keine CVEs — kein NVD-Lookup nötig.")
-
     @listen(run_interpret)
-    @listen(skip_interpret)
-    def run_reporting(self):
+    def run_threat_intel(self):
+        # 7.1 — Threat Intelligence Agent (Team 4)
+        # Aktiv nur bei full_analysis (has_exploitable); no-op bei cve_analysis.
+        if not self.state.has_exploitable:
+            return
         console.print()
-        console.print("  [bold cyan]→ reporting[/]  Final Report wird erstellt...")
+        console.print("  [bold red]→ threatintel-agent[/]  [dim](Phase 7.1 — noch nicht implementiert)[/]")
+
+    @listen(run_threat_intel)
+    def run_compliance(self):
+        # 7.2 — Compliance Mapper (Team 5)
+        console.print()
+        console.print("  [bold magenta]→ compliance-agent[/]  [dim](Phase 7.2 — noch nicht implementiert)[/]")
+
+    @listen(run_compliance)
+    def run_risk_scorer(self):
+        # 7.3 — Asset Risk Scorer (Team 6)
+        console.print()
+        console.print("  [bold blue]→ risk-scorer[/]  [dim](Phase 7.3 — noch nicht implementiert)[/]")
+
+    @listen(run_risk_scorer)
+    @listen("clean")
+    def run_reporting(self):
+        if self.state.has_cve_findings or self.state.has_exploitable:
+            console.print()
+            console.print("  [bold cyan]→ reporting[/]  Final Report wird erstellt...")
+        else:
+            console.print()
+            console.print("  [bold green]→ Route: CLEAN[/]  Keine CVEs — kein NVD-Lookup nötig.")
         flow = _reporting.run_reporting_flow(
             scan_target      = self.state.target,
             scan_report_path = self.state.scan_report_path,
