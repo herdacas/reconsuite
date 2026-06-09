@@ -127,7 +127,7 @@ if __name__ == "__main__":
         console.print(
             "  [dim]Scopes:[/]  "
             "[cyan]osint[/] · [cyan]ssl[/] · [cyan]quick[/] · "
-            "[cyan]web[/] · [cyan]network[/] · [cyan]full[/]"
+            "[cyan]web[/] · [cyan]network[/] · [cyan]full[/] · [cyan]hierarchical[/]"
         )
         _scope = Prompt.ask("[bold]Scope[/]", default="full")
 

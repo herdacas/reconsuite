@@ -312,7 +312,7 @@ def make_tasks() -> dict:
         guardrails=[_cve_trace_guardrail],
         guardrail_max_retries=2,
         agent=research_agent,
-        context=[blue],
+        context=[research, blue],
     )
 
     red_scan = Task(
@@ -343,7 +343,7 @@ def make_tasks() -> dict:
         ),
         output_pydantic=RedScanOutput,
         agent=blue_agent,
-        context=[findings],
+        context=[blue, findings],
     )
 
     # red_scan is NOT in context= — its output flows in automatically via sequential

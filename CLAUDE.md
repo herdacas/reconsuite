@@ -1,5 +1,37 @@
 # CLAUDE.md — AgentScanIT / Recon-Suite
 
+## Arbeitsweise / Entwicklungsprozess
+
+Wir arbeiten die Roadmap (`roadmap.md`) phasenweise ab. Im Ablauf wird entschieden:
+- Schritte zu verschieben wenn sie ein höheres Risiko für die Hauptfunktionalität darstellen
+- Arbeitsschritte zusammenzufassen wenn sie logisch zusammengehören
+- Schritte vorübergehend zu überspringen um die Kernfunktion nicht zu beeinträchtigen
+
+**WICHTIG — Keine pauschalen Antworten. Faktenbasierte Responses auf jede Frage.**
+
+### Teilschritte in Phasen
+
+Wenn eine Phase in Teilschritte zerlegt wird, werden diese hier notiert.
+Abgeschlossene Teilschritte werden sofort als erledigt markiert.
+
+### Nach jeder Phase
+
+Check ob der aktuelle Stand noch der Planung in `roadmap.md` entspricht.
+Abweichungen werden begründet dokumentiert.
+
+---
+
+### Phase 5 — True Multi-Agent (Branch: phase/5-multi-agent)
+
+| Schritt | Beschreibung | Status |
+|---|---|---|
+| 5.1 | `allow_delegation=True` auf research_agent + red_agent | Reverted — inkompatibel mit Sequential Process + lokalen Ollama-Modellen (Delegation-Tools triggern native FC auf Regular-Agents). Manager-Delegation (5.3) ist der korrekte Weg. |
+| 5.2 | `_arun()` auf `NvdSearchTool` (async NVD-Lookup) | ✅ Erledigt |
+| 5.3 | Hierarchical Process Option (`scope=hierarchical`) | ✅ Erledigt |
+| 5.4 | `context=[]` Review auf `findings_task` + `red_scan_task` | ✅ Erledigt |
+
+---
+
 ## Was ist das?
 
 Agentic Vulnerability Assessment Framework auf Basis von CrewAI + lokalen Ollama-Modellen.
@@ -141,6 +173,9 @@ Modell-Auswahl via `models.json` (aus `models.json.example` ableiten).
 ---
 
 ## Bekannte Probleme / Offene Punkte
+
+### allow_delegation=False (agents.py)
+- Alle Agents haben `allow_delegation=False`. `allow_delegation=True` würde Delegation-Tools injizieren, was mit lokalen Ollama-Modellen nicht zuverlässig funktioniert (keine Garantie dass das Modell das Delegation-Schema korrekt ausführt).
 
 ### think: False (agents.py)
 - `extra_body={"think": False}` wird bedingungslos gesetzt — lokales Ollama ignoriert es für nicht-thinking-Modelle, remote-Modelle (Qwen3, gpt-oss) benötigen es.
