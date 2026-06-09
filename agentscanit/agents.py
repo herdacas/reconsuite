@@ -3,6 +3,8 @@ agents.py – CrewAI Agent-Definitionen für AgentScanIT
 Jeder Agent hat eine klar abgegrenzte Rolle im Vulnerability Assessment Workflow.
 """
 
+import warnings
+
 from crewai import Agent, LLM
 from rich.console import Console
 
@@ -12,6 +14,20 @@ from config import (
     TEMP_ANALYSIS, TEMP_CODE, TEMP_RESEARCH,
     LOCAL_MODEL_PLANNER, PLANNER_BASE_URL,
 )
+
+# Remote-Mode: gpt-oss models via ollama.com don't support Ollama's native
+# function-calling API (call_llm_native_tools returns None → ValueError).
+# The experimental AgentExecutor uses native FC; CrewAgentExecutor (legacy ReAct)
+# does not — it sends tool descriptions as text and parses text responses.
+# Local-Mode: experimental executor works reliably with local Ollama native FC.
+if OLLAMA_API_KEY:
+    from crewai.agents.crew_agent_executor import CrewAgentExecutor as _ExecutorClass
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        _EXECUTOR_CLASS = _ExecutorClass
+else:
+    from crewai.experimental.agent_executor import AgentExecutor as _ExecutorClass
+    _EXECUTOR_CLASS = _ExecutorClass
 from knowledge import service_normalization_knowledge
 # Note: `_run` in tools/_base.py is the subprocess helper. Within tool classes, bare
 # `_run(cmd)` calls that helper; `self._run` is the BaseTool interface method (CrewAI).
@@ -167,6 +183,7 @@ research_agent = Agent(
     knowledge_sources=[service_normalization_knowledge],
     llm=llm_research,
     function_calling_llm=llm_research,
+    executor_class=_EXECUTOR_CLASS,
     verbose=False,
     memory=False,
     allow_delegation=False,
@@ -197,6 +214,7 @@ blue_agent = Agent(
     ],
     llm=llm_analysis,
     function_calling_llm=llm_analysis,
+    executor_class=_EXECUTOR_CLASS,
     verbose=False,
     memory=False,
     allow_delegation=False,
@@ -227,6 +245,7 @@ red_agent = Agent(
     knowledge_sources=[service_normalization_knowledge],
     llm=llm_analysis,
     function_calling_llm=llm_analysis,
+    executor_class=_EXECUTOR_CLASS,
     verbose=False,
     memory=False,
     allow_delegation=False,
@@ -252,6 +271,7 @@ coding_agent = Agent(
     ),
     llm=llm_code,
     function_calling_llm=llm_code,
+    executor_class=_EXECUTOR_CLASS,
     verbose=False,
     memory=False,
     allow_delegation=False,
@@ -277,6 +297,7 @@ reporter_agent = Agent(
     ),
     llm=llm_analysis,
     function_calling_llm=llm_analysis,
+    executor_class=_EXECUTOR_CLASS,
     verbose=False,
     memory=False,
     allow_delegation=False,
