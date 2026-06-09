@@ -142,6 +142,9 @@ Modell-Auswahl via `models.json` (aus `models.json.example` ableiten).
 
 ## Bekannte Probleme / Offene Punkte
 
+### allow_delegation=False (agents.py)
+- Alle Agents haben `allow_delegation=False` — bewusste Entscheidung. `allow_delegation=True` aktiviert in CrewAI's `agent_executor` den `call_llm_native_tools`-Pfad für Delegation-Flows. Dieser Pfad verwendet native function-calling und liefert mit unserem Remote-Ollama-Setup leere LLM-Antworten (`ValueError: Invalid response from LLM call - None or empty`). Solange der Delegation-Pfad nicht mit `extra_body={"think": False}` + Ollama kompatibel ist, bleibt Delegation deaktiviert.
+
 ### think: False (agents.py)
 - `extra_body={"think": False}` wird bedingungslos gesetzt — lokales Ollama ignoriert es für nicht-thinking-Modelle, remote-Modelle (Qwen3, gpt-oss) benötigen es.
 
