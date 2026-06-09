@@ -30,8 +30,11 @@ sys.path.insert(0, _SUITE_DIR)
 
 import agentscanit.main as _scan_main       # lädt CrewAI-Patches als Seiteneffekt
 from agentscanit import AgentScanITCrew
-import interpret_agent as _interpret        # Verzeichnis: interpret_agent/
-import reporting as _reporting             # Verzeichnis: reporting/
+import interpret_agent as _interpret        # Team 2: NVD-Enrichment
+import reporting as _reporting             # Team 3: Final Report
+import threatintel_agent as _threatintel   # Team 4: Threat Intelligence
+import compliance_agent as _compliance     # Team 5: Compliance Mapper
+import risk_scorer as _risk                # Team 6: Risk Scorer
 
 from pydantic import BaseModel, Field
 from crewai.flow.flow import Flow, start, listen, router
@@ -130,24 +133,35 @@ class ReconSuiteFlow(Flow[ScanState]):
 
     @listen(run_interpret)
     def run_threat_intel(self):
-        # 7.1 — Threat Intelligence Agent (Team 4)
         # Aktiv nur bei full_analysis (has_exploitable); no-op bei cve_analysis.
         if not self.state.has_exploitable:
             return
         console.print()
-        console.print("  [bold red]→ threatintel-agent[/]  [dim](Phase 7.1 — noch nicht implementiert)[/]")
+        console.print("  [bold red]→ threatintel-agent[/]  Threat Intelligence läuft...")
+        flow = _threatintel.run_threatintel_flow(self.state.scan_json_path)
+        self.state.threat_intel_output = flow.state.threat_summary
 
     @listen(run_threat_intel)
     def run_compliance(self):
-        # 7.2 — Compliance Mapper (Team 5)
         console.print()
-        console.print("  [bold magenta]→ compliance-agent[/]  [dim](Phase 7.2 — noch nicht implementiert)[/]")
+        console.print("  [bold magenta]→ compliance-agent[/]  OWASP Mapping läuft...")
+        flow = _compliance.run_compliance_flow(self.state.scan_json_path)
+        self.state.compliance_output = flow.state.mapping_result
 
     @listen(run_compliance)
     def run_risk_scorer(self):
-        # 7.3 — Asset Risk Scorer (Team 6)
         console.print()
-        console.print("  [bold blue]→ risk-scorer[/]  [dim](Phase 7.3 — noch nicht implementiert)[/]")
+        console.print("  [bold blue]→ risk-scorer[/]  Risk Score wird berechnet...")
+        flow = _risk.run_risk_flow(
+            scan_json_path      = self.state.scan_json_path,
+            nvd_results         = self.state.nvd_results,
+            threat_intel_output = self.state.threat_intel_output,
+            compliance_output   = self.state.compliance_output,
+            has_exploitable     = self.state.has_exploitable,
+        )
+        self.state.risk_score_output = (
+            f"Score: {flow.state.risk_score} / 10 — {flow.state.risk_level}"
+        )
 
     @listen(run_risk_scorer)
     @listen("clean")
