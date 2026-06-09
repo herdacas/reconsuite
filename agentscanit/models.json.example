@@ -1,24 +1,38 @@
 {
-  "_comment": "Kopiere diese Datei zu models.json und trage deine Zugangsdaten ein. models.json ist gitignored.",
+  "//": [
+    "Kopiere diese Datei zu models.json und trage deine Zugangsdaten ein.",
+    "models.json ist gitignored und wird nie committed.",
+    "",
+    "Remote-Mode:  ollama_api_key setzen → Agents laufen gegen ollama_base_url.",
+    "Local-Mode:   ollama_api_key leer lassen → Agents laufen gegen localhost:11434.",
+    "              Dann gelten die Werte aus 'local_fallback_models'.",
+    "",
+    "embed_base_url ist optional (Default: http://localhost:11434).",
+    "Das Embedding-Modell laeuft immer lokal, unabhaengig vom Remote/Local-Switch."
+  ],
 
-  "ollama_base_url": "https://ollama.com",
-  "ollama_api_key":  "DEIN_API_KEY_HIER",
+  "ollama_base_url": "http://<remote-host>:11434",
+  "ollama_api_key":  "",
 
-  "_comment_embed": "Das Embedding-Modell (LanceDB-Memory) laeuft IMMER lokal, unabhaengig vom Remote/Local-LLM-Switch. 'embed_base_url' ist optional (Default: http://localhost:11434) und nur noetig, wenn das Embedding auf einem anderen Host als localhost laufen soll. 'models.embed' gilt fuer beide Modi — es gibt bewusst keinen embed-Eintrag in local_fallback_models.",
   "embed_base_url": "http://localhost:11434",
 
   "models": {
-    "analysis":  "gpt-oss:120b",
-    "code":      "devstral-2:123b",
-    "research":  "gpt-oss:20b",
-    "embed":     "nomic-embed-text"
-  },
-
-  "local_fallback_models": {
     "analysis": "qwen2.5-coder:14b",
     "code":     "qwen2.5-coder:14b",
     "research": "qwen2.5:7b",
-    "_comment_planner": "Planner laeuft IMMER lokal (localhost:11434), unabhaengig vom Remote/Local-Switch. Benoetigt native Ollama tool-calling API. Default = research-Modell (qwen2.5:7b). Instruct-Variante empfohlen.",
+    "embed":    "nomic-embed-text"
+  },
+
+  "local_fallback_models": {
+    "//": [
+      "analysis/code/research: wird genutzt wenn ollama_api_key leer ist (Local-Mode).",
+      "planner: wird IMMER von hier gelesen — auch im Remote-Mode.",
+      "  Der Planner laeuft grundsaetzlich lokal (Ollama native tool-calling API).",
+      "  Instruct-Variante empfohlen."
+    ],
+    "analysis": "qwen2.5-coder:14b",
+    "code":     "qwen2.5-coder:14b",
+    "research": "qwen2.5:7b",
     "planner":  "qwen2.5:7b-instruct"
   }
 }

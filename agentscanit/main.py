@@ -86,17 +86,36 @@ def _on_task_done(output) -> None:
 # entfällt dieser Schritt — der Server hält die Modelle bereits vor.
 
 def _warmup_models() -> None:
-    """Lädt die aktiven lokalen LLMs + das Embedding-Modell parallel in den VRAM."""
+    """Lädt die aktiven LLMs + Embedding-Modell in den VRAM.
+
+    Local-Mode:  alle 3 Haupt-LLMs + Planner + Embedding (alle lokal).
+    Remote-Mode: nur Planner + Embedding (immer lokal) — Haupt-LLMs laufen remote
+                 und müssen nicht lokal geladen werden.
+    """
     import requests
     import concurrent.futures
+    from config import LOCAL_MODEL_PLANNER, PLANNER_BASE_URL
 
-    llm_models = list(dict.fromkeys([ACTIVE_ANALYSIS, ACTIVE_CODE, ACTIVE_RESEARCH]))
-    console.print(f"  [dim]Warming up {len(llm_models) + 1} local model(s) (parallel)...[/]", end="")
+    local_llms: list[tuple[str, str]] = []   # (model, base_url)
 
-    def _load_llm(model: str) -> None:
+    if not OLLAMA_API_KEY:
+        # Local-Mode: alle Haupt-LLMs warmup
+        for m in dict.fromkeys([ACTIVE_ANALYSIS, ACTIVE_CODE, ACTIVE_RESEARCH]):
+            local_llms.append((m, ACTIVE_BASE_URL))
+
+    # Planner läuft immer lokal — auch im Remote-Mode warmupen.
+    # Ohne Warmup wartet der erste Planner-Call bis qwen2.5:7b geladen ist (~2-4min).
+    planner_key = (LOCAL_MODEL_PLANNER, PLANNER_BASE_URL)
+    if planner_key not in local_llms:
+        local_llms.append(planner_key)
+
+    n_total = len(local_llms) + 1  # +1 für Embedding
+    console.print(f"  [dim]Warming up {n_total} local model(s) (parallel)...[/]", end="")
+
+    def _load_llm(model: str, base_url: str) -> None:
         try:
             requests.post(
-                f"{ACTIVE_BASE_URL.rstrip('/')}/api/generate",
+                f"{base_url.rstrip('/')}/api/generate",
                 json={"model": model, "prompt": "", "keep_alive": "30m"},
                 timeout=300,
             )
@@ -114,7 +133,7 @@ def _warmup_models() -> None:
             console.print(f"\n  [yellow]⚠[/]  Warmup embed '{EMBED_MODEL}' fehlgeschlagen: {exc}")
 
     with concurrent.futures.ThreadPoolExecutor() as pool:
-        futs = [pool.submit(_load_llm, m) for m in llm_models]
+        futs = [pool.submit(_load_llm, m, u) for m, u in local_llms]
         futs.append(pool.submit(_load_embed))
         concurrent.futures.wait(futs)
 
@@ -160,10 +179,10 @@ def run(target: str, objective: str = "", scope: str = "full") -> object:
     ))
     console.print()
 
-    # Local-Mode: Modelle vor dem ersten LLM-Call (Planner) in den VRAM laden.
-    if not OLLAMA_API_KEY:
-        _warmup_models()
-        console.print()
+    # Warmup: Planner + Embedding immer lokal — auch im Remote-Mode.
+    # Remote-Mode lädt zusätzlich keine Haupt-LLMs (laufen remote).
+    _warmup_models()
+    console.print()
 
     _run_ts      = datetime.now().strftime("%Y%m%d_%H%M%S")
     _safe_target = re.sub(r"[^\w.-]", "_", target)
@@ -198,6 +217,10 @@ def run(target: str, objective: str = "", scope: str = "full") -> object:
                 "ended without reaching a final answer" in exc_str
             )
             if _is_retryable and _attempt < 2:
+                console.print(
+                    f"  [yellow]⚠[/]  Retryable error ({type(_exc).__name__}): "
+                    f"{str(_exc)[:120]}"
+                )
                 _n_done  = len(_completed_labels)
                 _resumed = False
 
@@ -238,10 +261,12 @@ def run(target: str, objective: str = "", scope: str = "full") -> object:
                                 )
                                 _reset_task_progress(scanner.pipeline, time.time())
                             except Exception as _ckpt_err:
+                                import traceback as _tb
                                 console.print(
                                     f"  [yellow]⚠[/]  Checkpoint-Resume fehlgeschlagen "
-                                    f"({type(_ckpt_err).__name__}) — Vollneustart"
+                                    f"({type(_ckpt_err).__name__}: {str(_ckpt_err)[:80]}) — Vollneustart"
                                 )
+                                console.print(f"  [dim]{_tb.format_exc()[-300:]}[/]")
 
                 if not _resumed:
                     console.print(
