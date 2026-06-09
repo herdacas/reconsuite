@@ -499,7 +499,8 @@ if __name__ == "__main__":
             "[cyan]quick[/]  ·  "
             "[cyan]web[/]  ·  "
             "[cyan]network[/]  ·  "
-            "[cyan]full[/] [dim]all tools[/]"
+            "[cyan]full[/] [dim]all tools[/]  ·  "
+            "[cyan]hierarchical[/] [dim]manager-koordiniert[/]"
         )
         _scope = Prompt.ask("[bold]Scope[/]", default="full")
 

@@ -173,15 +173,16 @@ _TASK_AGENT = {
     "report":   reporter_agent,
 }
 
-VALID_SCOPES = {"osint", "ssl", "quick", "web", "network", "full"}
+VALID_SCOPES = {"osint", "ssl", "quick", "web", "network", "full", "hierarchical"}
 
 _SCOPE_CEILING: dict[str, set] = {
-    "osint":   {"research", "report"},
-    "ssl":     {"research", "blue", "report"},
-    "quick":   {"research", "blue", "findings", "report"},
-    "web":     {"research", "blue", "findings", "red", "report"},
-    "network": {"research", "blue", "findings", "red", "report"},
-    "full":    {"research", "blue", "findings", "red_scan", "red", "coding", "report"},
+    "osint":        {"research", "report"},
+    "ssl":          {"research", "blue", "report"},
+    "quick":        {"research", "blue", "findings", "report"},
+    "web":          {"research", "blue", "findings", "red", "report"},
+    "network":      {"research", "blue", "findings", "red", "report"},
+    "full":         {"research", "blue", "findings", "red_scan", "red", "coding", "report"},
+    "hierarchical": {"research", "blue", "findings", "red", "report"},
 }
 
 PHASE_LABEL = {
@@ -193,6 +194,36 @@ PHASE_LABEL = {
     "coding":   "Script Generation",
     "report":   "Report",
 }
+
+
+def _make_manager_agent() -> "Agent":
+    """Koordinations-Agent für Process.hierarchical.
+
+    Besitzt keine eigenen Tools — delegiert alle Aufgaben an Worker-Agents
+    (research, blue, red, coding, reporter). allow_delegation=True ist
+    für den Manager-Role in CrewAI's hierarchical Process erforderlich.
+    """
+    from agents import llm_analysis
+    from crewai import Agent as _Agent
+    return _Agent(
+        role="Security Assessment Manager",
+        goal=(
+            "Koordiniere das Pentest-Team so dass jede Recon-Phase vollständig durchlaufen wird. "
+            "Delegiere Aufgaben gezielt an die spezialisierten Agents und stelle sicher dass "
+            "alle Findings zusammengeführt werden bevor der Report erstellt wird."
+        ),
+        backstory=(
+            "Du leitest ein spezialisiertes Security-Assessment-Team. "
+            "Du kennst die Stärken jedes Team-Mitglieds und sorgst dafür dass "
+            "OSINT, Active Scanning, CVE-Analyse und Exploitability-Bewertung "
+            "in der richtigen Reihenfolge und mit den richtigen Agents durchgeführt werden."
+        ),
+        llm=llm_analysis,
+        allow_delegation=True,
+        verbose=False,
+        memory=False,
+        respect_context_window=True,
+    )
 
 
 def plan_tasks(target: str, objective: str, scope: str) -> tuple[list, list, dict]:
@@ -266,17 +297,29 @@ class AgentScanITCrew:
                 max_checkpoints=3,
             )
 
-        crew_kwargs: dict = dict(
-            agents=self._active_agents,
-            tasks=self._active_tasks,
-            process=Process.sequential,
-            planning=True,
-            planning_llm=llm_planner,
-            memory=_crew_memory,
-            cache=True,
-            verbose=False,
-            task_callback=task_callback,
-        )
+        if self.scope == "hierarchical":
+            crew_kwargs: dict = dict(
+                agents=self._active_agents,
+                tasks=self._active_tasks,
+                process=Process.hierarchical,
+                manager_agent=_make_manager_agent(),
+                memory=_crew_memory,
+                cache=True,
+                verbose=False,
+                task_callback=task_callback,
+            )
+        else:
+            crew_kwargs = dict(
+                agents=self._active_agents,
+                tasks=self._active_tasks,
+                process=Process.sequential,
+                planning=True,
+                planning_llm=llm_planner,
+                memory=_crew_memory,
+                cache=True,
+                verbose=False,
+                task_callback=task_callback,
+            )
         if checkpoint is not None:
             crew_kwargs["checkpoint"] = checkpoint
 
