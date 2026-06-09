@@ -142,13 +142,8 @@ Modell-Auswahl via `models.json` (aus `models.json.example` ableiten).
 
 ## Bekannte Probleme / Offene Punkte
 
-### allow_delegation=False + native tool calling deaktiviert (agents.py / crew.py)
-- Alle Agents haben `allow_delegation=False`. `allow_delegation=True` wäre möglich wenn native tool calling funktioniert (s.u.).
-- `check_native_tool_support()` wird in `_apply_memory_patches()` an **drei Stellen** gepatcht — weil `agent_executor.py` die Funktion via `from ... import` importiert (lokale Modulbindung), die durch Patchen von `agent_utils` alleine nicht überschrieben wird:
-  1. `crewai.utilities.agent_utils.check_native_tool_support` (Quellmodul)
-  2. `crewai.experimental.agent_executor.check_native_tool_support` (lokale Bindung im agent_executor-Modul)
-  3. `AgentExecutor._check_native_tool_support` (Instanzmethode der Klasse)
-- Hintergrund: LiteLLM gibt für unbekannte Ollama-Modelle (`gpt-oss:120b`, `gpt-oss:20b`) `supports_function_calling() = True` zurück. Das aktiviert `use_native_tools = True` im `agent_executor` und sendet Tools im OpenAI-Schema-Format. Der Remote-Ollama-Endpunkt antwortet darauf leer → `ValueError: Invalid response from LLM call - None or empty` bei jedem Scan. Der ReAct/Text-Pfad (`use_native_tools = False`) funktioniert zuverlässig und wird daher erzwungen.
+### allow_delegation=False (agents.py)
+- Alle Agents haben `allow_delegation=False`. `allow_delegation=True` würde Delegation-Tools injizieren, was mit lokalen Ollama-Modellen nicht zuverlässig funktioniert (keine Garantie dass das Modell das Delegation-Schema korrekt ausführt).
 
 ### think: False (agents.py)
 - `extra_body={"think": False}` wird bedingungslos gesetzt — lokales Ollama ignoriert es für nicht-thinking-Modelle, remote-Modelle (Qwen3, gpt-oss) benötigen es.
@@ -165,7 +160,7 @@ Modell-Auswahl via `models.json` (aus `models.json.example` ableiten).
 - CrewAI's Memory-Analyse-LLM-Calls werden monkey-gepatcht (keine LLM-Calls bei save/recall).
 - Grund: Pydantic-Validation-Errors + Rate-Limit-Probleme bei gleichzeitigen async-Requests.
 - Patch sitzt in `crew.py:_apply_memory_patches()` — co-located mit der Memory-Konfiguration.
-- Patch-Targets nach CrewAI-Update immer prüfen: `crewai.memory.analyze`, `encoding_flow`, `recall_flow`, `crewai.utilities.agent_utils.check_native_tool_support`, `crewai.experimental.agent_executor.check_native_tool_support`, `AgentExecutor._check_native_tool_support`.
+- Patch-Targets nach CrewAI-Update immer prüfen: `crewai.memory.analyze`, `encoding_flow`, `recall_flow`.
 
 ### Flow-Persistence (`@persist`, flow.py)
 - `ReconSuiteFlow` trägt `@persist(SQLiteFlowPersistence(_FLOW_DB), verbose=False)` — nach jedem abgeschlossenen Flow-Schritt wird der State in `logs/flow_state.db` gespeichert.
