@@ -11,7 +11,7 @@ Scopes:
     ssl     – sslscan + testssl
     quick   – ping + nmap Top-100 + httpx
     web     – httpx, whatweb, nikto, nuclei + Red-Analyse
-    network – nmap + naabu + httpx + Red-Analyse
+    network – nmap + httpx + Red-Analyse
     full    – alle Tools
 
 Als Flow-Crew importieren:
@@ -186,7 +186,22 @@ def run(target: str, objective: str = "", scope: str = "full") -> object:
 
     _run_ts      = datetime.now().strftime("%Y%m%d_%H%M%S")
     _safe_target = re.sub(r"[^\w.-]", "_", target)
-    checkpoint_dir = Path(LOG_DIR) / "checkpoints" / f"{_safe_target}_{_run_ts}"
+    # Intra-Crew-Checkpointing ist standardmäßig DEAKTIVIERT.
+    # Bewiesene Ursache (debugging/DIAGNOSIS.md, A/B-Test): Der Checkpoint-Write
+    # nach der blue-Task läuft im Hintergrund-Thread (event_bus.emit submittet an
+    # ThreadPoolExecutor ohne zu warten) und serialisiert die crew/agent/task-
+    # Entities WÄHREND der Main-Thread sie in der findings-Phase mutiert
+    # → PyO3-Panic "dict changed size during iteration" → Thread-Local-Korruption
+    # → findings-Task crasht mit "ended without reaching a final answer".
+    # Mit deaktiviertem Checkpoint läuft die Pipeline nachweislich durch.
+    # Der frühere event_record-Lock schützt nur das event_record, nicht die Entities.
+    # Zusätzlich ist Checkpoint-Resume unabhängig kaputt (BaseKnowledgeSource).
+    # Zwischen-Team-Resume bleibt über @persist(SQLiteFlowPersistence) erhalten.
+    # ENABLE_CHECKPOINT=1 reaktiviert das (race-behaftete) Verhalten für Debugging.
+    if os.getenv("ENABLE_CHECKPOINT"):
+        checkpoint_dir = Path(LOG_DIR) / "checkpoints" / f"{_safe_target}_{_run_ts}"
+    else:
+        checkpoint_dir = None
 
     run_start = time.time()
     crew_obj  = scanner.crew(task_callback=_on_task_done, checkpoint_dir=checkpoint_dir)
@@ -235,7 +250,9 @@ def run(target: str, objective: str = "", scope: str = "full") -> object:
 
                 # Checkpoint-Resume: wenn mindestens eine Phase abgeschlossen ist,
                 # versuche die Crew aus dem letzten Checkpoint wiederherzustellen.
-                if _n_done > 0:
+                # checkpoint_dir kann None sein (Checkpointing deaktiviert) → dann
+                # direkt Vollneustart, kein Resume-Versuch.
+                if _n_done > 0 and checkpoint_dir is not None:
                     _ckpt_main = checkpoint_dir / "main"
                     if _ckpt_main.exists():
                         _ckpt_files = sorted(

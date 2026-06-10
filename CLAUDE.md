@@ -116,7 +116,7 @@ recon-suite/
 | Agent | Rolle | Tools |
 |---|---|---|
 | `research_agent` | Passive OSINT / Recon | 15 (subfinder, dnsrecon, dig, whois, ..., nvd_tool) |
-| `blue_agent` | Active Scanning | 12 (nmap, nikto, nuclei, sslscan, ...) |
+| `blue_agent` | Active Scanning | 11 (nmap, nikto, nuclei, sslscan, ...; naabu ausgeklammert) |
 | `research_agent` | CVE-Analyse (findings_task) | searchsploit, ddg, nvd_tool — max_iter=20 (erhöht von 12: 5-10 Services × 2-3 Calls = bis 30 Iterations) |
 | `blue_agent` | Targeted Follow-up (red_scan_task) | nuclei, nikto |
 | `red_agent` | Exploitability-Analyse | searchsploit, ddg, nvd_tool |
@@ -214,6 +214,30 @@ Modell-Auswahl via `models.json` (aus `models.json.example` ableiten).
 ---
 
 ## Bekannte Probleme / Offene Punkte
+
+### ⭐ Phase-7-Verifikation (2026-06-10) — Pipeline-Crash gefixt + naabu ausgeklammert
+Vollständiger Beweis-Trail: `debugging/DIAGNOSIS.md`. Kurzfassung für die nächste Session:
+
+**ROOT CAUSE (gefixt): Checkpoint-Write korrumpiert die findings-Task.**
+- Symptom war: Pipeline crasht nach blue in `findings` mit `Agent execution ended without reaching a final answer` (3× Retry → exit 1). KEIN Hang zwischen research/blue — das war eine Fehlannahme.
+- Ursache (A/B-Test bewiesen): `CheckpointConfig` schreibt nach `task_completed` im **Hintergrund-Thread** (`event_bus.emit` submittet an ThreadPoolExecutor ohne zu warten). `RuntimeState._serialize` serialisiert die `self.root`-Entities (crew/agent/task) WÄHREND der Main-Thread sie in der findings-Phase mutiert → Pydantic-Rust-Serializer → PyO3-Panic „dict changed size during iteration" → Thread-Local-Korruption → nächster findings-LLM-Call schlägt fehl.
+- Der ältere Fix (`EventRecord.model_dump` mit `r_locked()` in crew.py) schützt nur das `event_record`, **NICHT die Entities** → wirkt nicht. Patch ist aktiv, RWLock korrekt — verifiziert.
+- **Fix (main.py):** Intra-Crew-Checkpointing standardmäßig AUS (`checkpoint_dir = None`), `ENABLE_CHECKPOINT=1` reaktiviert das (race-behaftete) Verhalten. Retry-Resume-Block gegen `checkpoint_dir is None` abgesichert. Zwischen-Team-Resume bleibt über `@persist(SQLiteFlowPersistence)` erhalten.
+- **Verifiziert E2E:** quick-Scope läuft research→blue→findings→report→reporting komplett durch, 0 Fehler-Marker.
+
+**naabu ausgeklammert (agents.py).**
+- `naabu_tool` ist aus der `blue_agent`-Tool-Liste entfernt (jetzt 11 statt 12 Tools). Grund: naabu macht `-p 1-65535` (Full-Port-Scan), läuft mehrere Minuten ohne Output → das vom User als „Hängen nach Research" wahrgenommene Verhalten. Port-Discovery läuft weiter über nmap.
+- Auswirkung verifiziert: Active-Scanning-Phase von ~293s auf ~19s.
+- Prompt-Erwähnungen in `tasks.py` (4 Stellen) + Docstring in `main.py` auf nmap/httpx umgestellt.
+- **Reversibel:** `NaabuTool`-Klasse, Import, `NAABU_BIN` bleiben. Wieder einschalten = `naabu_tool` zurück in die `tools=[]`-Liste des blue_agent.
+
+**Verworfene Hypothese (NICHT erneut verfolgen): „gpt-oss liefert leere Antworten".**
+- Ein Retry-on-empty-Fix (`OpenAICompletion.call`-Patch) wurde gebaut, unit-getestet UND End-to-End widerlegt: das Retry feuerte nie, findings crashte trotzdem. Komplett zurückgenommen. Die leere Antwort ist real (kommt vereinzelt vor), aber NICHT der Crash-Pfad.
+
+**Noch offen (nicht angefasst):**
+- „Strg+C wirkt nicht" während langer Tool-Scans = Subprozess-/asyncio-Signalhandling. Prozess ist via `kill` beendbar. Separater Punkt.
+- Saubere Checkpoint-Reparatur (synchrone Serialisierung gegen Entity-Race + `knowledge_sources` beim Restore neu anhängen, wegen `BaseKnowledgeSource`-TypeError) → dann `ENABLE_CHECKPOINT` wieder Default.
+- Gegentest auf Ziel mit vielen offenen Ports + echten CVEs steht aus (bisher CLEAN-Route verifiziert).
 
 ### allow_delegation=False (agents.py)
 - Alle Agents haben `allow_delegation=False`. `allow_delegation=True` würde Delegation-Tools injizieren, was mit lokalen Ollama-Modellen nicht zuverlässig funktioniert (keine Garantie dass das Modell das Delegation-Schema korrekt ausführt).

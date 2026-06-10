@@ -15,7 +15,7 @@ Inputs für kickoff():
                 quick   → max. 3 Tools, kein Fuzzing, kein Screenshot
                 ssl     → NUR sslscan + testssl
                 web     → HTTP/HTTPS-Fokus: httpx, whatweb, nikto, nuclei, ffuf
-                network → Port-Discovery: nmap, naabu, httpx (kein SMB ohne offenen Port)
+                network → Port-Discovery: nmap, httpx (kein SMB ohne offenen Port)
                 full    → alle verfügbaren Tools (vollständiges Assessment)
 """
 
@@ -278,11 +278,11 @@ def make_tasks() -> dict:
             "- nuclei: Nutze 'tags' mit den von whatweb/httpx erkannten Technologien "
             "  (z.B. tags='apache' oder tags='wordpress'). Nutze 'severity=critical,high' "
             "  für gezielte CVE-Suche.\n"
-            "- nmap: Nutze 'ports' mit konkreten Ports aus naabu-Discovery statt Top-1000.\n\n"
+            "- nmap: Nutze 'ports' mit konkreten Ports aus vorheriger nmap-Discovery statt Top-1000.\n\n"
             "Tool-Auswahl nach Scope:\n"
             "Scope 'quick':   ping + nmap (Top-100-Ports) + httpx. Fertig.\n"
             "Scope 'web':     httpx + whatweb + curl + nikto. SSL nur wenn HTTPS aktiv. Kein nmap full-scan.\n"
-            "Scope 'network': nmap (alle Ports, -T4) + naabu + httpx für offene Web-Ports.\n"
+            "Scope 'network': nmap (alle Ports, -T4) + httpx für offene Web-Ports.\n"
             "Scope 'ssl':     NUR sslscan + testssl auf {target}. Keine anderen Tools.\n"
             "Scope 'full':    Starte mit nmap Top-1000 (aggressive=False), dann basierend auf Ergebnissen:\n"
             "                 - PFLICHT nach Port-Discovery: nmap erneut mit aggressive=True NUR auf den "
@@ -298,7 +298,7 @@ def make_tasks() -> dict:
             "- Max. 6 Tool-Aufrufe für Scope 'quick' und 'web'\n"
             "- Tool-Fehler: Wenn ein Tool-Output mit '[TOOL_ERROR]' beginnt, "
             "dieses Tool ÜBERSPRINGEN und das nächste Tool im Plan ausführen. "
-            "Kein Retry. '[TOOL_ERROR] nmap: binary not found' → naabu als Ersatz nutzen. "
+            "Kein Retry. '[TOOL_ERROR] nmap: binary not found' → mit httpx weiterarbeiten. "
             "'[TOOL_ERROR] nikto: timeout after 300s' → mit httpx/whatweb weiterarbeiten.\n\n"
             "Nach den Scans: Analysiere alle Outputs und identifiziere sicherheitsrelevante Findings.\n\n"
             "TOOL-PFLICHT:\n"

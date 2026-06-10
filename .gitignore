@@ -22,3 +22,7 @@ agentscanit/enum4linux-ng/
 benchmark.py
 bericht.md
 roadmap.md
+
+# Laufzeit-Artefakte / Backups (nicht ins Repo)
+agentscanit/knowledge_storage/
+*.json_backup

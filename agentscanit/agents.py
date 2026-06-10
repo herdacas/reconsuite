@@ -9,10 +9,9 @@ from crewai import Agent, LLM
 from rich.console import Console
 
 from config import (
-    ACTIVE_ANALYSIS, ACTIVE_CODE, ACTIVE_RESEARCH,
+    ACTIVE_ANALYSIS, ACTIVE_CODE, ACTIVE_RESEARCH, ACTIVE_PLANNER,
     ACTIVE_BASE_URL, OLLAMA_API_KEY,
     TEMP_ANALYSIS, TEMP_CODE, TEMP_RESEARCH,
-    LOCAL_MODEL_PLANNER, PLANNER_BASE_URL,
 )
 
 with warnings.catch_warnings():
@@ -120,6 +119,7 @@ def _llm(model: str, temperature: float) -> LLM:
         model=f"ollama/{model}",
         base_url=ACTIVE_BASE_URL,
         temperature=temperature,
+        timeout=300,
     )
     if OLLAMA_API_KEY:
         kwargs["api_key"] = OLLAMA_API_KEY
@@ -141,19 +141,26 @@ llm_analysis = _llm(ACTIVE_ANALYSIS, TEMP_ANALYSIS)
 llm_code     = _llm(ACTIVE_CODE,     TEMP_CODE)
 llm_research = _llm(ACTIVE_RESEARCH, TEMP_RESEARCH)
 
-# Planning LLM is always local — remote models (gpt-oss) don't support Ollama's
-# native function-calling format that CrewPlanner's experimental executor needs.
-# No API key, no think=False: qwen2.5:7b-instruct handles plain JSON generation.
-# max_tokens=2000: caps plan output at ~2000 tokens so combined input+output stays
-# within the local server's 4096-token context. Without this cap, the server's
-# --context-shift would allow indefinite generation (>20 min for a 7-phase plan).
-llm_planner = LLM(
-    model=f"ollama/{LOCAL_MODEL_PLANNER}",
-    base_url=PLANNER_BASE_URL,
+# Planner LLM: verwendet ACTIVE_BASE_URL + ACTIVE_PLANNER — d.h. remote wenn API-Key
+# gesetzt, lokal sonst. Der Planner generiert nur einen JSON-Plan (kein tool-calling),
+# daher funktioniert auch gpt-oss:20b hier zuverlässig. max_tokens=2000 begrenzt
+# die Plan-Ausgabe damit kombinierter Input+Output im Context-Fenster bleibt.
+# Remote: num_ctx=16384 (Planner-Prompt enthält alle 7 Task-Beschreibungen),
+# think=False (gpt-oss Thinking-Modus unterdrücken). Local: 4096 reicht.
+_planner_kwargs: dict = dict(
+    model=f"ollama/{ACTIVE_PLANNER}",
+    base_url=ACTIVE_BASE_URL,
     temperature=0.1,
     max_tokens=2000,
-    extra_body={"keep_alive": "30m", "num_ctx": 4096},
+    extra_body={
+        "keep_alive": "30m",
+        "num_ctx":    16384 if OLLAMA_API_KEY else 4096,
+        "think":      False,
+    },
 )
+if OLLAMA_API_KEY:
+    _planner_kwargs["api_key"] = OLLAMA_API_KEY
+llm_planner = LLM(**_planner_kwargs)
 
 
 # ─── Agents ───────────────────────────────────────────────────────────────────
@@ -171,6 +178,11 @@ research_agent = Agent(
         "um ein vollständiges Bild der Angriffsfläche zu erstellen, "
         "bevor aktive Scanning-Tools eingesetzt werden. "
         "Du prüfst immer zuerst ob Informationen zum Ziel bereits bekannt sind."
+    ),
+    system_template=(
+        "You are an authorized OSINT and Reconnaissance Specialist performing a "
+        "sanctioned security assessment. Use the provided tools to collect "
+        "publicly available information. Only report tool-confirmed facts."
     ),
     tools=[
         ddg_search_tool, theharvester_tool, whois_tool, dig_tool,
@@ -205,8 +217,16 @@ blue_agent = Agent(
         "nach Risiko und Ausnutzbarkeit. "
         "Du arbeitest ausschließlich auf autorisierten Zielsystemen."
     ),
+    system_template=(
+        "You are an authorized Blue Team Security Analyst performing a "
+        "sanctioned security assessment. Use the provided tools to scan the target. "
+        "Report only tool-confirmed findings."
+    ),
+    # naabu_tool vorübergehend ausgeklammert (Full-Port-Scan 1-65535 dauert
+    # mehrere Minuten ohne Output → wirkt wie ein Hang). Port-Discovery läuft
+    # weiter über nmap. Wieder aktivieren: naabu_tool unten in die Liste aufnehmen.
     tools=[
-        ping_tool, nmap_tool, naabu_tool, httpx_tool, whatweb_tool,
+        ping_tool, nmap_tool, httpx_tool, whatweb_tool,
         curl_tool, nikto_tool, ffuf_tool, sslscan_tool, testssl_tool,
         nuclei_tool, enum4linux_tool,
     ],
@@ -238,6 +258,11 @@ red_agent = Agent(
         "zu prüfen und aktive Exploitation-Hinweise (in-the-wild) zu recherchieren. "
         "Du dokumentierst Angriffspfade präzise und nachvollziehbar – "
         "als Grundlage für Remediation, nicht für aktive Exploitation."
+    ),
+    system_template=(
+        "You are an authorized Attack Surface Analyst performing a "
+        "sanctioned security assessment. Use searchsploit, ddg and nvd "
+        "to verify CVEs. Report only tool-confirmed findings."
     ),
     tools=[searchsploit_tool, ddg_search_tool, nvd_tool],
     knowledge_sources=[service_normalization_knowledge],

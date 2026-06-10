@@ -117,24 +117,52 @@ def _apply_memory_patches() -> None:
     # "dictionary changed size during iteration" → PyO3 Rust panic → PanicException.
     # PyO3 "resumes" the Rust panic after Python catches it, which can corrupt thread-
     # local state accessed by the next LLM call → "ended without reaching a final answer".
-    # Fix: acquire the event_record read lock before invoking _do_checkpoint so that
-    # concurrent add() (write lock) blocks until serialization finishes — no dict mutation
-    # during Rust iteration. Falls back to catch-and-skip on any remaining BaseException.
+    # Fix: Prevent PyO3 panic from concurrent dict mutation during Pydantic serialization.
+    #
+    # Root cause: RuntimeState._serialize() calls self._event_record.model_dump(mode="json")
+    # (the Pydantic v2 Rust serializer) while the main thread concurrently calls
+    # event_record.add() (write-lock). The Rust serializer iterates `nodes` outside the GIL
+    # → "dictionary changed size during iteration" → PyO3 Rust panic → PanicException →
+    # thread-local state corrupted → next LLM call returns list instead of str (TaskOutput
+    # raw validation error), then AgentExecutor ends without final answer.
+    #
+    # Previous fix (BROKEN): wrapping the entire _do_checkpoint call in r_locked(). This
+    # caused a DEADLOCK because _do_checkpoint itself calls emit() → add() (WRITE lock)
+    # internally. The thread holding READ lock cannot upgrade to WRITE → both threads blocked.
+    #
+    # Correct fix: patch EventRecord.model_dump to hold READ lock ONLY during the Rust
+    # serialization call. _do_checkpoint runs unmodified; all add() calls can freely acquire
+    # WRITE lock. The READ lock in model_dump briefly blocks concurrent add() (write) during
+    # Rust dict iteration — no upgrade needed, no deadlock.
+    try:
+        from crewai.state.event_record import EventRecord as _EventRecord
+        _orig_model_dump = _EventRecord.model_dump
+
+        def _locked_model_dump(self, **kwargs):
+            rw_lock = getattr(self, "_lock", None)
+            if rw_lock is not None:
+                try:
+                    with rw_lock.r_locked():
+                        return _orig_model_dump(self, **kwargs)
+                except Exception:
+                    pass
+            return _orig_model_dump(self, **kwargs)
+
+        _EventRecord.model_dump = _locked_model_dump
+    except Exception:
+        pass
+
+    # Wrap _do_checkpoint in a simple BaseException guard — skips checkpoint on any
+    # unrecoverable error. No lock held here — let internal add() calls proceed normally.
     try:
         from crewai.state import checkpoint_listener as _cl
         _orig_do_ckpt = _cl._do_checkpoint
 
         def _safe_do_checkpoint(state: Any, cfg: Any, event: Any = None) -> None:
             try:
-                event_record = getattr(state, "_event_record", None)
-                rw_lock = getattr(event_record, "_lock", None) if event_record is not None else None
-                if rw_lock is not None:
-                    with rw_lock.r_locked():
-                        _orig_do_ckpt(state, cfg, event)
-                else:
-                    _orig_do_ckpt(state, cfg, event)
+                _orig_do_ckpt(state, cfg, event)
             except BaseException:
-                pass  # fallback: skip checkpoint on any unrecoverable error
+                pass
 
         _cl._do_checkpoint = _safe_do_checkpoint
     except Exception:
@@ -345,13 +373,18 @@ class AgentScanITCrew:
             },
         }
 
+        # memory=False: LanceDB's Rust embedder callback fires from a background
+        # thread without the GIL → PyO3 panic on save → corrupts thread-local
+        # state → blue_agent's first LLM call hangs indefinitely.
+        # Knowledge sources (service_normalization, OWASP) are unaffected —
+        # they use CREWAI_STORAGE_DIR / _knowledge_embedder which is separate.
         if self.scope == "hierarchical":
             crew_kwargs: dict = dict(
                 agents=self._active_agents,
                 tasks=self._active_tasks,
                 process=Process.hierarchical,
                 manager_agent=_make_manager_agent(),
-                memory=_crew_memory,
+                memory=False,
                 embedder=_knowledge_embedder,
                 cache=True,
                 verbose=False,
@@ -362,9 +395,7 @@ class AgentScanITCrew:
                 agents=self._active_agents,
                 tasks=self._active_tasks,
                 process=Process.sequential,
-                planning=True,
-                planning_llm=llm_planner,
-                memory=_crew_memory,
+                memory=False,
                 embedder=_knowledge_embedder,
                 cache=True,
                 verbose=False,
