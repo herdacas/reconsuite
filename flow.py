@@ -68,6 +68,10 @@ class ScanState(BaseModel):
     threat_intel_output:  str        = ""
     compliance_output:    str        = ""
     risk_score_output:    str        = ""
+    # Resume-Tracking (Phase 7, Stufe 3 Vorstufe): abgeschlossene Flow-Schritte.
+    # Wird via @persist mitserialisiert; bei --resume (restore_from_state_id)
+    # hydratisiert → erledigte Schritte werden übersprungen statt neu ausgeführt.
+    completed_steps:      list[str]  = Field(default_factory=list)
 
 
 # ─── Flow ─────────────────────────────────────────────────────────────────────
@@ -75,6 +79,20 @@ class ScanState(BaseModel):
 @persist(SQLiteFlowPersistence(_FLOW_DB), verbose=False)
 class ReconSuiteFlow(Flow[ScanState]):
     """Master-Flow: agentscanit → interpret-agent → reporting."""
+
+    # ─── Resume-Skip-Guards ────────────────────────────────────────────────
+    # @persist restored bei --resume den State, führt die @listen-Methoden aber
+    # von vorn aus. Ohne Guard würde run_scan etc. die (teure) Arbeit erneut tun.
+    # _step_done() überspringt einen Schritt der laut completed_steps schon lief.
+    def _step_done(self, name: str) -> bool:
+        if name in self.state.completed_steps:
+            console.print(f"  [dim]↻ {name} übersprungen (Resume — bereits abgeschlossen)[/]")
+            return True
+        return False
+
+    def _mark_step(self, name: str) -> None:
+        if name not in self.state.completed_steps:
+            self.state.completed_steps.append(name)
 
     @start()
     def initialize(self):
@@ -89,6 +107,8 @@ class ReconSuiteFlow(Flow[ScanState]):
 
     @listen(initialize)
     def run_scan(self):
+        if self._step_done("run_scan"):
+            return
         result = _scan_main.run(
             self.state.target,
             self.state.objective,
@@ -114,6 +134,7 @@ class ReconSuiteFlow(Flow[ScanState]):
             self.state.scan_json_path   = last
         except Exception:
             pass
+        self._mark_step("run_scan")
 
     @router(run_scan)
     def route_results(self) -> str:
@@ -125,30 +146,42 @@ class ReconSuiteFlow(Flow[ScanState]):
 
     @listen(or_("full_analysis", "cve_analysis"))
     def run_interpret(self):
+        if self._step_done("run_interpret"):
+            return
         console.print()
         console.print("  [bold yellow]→ interpret-agent[/]  CVE Enrichment läuft...")
         flow = _interpret.run_interpret_flow(self.state.scan_json_path)
         self.state.nvd_results = flow.state.nvd_results
+        self._mark_step("run_interpret")
 
     @listen(run_interpret)
     def run_threat_intel(self):
+        if self._step_done("run_threat_intel"):
+            return
         # Aktiv nur bei full_analysis (has_exploitable); no-op bei cve_analysis.
         if not self.state.has_exploitable:
+            self._mark_step("run_threat_intel")
             return
         console.print()
         console.print("  [bold red]→ threatintel-agent[/]  Threat Intelligence läuft...")
         flow = _threatintel.run_threatintel_flow(self.state.scan_json_path)
         self.state.threat_intel_output = flow.state.threat_summary
+        self._mark_step("run_threat_intel")
 
     @listen(run_threat_intel)
     def run_compliance(self):
+        if self._step_done("run_compliance"):
+            return
         console.print()
         console.print("  [bold magenta]→ compliance-agent[/]  OWASP Mapping läuft...")
         flow = _compliance.run_compliance_flow(self.state.scan_json_path)
         self.state.compliance_output = flow.state.mapping_result
+        self._mark_step("run_compliance")
 
     @listen(run_compliance)
     def run_risk_scorer(self):
+        if self._step_done("run_risk_scorer"):
+            return
         console.print()
         console.print("  [bold blue]→ risk-scorer[/]  Risk Score wird berechnet...")
         flow = _risk.run_risk_flow(
@@ -161,6 +194,7 @@ class ReconSuiteFlow(Flow[ScanState]):
         self.state.risk_score_output = (
             f"Score: {flow.state.risk_score} / 10 — {flow.state.risk_level}"
         )
+        self._mark_step("run_risk_scorer")
 
     @listen("clean")
     def skip_teams(self):
@@ -170,6 +204,8 @@ class ReconSuiteFlow(Flow[ScanState]):
 
     @listen(or_(run_risk_scorer, skip_teams))
     def run_reporting(self):
+        if self._step_done("run_reporting"):
+            return
         console.print()
         console.print("  [bold cyan]→ reporting[/]  Final Report wird erstellt...")
         flow = _reporting.run_reporting_flow(
@@ -178,6 +214,7 @@ class ReconSuiteFlow(Flow[ScanState]):
             nvd_results      = self.state.nvd_results,
         )
         self.state.final_report_path = flow.state.final_report_path
+        self._mark_step("run_reporting")
 
 
 # ─── Entry points ─────────────────────────────────────────────────────────────
