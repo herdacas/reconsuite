@@ -184,27 +184,8 @@ def run(target: str, objective: str = "", scope: str = "full") -> object:
     _warmup_models()
     console.print()
 
-    _run_ts      = datetime.now().strftime("%Y%m%d_%H%M%S")
-    _safe_target = re.sub(r"[^\w.-]", "_", target)
-    # Intra-Crew-Checkpointing ist standardmäßig DEAKTIVIERT.
-    # Bewiesene Ursache (debugging/DIAGNOSIS.md, A/B-Test): Der Checkpoint-Write
-    # nach der blue-Task läuft im Hintergrund-Thread (event_bus.emit submittet an
-    # ThreadPoolExecutor ohne zu warten) und serialisiert die crew/agent/task-
-    # Entities WÄHREND der Main-Thread sie in der findings-Phase mutiert
-    # → PyO3-Panic "dict changed size during iteration" → Thread-Local-Korruption
-    # → findings-Task crasht mit "ended without reaching a final answer".
-    # Mit deaktiviertem Checkpoint läuft die Pipeline nachweislich durch.
-    # Der frühere event_record-Lock schützt nur das event_record, nicht die Entities.
-    # Zusätzlich ist Checkpoint-Resume unabhängig kaputt (BaseKnowledgeSource).
-    # Zwischen-Team-Resume bleibt über @persist(SQLiteFlowPersistence) erhalten.
-    # ENABLE_CHECKPOINT=1 reaktiviert das (race-behaftete) Verhalten für Debugging.
-    if os.getenv("ENABLE_CHECKPOINT"):
-        checkpoint_dir = Path(LOG_DIR) / "checkpoints" / f"{_safe_target}_{_run_ts}"
-    else:
-        checkpoint_dir = None
-
     run_start = time.time()
-    crew_obj  = scanner.crew(task_callback=_on_task_done, checkpoint_dir=checkpoint_dir)
+    crew_obj  = scanner.crew(task_callback=_on_task_done)
     pipeline  = scanner.pipeline
     run_trace.activate(target, objective, scope, pipeline)
 
@@ -245,68 +226,15 @@ def run(target: str, objective: str = "", scope: str = "full") -> object:
                     f"{str(_exc)[:120]}"
                 )
                 console.print(f"  [dim]{_tb.format_exc()[-600:]}[/]")
-                _n_done  = len(_completed_labels)
-                _resumed = False
-
-                # Checkpoint-Resume: wenn mindestens eine Phase abgeschlossen ist,
-                # versuche die Crew aus dem letzten Checkpoint wiederherzustellen.
-                # checkpoint_dir kann None sein (Checkpointing deaktiviert) → dann
-                # direkt Vollneustart, kein Resume-Versuch.
-                if _n_done > 0 and checkpoint_dir is not None:
-                    _ckpt_main = checkpoint_dir / "main"
-                    if _ckpt_main.exists():
-                        _ckpt_files = sorted(
-                            _ckpt_main.glob("*.json"),
-                            key=lambda p: p.stat().st_mtime,
-                        )
-                        if _ckpt_files:
-                            try:
-                                from crewai import Crew as _CrewCls
-                                from crewai.state.checkpoint_config import CheckpointConfig as _CC
-                                from tasks import (
-                                    FindingsOutput, RedOutput, _cve_trace_guardrail,
-                                    ResearchOutput, BlueOutput, _tool_call_guardrail,
-                                )
-                                _restored = _CrewCls.from_checkpoint(
-                                    _CC(restore_from=str(_ckpt_files[-1]))
-                                )
-                                # Re-attach callbacks — non-serializable, dropped by checkpoint
-                                _restored.task_callback = _on_task_done
-                                for _t in _restored.tasks:
-                                    _t.callback = _on_task_done
-                                # Re-attach guardrails — callables dropped by checkpoint
-                                for _t in _restored.tasks:
-                                    _op = getattr(_t, "output_pydantic", None)
-                                    if _op in (FindingsOutput, RedOutput):
-                                        _t.guardrails = [_cve_trace_guardrail]
-                                        object.__setattr__(_t, "_guardrails", [_cve_trace_guardrail])
-                                        object.__setattr__(_t, "_guardrail",  None)
-                                    elif _op in (ResearchOutput, BlueOutput):
-                                        _t.guardrails = [_tool_call_guardrail]
-                                        object.__setattr__(_t, "_guardrails", [_tool_call_guardrail])
-                                        object.__setattr__(_t, "_guardrail",  None)
-                                crew_obj = _restored
-                                _resumed = True
-                                console.print(
-                                    f"  [cyan]↻[/]  Checkpoint-Resume — "
-                                    f"{_n_done}/{len(scanner.pipeline)} Phase(n) übersprungen, "
-                                    f"weiter ab Fehlerphase... (Versuch {_attempt + 2}/3)"
-                                )
-                                _reset_task_progress(scanner.pipeline, time.time())
-                            except Exception as _ckpt_err:
-                                import traceback as _tb
-                                console.print(
-                                    f"  [yellow]⚠[/]  Checkpoint-Resume fehlgeschlagen "
-                                    f"({type(_ckpt_err).__name__}: {str(_ckpt_err)[:80]}) — Vollneustart"
-                                )
-                                console.print(f"  [dim]{_tb.format_exc()[-300:]}[/]")
-
-                if not _resumed:
-                    console.print(
-                        f"  [yellow]⚠[/]  LLM error — retry {_attempt + 2}/3 (Vollneustart)..."
-                    )
-                    crew_obj = scanner.crew(task_callback=_on_task_done, checkpoint_dir=checkpoint_dir)
-                    _reset_task_progress(scanner.pipeline, time.time())
+                # Vollneustart mit frischer Crew-Instanz. Kein Intra-Crew-Resume mehr
+                # (Phase 7, Stufe 1): der nicht-idiomatische Checkpoint-Mechanismus war
+                # race-behaftet + beim Restore kaputt. Zwischen-Team-Resume läuft auf
+                # Flow-Ebene über @persist(SQLiteFlowPersistence).
+                console.print(
+                    f"  [yellow]⚠[/]  LLM error — retry {_attempt + 2}/3 (Vollneustart)..."
+                )
+                crew_obj = scanner.crew(task_callback=_on_task_done)
+                _reset_task_progress(scanner.pipeline, time.time())
             else:
                 raise
 
@@ -318,7 +246,6 @@ def run(target: str, objective: str = "", scope: str = "full") -> object:
         result, target, objective, scope,
         scanner._active_tasks, scanner.task_label,
         total_time, has_prior_data,
-        checkpoint_dir=checkpoint_dir,
     )
     return result
 
@@ -334,7 +261,6 @@ def _save_outputs(
     task_label: dict,
     total_time: float = 0.0,
     has_prior_data: bool = False,
-    checkpoint_dir: Path | None = None,
 ) -> None:
     _now        = datetime.now()
     ts          = _now.strftime("%Y%m%d_%H%M%S")
@@ -476,10 +402,6 @@ def _save_outputs(
     if trace_path:
         table.add_row("Trace",     f"[dim]{trace_path}[/]  [dim](tool calls + raw output)[/]")
     table.add_row("Memory DB", f"[dim]{MEMORY_DIR / 'lancedb'}[/]  [dim](persisted — reused on next run)[/]")
-    if checkpoint_dir is not None:
-        _ckpt_main = checkpoint_dir / "main"
-        if _ckpt_main.exists() and any(_ckpt_main.glob("*.json")):
-            table.add_row("Checkpoints", f"[dim]{checkpoint_dir}[/]  [dim](per-task recovery files)[/]")
     hit_label = (
         "[green]hit[/] [dim](prior run data was available for this target)[/]"
         if memory_hit else

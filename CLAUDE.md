@@ -192,7 +192,6 @@ Outputs in `logs/`:
 - `interpret_<target>_<ts>.md` — NVD-Enrichment-Report (Team 2)
 - `final_report_<target>_<ts>.md` — Merged Final Report (Team 3)
 - `workflow_last.json` — letzter Run (überschrieben)
-- `checkpoints/<target>_<ts>/main/*.json` — Checkpoint-Files pro Task (max 3 kept)
 - `flow_state.db` — SQLite-DB mit persistierten Flow-States (alle Runs, `--list`/`--resume`)
 
 ---
@@ -222,7 +221,7 @@ Vollständiger Beweis-Trail: `debugging/DIAGNOSIS.md`. Kurzfassung für die näc
 - Symptom war: Pipeline crasht nach blue in `findings` mit `Agent execution ended without reaching a final answer` (3× Retry → exit 1). KEIN Hang zwischen research/blue — das war eine Fehlannahme.
 - Ursache (A/B-Test bewiesen): `CheckpointConfig` schreibt nach `task_completed` im **Hintergrund-Thread** (`event_bus.emit` submittet an ThreadPoolExecutor ohne zu warten). `RuntimeState._serialize` serialisiert die `self.root`-Entities (crew/agent/task) WÄHREND der Main-Thread sie in der findings-Phase mutiert → Pydantic-Rust-Serializer → PyO3-Panic „dict changed size during iteration" → Thread-Local-Korruption → nächster findings-LLM-Call schlägt fehl.
 - Der ältere Fix (`EventRecord.model_dump` mit `r_locked()` in crew.py) schützt nur das `event_record`, **NICHT die Entities** → wirkt nicht. Patch ist aktiv, RWLock korrekt — verifiziert.
-- **Fix (main.py):** Intra-Crew-Checkpointing standardmäßig AUS (`checkpoint_dir = None`), `ENABLE_CHECKPOINT=1` reaktiviert das (race-behaftete) Verhalten. Retry-Resume-Block gegen `checkpoint_dir is None` abgesichert. Zwischen-Team-Resume bleibt über `@persist(SQLiteFlowPersistence)` erhalten.
+- **Fix (Phase 7, Stufe 1 — strukturell entfernt):** Intra-Crew-Checkpointing (`CheckpointConfig`) komplett entfernt — kein dokumentierter CrewAI-Resume-Mechanismus (Docs: Resume = Flow-`@persist`). Mitentfernt: die drei checkpoint-bezogenen Monkey-Patches (`JsonProvider.checkpoint`, `EventRecord.model_dump`-RWLock, `_do_checkpoint`-Wrapper) und der Checkpoint-Resume-Zweig in `main.py` (Retry = Vollneustart). Zwischen-Team-Resume bleibt über `@persist(SQLiteFlowPersistence)`. Verifiziert: quick-Pipeline läuft durch, keine Checkpoint-Dateien mehr.
 - **Verifiziert E2E:** quick-Scope läuft research→blue→findings→report→reporting komplett durch, 0 Fehler-Marker.
 
 **naabu ausgeklammert (agents.py).**
@@ -236,7 +235,7 @@ Vollständiger Beweis-Trail: `debugging/DIAGNOSIS.md`. Kurzfassung für die näc
 
 **Noch offen (nicht angefasst):**
 - „Strg+C wirkt nicht" während langer Tool-Scans = Subprozess-/asyncio-Signalhandling. Prozess ist via `kill` beendbar. Separater Punkt.
-- Saubere Checkpoint-Reparatur (synchrone Serialisierung gegen Entity-Race + `knowledge_sources` beim Restore neu anhängen, wegen `BaseKnowledgeSource`-TypeError) → dann `ENABLE_CHECKPOINT` wieder Default.
+- (ERLEDIGT in Phase 7, Stufe 1) Intra-Crew-Checkpoint entfernt statt repariert — Resume läuft über Flow-`@persist`.
 - Gegentest auf Ziel mit vielen offenen Ports + echten CVEs steht aus (bisher CLEAN-Route verifiziert).
 
 ### allow_delegation=False (agents.py)
@@ -251,13 +250,11 @@ Vollständiger Beweis-Trail: `debugging/DIAGNOSIS.md`. Kurzfassung für die näc
 - **Fix**: `run_trace._guardrail_reject_count` — wird beim ersten Reject hochgezählt, beim zweiten Aufruf (count≥1) wird der Output akzeptiert (Warm-Memory-Fallback). Reset in `close_phase()`. Verhindert endlose Retry-Schleifen; CVE-Guardrail bleibt der entscheidende Fakten-Check.
 - `_EXECUTOR_CLASS` ist einheitlich `AgentExecutor` (experimental, native FC) für alle Modi — kein OLLAMA_API_KEY-bedingtes Umschalten auf `CrewAgentExecutor` mehr.
 
-### Checkpoint + Retry-Logik (main.py / crew.py)
-- `Crew(checkpoint=CheckpointConfig(...))` speichert nach jeder abgeschlossenen Task einen Snapshot unter `logs/checkpoints/<target>_<ts>/main/*.json` (max 3 behalten).
-- Retryable Errors: `json_invalid`, pydantic `ValidationError` (Klassen- UND String-Check), `ConverterError`, `Failed to convert`, `Agent must be provided`, `Field required`, `ended without reaching a final answer`, `Invalid response from LLM call`, `guardrail validation after`.
-  - Wenn ≥1 Phase abgeschlossen: Checkpoint-Resume via `Crew.from_checkpoint()` — überspringt bereits erledigte Phasen.
-  - Callables (guardrails, task_callback) werden beim Checkpoint-Serialisieren gedroppt und nach dem Restore manuell re-attached: `_cve_trace_guardrail` auf `FindingsOutput`/`RedOutput`-Tasks, `_tool_call_guardrail` auf `ResearchOutput`/`BlueOutput`-Tasks.
-  - Fallback bei fehlgeschlagenem Restore: Vollneustart mit frischer Crew-Instanz.
-- **Checkpoint Race-Condition Fix (crew.py)**: `EventRecord._serialize()` ruft `_event_record.model_dump()` auf ohne den `_lock` zu halten. Der Pydantic-v2-Rust-Serializer iteriert `nodes` auf Rust-Ebene (außerhalb des GIL) — wenn der Main-Thread gleichzeitig `add()` aufruft (Write-Lock), entsteht `dict changed size during iteration` → PyO3-Rust-Panic → `PanicException`. PyO3 "resumt" den Rust-Panic nach dem Python-Catch, was Thread-Local-State korruptieren kann → nächster LLM-Call in findings_task schlägt sofort fehl mit `"ended without reaching a final answer"`. **Fix**: `_safe_do_checkpoint()` in `_apply_memory_patches()` acquiert `state._event_record._lock.r_locked()` vor dem Checkpoint-Write. Concurrent `add()` (Write-Lock) blockiert kurz bis die Serialisierung fertig ist — kein Dict-Mutation während Rust iteriert. `BaseException`-Catch als Fallback bleibt.
+### Retry-Logik (main.py) — kein Intra-Crew-Checkpointing mehr
+- **Intra-Crew-Checkpointing (`CheckpointConfig`) ist seit Phase 7, Stufe 1 entfernt.** Grund: kein dokumentierter CrewAI-Resume-Mechanismus (Docs: Resume = Flow-`@persist`) + war race-behaftet (Entity-Serialisierung im Hintergrund-Thread vs. findings-Mutation) + Resume kaputt (`BaseKnowledgeSource`). Beweis: `debugging/DIAGNOSIS.md`.
+- Retryable Errors (lösen Vollneustart aus, max 3): `json_invalid`, pydantic `ValidationError` (Klassen- UND String-Check), `ConverterError`, `Failed to convert`, `Agent must be provided`, `Field required`, `ended without reaching a final answer`, `Invalid response from LLM call`, `guardrail validation after`.
+- Bei retrybarem Fehler: **Vollneustart** mit frischer Crew-Instanz (`scanner.crew(task_callback=...)`). Kein Phasen-Überspringen mehr.
+- Zwischen-Team-Resume läuft weiterhin über `@persist(SQLiteFlowPersistence)` auf Flow-Ebene (`--list`/`--resume`).
 
 ### Memory-Patching (crew.py)
 - CrewAI's Memory-Analyse-LLM-Calls werden monkey-gepatcht (keine LLM-Calls bei save/recall).
@@ -270,7 +267,7 @@ Vollständiger Beweis-Trail: `debugging/DIAGNOSIS.md`. Kurzfassung für die näc
 - `ScanState.id` (uuid4) ist der `flow_uuid`-Key in der DB. Wird beim Flow-Start angezeigt und am Ende erneut gedruckt.
 - `--resume <flow-id>`: erstellt neue `ReconSuiteFlow`-Instanz, ruft `flow.kickoff(restore_from_state_id=...)` — Flow lädt State aus DB und überspringt bereits abgeschlossene Schritte.
 - `--list`: liest `flow_states`-Tabelle direkt per `sqlite3` — zeigt letzten Snapshot pro `flow_uuid` sortiert nach Zeitstempel.
-- **Limitation**: Nur Flow-Level-Persistence (zwischen den drei Teams). Intra-Crew-Persistence (zwischen Tasks) läuft weiterhin über `CheckpointConfig` in `crew.py`.
+- **Limitation**: Nur Flow-Level-Persistence (zwischen den Teams). Intra-Crew-Persistence (zwischen Tasks) gibt es nicht mehr — `CheckpointConfig` wurde in Phase 7, Stufe 1 entfernt.
 
 ### CVE-Trefferquote bei Cloudflare/CDN-Targets
 - Bremen.de etc. liefern keine CVEs weil Dienste hinter Cloudflare versteckt sind — kein Bug.
@@ -296,7 +293,7 @@ Vollständiger Beweis-Trail: `debugging/DIAGNOSIS.md`. Kurzfassung für die näc
 - **`Crew(planning=True, planning_llm=llm_planner)`** — AgentPlanner erstellt vor der ersten Task einen Ausführungsplan. `planning_llm` (`llm_planner`) läuft IMMER lokal (`localhost:11434`, z.B. `qwen2.5:7b-instruct`) — remote Modelle unterstützen Ollama's native function-calling API nicht zuverlässig. `_SCOPE_CEILING` bleibt der Gate-Keeper für welche Tasks überhaupt laufen. **`max_tokens=2000` auf `llm_planner`** — begrenzt Plan-Output auf ~2000 Tokens, damit combined input+output im 4096-Token-Kontext des lokalen Servers bleibt. Ohne diese Begrenzung kann `--context-shift` im Server eine endlose Generierung auslösen (>20 Minuten für 7-Phasen-Plan).
 - **Memory** — LanceDB vector storage, shallow recall erzwungen (`_ShallowMemory`). Warme Runs nutzen Prior-Run-Daten.
 - **reporter_agent max_iter=3** — bewusst niedrig gehalten; der Reporter nutzt keine Tools und soll den Report in einem Durchgang schreiben. Höhere Werte führen zu 400s+ Laufzeiten bei großem Kontext.
-- **Checkpoint-Resume** — Nach `Crew.from_checkpoint()`: `_guardrails` (PrivateAttr) werden via `object.__setattr__()` re-attached, weil Pydantic validators bei direktem Field-Setzen nicht erneut laufen. `task_callback` wird sowohl auf Crew als auch auf jedem Task gesetzt.
+- **Resume** — ausschließlich auf Flow-Ebene über `@persist(SQLiteFlowPersistence)` (`--list`/`--resume`). Intra-Crew-Checkpoint-Resume (`Crew.from_checkpoint()`) wurde in Phase 7, Stufe 1 entfernt.
 - **Flow-Persistence** — `@persist(SQLiteFlowPersistence(_FLOW_DB))` als Klassen-Dekorator auf `ReconSuiteFlow` speichert nach jedem Schritt in `logs/flow_state.db`. `ScanState` braucht `id: str = Field(default_factory=lambda: str(uuid4()))`. Resume via `flow.kickoff(restore_from_state_id=state_id)` — lädt State aus DB und überspringt fertige Schritte. `_FLOW_DB` muss vor der Klassendefinition stehen (Dekorator evaluiert bei Import).
 - **`@listen` Stacking — BROKEN** — `@listen(A)` + `@listen(B)` auf derselben Methode registriert NUR den äußersten Trigger. Jeder `@listen`-Aufruf erstellt einen neuen `ListenMethod`-Wrapper und setzt `__trigger_methods__` neu — die innere Registration wird überschrieben. Immer `@listen(or_(A, B))` verwenden wenn eine Methode auf mehrere Quellen hören soll. Import: `from crewai.flow.flow import or_`.
 - **`_tool_call_guardrail` — Halluzinations-Blocker** — `research` und `blue` Tasks haben `guardrails=[_tool_call_guardrail]`. Prüft `run_trace._pending` bei Task-Abschluss: wenn leer (kein Subprocess aufgerufen), lehnt der Guardrail beim ERSTEN Auftreten ab (Agent bekommt Feedback). Beim ZWEITEN Auftreten (count≥1 in `run_trace._guardrail_reject_count`) wird der Output akzeptiert — Warm-Memory-Fallback um endlose Retry-Schleifen zu verhindern. `close_phase()` setzt den Counter zurück. Timing: Guardrail läuft VOR `task_callback`/`close_phase()` — `_pending` enthält exakt die Calls der aktuellen Task. Fallback-safe: wenn `run_trace.is_active == False` (Unit-Tests, Standalone), gibt der Guardrail immer `True` zurück.

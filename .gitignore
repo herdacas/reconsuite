@@ -22,6 +22,7 @@ agentscanit/enum4linux-ng/
 benchmark.py
 bericht.md
 roadmap.md
+phase7.md
 
 # Laufzeit-Artefakte / Backups (nicht ins Repo)
 agentscanit/knowledge_storage/

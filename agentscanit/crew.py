@@ -25,7 +25,6 @@ from typing import Any
 from crewai import Crew, Process
 from crewai.memory import Memory
 from crewai.memory.storage.lancedb_storage import LanceDBStorage
-from crewai.state.checkpoint_config import CheckpointConfig
 from pydantic import model_serializer
 
 from config import OLLAMA_API_KEY, ACTIVE_ANALYSIS, ACTIVE_BASE_URL, EMBED_MODEL, EMBED_BASE_URL
@@ -80,94 +79,13 @@ def _apply_memory_patches() -> None:
     except Exception:
         pass
 
-    # Patch JsonProvider.checkpoint + acheckpoint: write pretty-printed JSON.
-    # CrewAI calls model_dump_json() which produces a single-line minified string.
-    # JsonProvider.checkpoint() writes it verbatim → 1 MB single-line files in the IDE.
-    try:
-        import json as _json
-        from crewai.state.provider.json_provider import JsonProvider as _JsonProvider
-
-        _orig_cp  = _JsonProvider.checkpoint
-        _orig_acp = _JsonProvider.acheckpoint
-
-        def _pretty_cp(self: Any, data: str, location: str, **kw: Any) -> str:
-            try:
-                data = _json.dumps(_json.loads(data), indent=2, ensure_ascii=False)
-            except Exception:
-                pass
-            return _orig_cp(self, data, location, **kw)
-
-        async def _pretty_acp(self: Any, data: str, location: str, **kw: Any) -> str:
-            try:
-                data = _json.dumps(_json.loads(data), indent=2, ensure_ascii=False)
-            except Exception:
-                pass
-            return await _orig_acp(self, data, location, **kw)
-
-        _JsonProvider.checkpoint  = _pretty_cp
-        _JsonProvider.acheckpoint = _pretty_acp
-    except Exception:
-        pass
-
-    # Patch checkpoint_listener._do_checkpoint to eliminate the PyO3 PanicException.
-    # Root cause: EventRecord._serialize() calls _event_record.model_dump() without
-    # holding _event_record._lock, while the main thread concurrently adds events via
-    # add() (write lock). The Pydantic v2 Rust serializer iterates nodes at the Rust
-    # level — outside GIL protection — so a concurrent Python dict mutation causes:
-    # "dictionary changed size during iteration" → PyO3 Rust panic → PanicException.
-    # PyO3 "resumes" the Rust panic after Python catches it, which can corrupt thread-
-    # local state accessed by the next LLM call → "ended without reaching a final answer".
-    # Fix: Prevent PyO3 panic from concurrent dict mutation during Pydantic serialization.
-    #
-    # Root cause: RuntimeState._serialize() calls self._event_record.model_dump(mode="json")
-    # (the Pydantic v2 Rust serializer) while the main thread concurrently calls
-    # event_record.add() (write-lock). The Rust serializer iterates `nodes` outside the GIL
-    # → "dictionary changed size during iteration" → PyO3 Rust panic → PanicException →
-    # thread-local state corrupted → next LLM call returns list instead of str (TaskOutput
-    # raw validation error), then AgentExecutor ends without final answer.
-    #
-    # Previous fix (BROKEN): wrapping the entire _do_checkpoint call in r_locked(). This
-    # caused a DEADLOCK because _do_checkpoint itself calls emit() → add() (WRITE lock)
-    # internally. The thread holding READ lock cannot upgrade to WRITE → both threads blocked.
-    #
-    # Correct fix: patch EventRecord.model_dump to hold READ lock ONLY during the Rust
-    # serialization call. _do_checkpoint runs unmodified; all add() calls can freely acquire
-    # WRITE lock. The READ lock in model_dump briefly blocks concurrent add() (write) during
-    # Rust dict iteration — no upgrade needed, no deadlock.
-    try:
-        from crewai.state.event_record import EventRecord as _EventRecord
-        _orig_model_dump = _EventRecord.model_dump
-
-        def _locked_model_dump(self, **kwargs):
-            rw_lock = getattr(self, "_lock", None)
-            if rw_lock is not None:
-                try:
-                    with rw_lock.r_locked():
-                        return _orig_model_dump(self, **kwargs)
-                except Exception:
-                    pass
-            return _orig_model_dump(self, **kwargs)
-
-        _EventRecord.model_dump = _locked_model_dump
-    except Exception:
-        pass
-
-    # Wrap _do_checkpoint in a simple BaseException guard — skips checkpoint on any
-    # unrecoverable error. No lock held here — let internal add() calls proceed normally.
-    try:
-        from crewai.state import checkpoint_listener as _cl
-        _orig_do_ckpt = _cl._do_checkpoint
-
-        def _safe_do_checkpoint(state: Any, cfg: Any, event: Any = None) -> None:
-            try:
-                _orig_do_ckpt(state, cfg, event)
-            except BaseException:
-                pass
-
-        _cl._do_checkpoint = _safe_do_checkpoint
-    except Exception:
-        pass
-
+    # Hinweis (Phase 7, Stufe 1): Die früheren Checkpoint-bezogenen Patches
+    # (JsonProvider.checkpoint pretty-print, EventRecord.model_dump-RWLock,
+    # _do_checkpoint-Safe-Wrapper) wurden entfernt. Grund: Intra-Crew-Checkpointing
+    # (CheckpointConfig) ist kein dokumentierter CrewAI-Resume-Mechanismus — Resume
+    # läuft auf Flow-Ebene über @persist(SQLiteFlowPersistence). Die Patches existierten
+    # nur, um die Race-Condition des Hintergrund-Checkpoint-Writes abzufedern; ohne
+    # Checkpointing sind sie toter Code. Beweis-Trail: debugging/DIAGNOSIS.md.
 
 
 _apply_memory_patches()
@@ -342,28 +260,20 @@ class AgentScanITCrew:
         self._active_tasks:  list = []
         self._active_agents: list = []
         self._task_label:    dict  = {}   # id(task) → name, built per-run in crew()
-        self._checkpoint_dir: Path | None = None
 
-    def crew(self, task_callback=None, checkpoint_dir: Path | None = None) -> Crew:
+    def crew(self, task_callback=None) -> Crew:
         """Ruft den Planner auf, assembliert die Crew und gibt sie zurück.
 
         task_callback:   optionale Funktion die nach jeder Phase aufgerufen wird.
-        checkpoint_dir:  Verzeichnis für Checkpoint-Files; None = kein Checkpointing.
         Nach dem Aufruf sind self.pipeline und self.task_label verfügbar.
+
+        Kein Intra-Crew-Checkpointing (Phase 7, Stufe 1): Resume läuft auf Flow-Ebene
+        über @persist(SQLiteFlowPersistence). Der frühere CheckpointConfig war
+        nicht-idiomatisch und race-behaftet (siehe debugging/DIAGNOSIS.md).
         """
         self._active_tasks, self._active_agents, self._task_label = plan_tasks(
             self.target, self.objective, self.scope
         )
-        self._checkpoint_dir = checkpoint_dir
-
-        checkpoint = None
-        if checkpoint_dir is not None:
-            checkpoint_dir.mkdir(parents=True, exist_ok=True)
-            checkpoint = CheckpointConfig(
-                location=str(checkpoint_dir),
-                on_events=["task_completed"],
-                max_checkpoints=3,
-            )
 
         _knowledge_embedder = {
             "provider": "ollama",
@@ -401,8 +311,6 @@ class AgentScanITCrew:
                 verbose=False,
                 task_callback=task_callback,
             )
-        if checkpoint is not None:
-            crew_kwargs["checkpoint"] = checkpoint
 
         return Crew(**crew_kwargs)
 
