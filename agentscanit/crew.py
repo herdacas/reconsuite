@@ -17,60 +17,31 @@ Als Flow-Crew:
             ).crew().kickoff(inputs=...)
 """
 
-import logging
 import os
-from pathlib import Path
-from typing import Any
 
 from crewai import Crew, Process
-from crewai.memory import Memory
-from crewai.memory.storage.lancedb_storage import LanceDBStorage
-from pydantic import model_serializer
 
-from config import OLLAMA_API_KEY, ACTIVE_ANALYSIS, ACTIVE_BASE_URL, EMBED_MODEL, EMBED_BASE_URL
+from config import EMBED_MODEL, EMBED_BASE_URL
 from agents import (
     research_agent, blue_agent, red_agent, coding_agent, reporter_agent,
     llm_planner,
 )
 from tasks import make_tasks
 
-# ─── Memory LLM-Call Suppression ─────────────────────────────────────────────
-# CrewAI fires async LLM calls (analyze_for_save, analyze_for_consolidation,
-# analyze_query) for every memory save/recall to enrich metadata. These calls
-# fail against our Ollama setup (Pydantic schema mismatches, rate-limit spikes
-# from concurrent requests). The embedding (vector storage/recall) works fine
-# without this enrichment.
+# ─── CrewAI Console-Patches ──────────────────────────────────────────────────
+# Hinweis (Phase 7, Stufe 3b): Die Memory-LLM-Suppression-Patches (analyze_for_save,
+# analyze_for_consolidation, analyze_query) wurden entfernt. Grund: Alle Crews laufen
+# mit memory=False — CrewAI nutzt das Memory-Subsystem während eines Scans gar nicht.
+# Es gab keinen save()-Pfad mehr; die Patches schützten nur einen toten Recall-Pfad.
+# Mitentfernt: _ShallowMemory + _crew_memory + LanceDB-Abhängigkeit (siehe phase7.md).
+# Das „warm/fresh"-Banner basiert jetzt auf vorhandenen Reports in logs/ (kein Memory).
 #
-# Patch: replace the three analysis functions at the point where they are
-# locally imported in their respective flow modules. Patching at import time is
-# reliable because Python caches module objects — every call site that imported
-# these names before the patch sees the new lambda.
+# Hinweis (Phase 7, Stufe 1): Die Checkpoint-bezogenen Patches (JsonProvider.checkpoint,
+# EventRecord.model_dump-RWLock, _do_checkpoint-Wrapper) wurden entfernt — Intra-Crew-
+# Checkpointing ist kein dokumentierter CrewAI-Resume-Mechanismus (Resume = Flow-@persist).
 #
-# Kept in crew.py (not main.py) because this is a Memory concern, not a CLI
-# concern. Any code path that creates a Crew with memory gets the patch.
-def _apply_memory_patches() -> None:
-    try:
-        import crewai.memory.analyze as _cma
-        import crewai.memory.encoding_flow as _cef
-        import crewai.memory.recall_flow as _crf
-
-        _cef.analyze_for_save = lambda content, existing_scopes, existing_categories, llm: _cma._SAVE_DEFAULTS
-        _cef.analyze_for_consolidation = lambda new_content, existing_records, llm: (
-            _cma.ConsolidationPlan(actions=[], insert_new=True)
-        )
-        _crf.analyze_query = lambda query, available_scopes, scope_info, llm: _cma.QueryAnalysis(
-            keywords=[],
-            suggested_scopes=(available_scopes or ["/"])[:5],
-            complexity="simple",
-            recall_queries=[query],
-        )
-    except Exception:
-        pass  # non-fatal — if CrewAI refactors these modules, memory just uses defaults
-
-    # Silence log noise from failed memory-analysis attempts
-    logging.getLogger("crewai.memory.analyze").setLevel(logging.CRITICAL)
-    logging.getLogger("crewai.memory").setLevel(logging.CRITICAL)
-
+# Verbleibender Patch: nur die Event-Bus-Console-Stille (kosmetisch).
+def _apply_crewai_patches() -> None:
     # Suppress CrewAI's "[CrewAIEventsBus] Warning: Event pairing mismatch" console spam
     try:
         import crewai.events.event_context as _evc
@@ -79,67 +50,15 @@ def _apply_memory_patches() -> None:
     except Exception:
         pass
 
-    # Hinweis (Phase 7, Stufe 1): Die früheren Checkpoint-bezogenen Patches
-    # (JsonProvider.checkpoint pretty-print, EventRecord.model_dump-RWLock,
-    # _do_checkpoint-Safe-Wrapper) wurden entfernt. Grund: Intra-Crew-Checkpointing
-    # (CheckpointConfig) ist kein dokumentierter CrewAI-Resume-Mechanismus — Resume
-    # läuft auf Flow-Ebene über @persist(SQLiteFlowPersistence). Die Patches existierten
-    # nur, um die Race-Condition des Hintergrund-Checkpoint-Writes abzufedern; ohne
-    # Checkpointing sind sie toter Code. Beweis-Trail: debugging/DIAGNOSIS.md.
 
-
-_apply_memory_patches()
+_apply_crewai_patches()
 
 
 # ─── Memory ───────────────────────────────────────────────────────────────────
 
-MEMORY_DIR = Path(__file__).parent / "memory"
-MEMORY_DIR.mkdir(exist_ok=True)
-
-# Remote: plain model name — LiteLLM picks up OPENAI_BASE_URL from env.
-# Local:  ollama/ prefix — LiteLLM routes to localhost:11434 by default.
-_memory_llm = ACTIVE_ANALYSIS if OLLAMA_API_KEY else f"ollama/{ACTIVE_ANALYSIS}"
-
-
-class _ShallowMemory(Memory):
-    """Memory subclass that forces depth='shallow' on every recall.
-
-    Why: CrewAI's deep recall uses RecallFlow.filter_and_chunk() which calls
-    list_scopes('/') to pick candidate scopes. Our LanceDB has 99 % of rows at
-    scope '/' (LLM save-analysis fails → default scope used). list_scopes only
-    finds the rare '/security' sub-scope, so the WHERE filter excludes almost
-    all rows. Shallow recall skips list_scopes entirely and does a direct
-    vector search over all rows — which is exactly what we need.
-
-    Checkpoint-safe: JSON serialization returns False (a valid Memory | bool value)
-    so that checkpoint writes succeed despite LanceDBStorage being non-serializable.
-    The restored Crew has memory=False (cold memory, no storage) — task outputs are
-    still fully restored; only warm-start recall is unavailable in the retried run.
-    """
-
-    @model_serializer(mode='plain', when_used='json')
-    def _serialize_for_checkpoint(self) -> bool:
-        # LanceDBStorage is not JSON-serializable.
-        # Return False so Crew.checkpoint writes succeed; on restore the Crew field
-        # `memory: Memory | bool` accepts False, giving a cold-memory retry run.
-        return False
-
-    def recall(self, query: str, **kwargs: Any) -> list:
-        kwargs["depth"] = "shallow"
-        return super().recall(query, **kwargs)
-
-
-_crew_memory = _ShallowMemory(
-    llm=_memory_llm,
-    storage=LanceDBStorage(path=str(MEMORY_DIR / "lancedb")),
-    embedder={
-        "provider": "ollama",
-        "config": {
-            "model": EMBED_MODEL,
-            "url": f"{EMBED_BASE_URL}/api/embeddings",
-        },
-    },
-)
+# Memory-Subsystem (Phase 7, Stufe 3b) entfernt: Crews laufen memory=False,
+# der Scan nutzte das Memory nie. _ShallowMemory + _crew_memory + LanceDB sind weg.
+# Das „warm/fresh"-Banner basiert jetzt auf vorhandenen Reports in logs/ (main.py).
 
 
 # ─── Task / Agent Registry ────────────────────────────────────────────────────

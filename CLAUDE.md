@@ -78,7 +78,7 @@ Mehrere spezialisierte Agents arbeiten sequenziell: Passive Recon → Aktiver Sc
 ```
 recon-suite/
 ├── agentscanit/          ← Haupt-Package (Team 1: Scanner)
-│   ├── main.py           ← CLI-Einstiegspunkt + Memory-Patching + Retry-Logik
+│   ├── main.py           ← CLI-Einstiegspunkt + Retry-Logik + Prior-Scan-Erkennung (logs)
 │   ├── crew.py           ← AgentScanITCrew, Planner, Pipeline-Logik
 │   ├── agents.py         ← CrewAI Agent-Definitionen (5 Agents)
 │   ├── tasks.py          ← Task-Definitionen + Pydantic Output-Schemas + CVE-Validator
@@ -244,10 +244,10 @@ Vollständiger Beweis-Trail: `debugging/DIAGNOSIS.md`. Kurzfassung für die näc
 ### think: False (agents.py)
 - `extra_body={"think": False}` wird bedingungslos gesetzt — lokales Ollama ignoriert es für nicht-thinking-Modelle, remote-Modelle (Qwen3, gpt-oss) benötigen es.
 
-### Warm-Memory + `_tool_call_guardrail` Loop (tasks.py / trace.py)
-- Bei wiederholten Scans desselben Targets nutzt der Agent LanceDB-Memory und überspringt Tools → `_tool_call_guardrail` lehnt ab (korrekt).
-- Im Guardrail-Retry kann das Modell (gpt-oss:20b) `None` oder leeren String zurückgeben → Crash oder ConverterError.
-- **Fix**: `run_trace._guardrail_reject_count` — wird beim ersten Reject hochgezählt, beim zweiten Aufruf (count≥1) wird der Output akzeptiert (Warm-Memory-Fallback). Reset in `close_phase()`. Verhindert endlose Retry-Schleifen; CVE-Guardrail bleibt der entscheidende Fakten-Check.
+### `_tool_call_guardrail` No-Tool-Fallback (tasks.py / trace.py)
+- Wenn ein Agent ein Ergebnis liefert ohne ein Tool aufzurufen → `_tool_call_guardrail` lehnt ab (korrekt). (Seit Phase 7, Stufe 3b nicht mehr durch LanceDB-Memory ausgelöst — Memory ist entfernt; tritt z. B. bei Modell-Halluzination auf.)
+- Im Guardrail-Retry kann das Modell `None` oder leeren String zurückgeben → Crash oder ConverterError.
+- **Fix**: `run_trace._guardrail_reject_count` — wird beim ersten Reject hochgezählt, beim zweiten Aufruf (count≥1) wird der Output akzeptiert (No-Tool-Fallback). Reset in `close_phase()`. Verhindert endlose Retry-Schleifen; CVE-Guardrail bleibt der entscheidende Fakten-Check.
 - `_EXECUTOR_CLASS` ist einheitlich `AgentExecutor` (experimental, native FC) für alle Modi — kein OLLAMA_API_KEY-bedingtes Umschalten auf `CrewAgentExecutor` mehr.
 
 ### Retry-Logik (main.py) — kein Intra-Crew-Checkpointing mehr
@@ -256,11 +256,10 @@ Vollständiger Beweis-Trail: `debugging/DIAGNOSIS.md`. Kurzfassung für die näc
 - Bei retrybarem Fehler: **Vollneustart** mit frischer Crew-Instanz (`scanner.crew(task_callback=...)`). Kein Phasen-Überspringen mehr.
 - Zwischen-Team-Resume läuft weiterhin über `@persist(SQLiteFlowPersistence)` auf Flow-Ebene (`--list`/`--resume`).
 
-### Memory-Patching (crew.py)
-- CrewAI's Memory-Analyse-LLM-Calls werden monkey-gepatcht (keine LLM-Calls bei save/recall).
-- Grund: Pydantic-Validation-Errors + Rate-Limit-Probleme bei gleichzeitigen async-Requests.
-- Patch sitzt in `crew.py:_apply_memory_patches()` — co-located mit der Memory-Konfiguration.
-- Patch-Targets nach CrewAI-Update immer prüfen: `crewai.memory.analyze`, `encoding_flow`, `recall_flow`.
+### Memory-Subsystem entfernt (Phase 7, Stufe 3b)
+- **Das LanceDB-Memory-Subsystem (`_crew_memory`, `_ShallowMemory`) + die drei Memory-Analyse-Monkey-Patches (`analyze_for_save/_consolidation/_query`) wurden entfernt.** Grund: Alle Crews laufen `memory=False` → CrewAI nutzt Memory während eines Scans gar nicht; es gab keinen `save()`-Pfad mehr; die Patches schützten nur einen toten Recall-Pfad.
+- Prior-Scan-Erkennung läuft jetzt **logs-basiert** in `main.py` (existiert `recon_report_<target>_*.md`?) — kein Memory, kein LLM, kein Patch. Banner-Label: „History: prior scan on disk / first run".
+- Verbleibender CrewAI-Patch: nur die Event-Bus-Console-Stille in `crew.py:_apply_crewai_patches()` (kosmetisch).
 
 ### Flow-Persistence (`@persist`, flow.py)
 - `ReconSuiteFlow` trägt `@persist(SQLiteFlowPersistence(_FLOW_DB), verbose=False)` — nach jedem abgeschlossenen Flow-Schritt wird der State in `logs/flow_state.db` gespeichert.
@@ -291,9 +290,9 @@ Vollständiger Beweis-Trail: `debugging/DIAGNOSIS.md`. Kurzfassung für die näc
 - **`interpret_agent/nvd.py`** — Thin Shim, re-exportiert aus `agentscanit.tools.nvd`. Nie direkt editieren.
 - **Strict factual outputs** — Task-Prompts verlangen "nur tool-bestätigte Fakten". CVEs nur wenn Tool-Bestätigung im Trace vorhanden.
 - **`Crew(planning=True, planning_llm=llm_planner)`** — AgentPlanner erstellt vor der ersten Task einen Ausführungsplan. `planning_llm` (`llm_planner`) läuft IMMER lokal (`localhost:11434`, z.B. `qwen2.5:7b-instruct`) — remote Modelle unterstützen Ollama's native function-calling API nicht zuverlässig. `_SCOPE_CEILING` bleibt der Gate-Keeper für welche Tasks überhaupt laufen. **`max_tokens=2000` auf `llm_planner`** — begrenzt Plan-Output auf ~2000 Tokens, damit combined input+output im 4096-Token-Kontext des lokalen Servers bleibt. Ohne diese Begrenzung kann `--context-shift` im Server eine endlose Generierung auslösen (>20 Minuten für 7-Phasen-Plan).
-- **Memory** — LanceDB vector storage, shallow recall erzwungen (`_ShallowMemory`). Warme Runs nutzen Prior-Run-Daten.
+- **Memory** — entfernt (Phase 7, Stufe 3b). Crews laufen `memory=False`; Prior-Scan-Erkennung ist logs-basiert in `main.py`.
 - **reporter_agent max_iter=3** — bewusst niedrig gehalten; der Reporter nutzt keine Tools und soll den Report in einem Durchgang schreiben. Höhere Werte führen zu 400s+ Laufzeiten bei großem Kontext.
 - **Resume** — ausschließlich auf Flow-Ebene über `@persist(SQLiteFlowPersistence)` (`--list`/`--resume`). Intra-Crew-Checkpoint-Resume (`Crew.from_checkpoint()`) wurde in Phase 7, Stufe 1 entfernt.
 - **Flow-Persistence** — `@persist(SQLiteFlowPersistence(_FLOW_DB))` als Klassen-Dekorator auf `ReconSuiteFlow` speichert nach jedem Schritt in `logs/flow_state.db`. `ScanState` braucht `id: str = Field(default_factory=lambda: str(uuid4()))`. Resume via `flow.kickoff(restore_from_state_id=state_id)` — lädt State aus DB und überspringt fertige Schritte. `_FLOW_DB` muss vor der Klassendefinition stehen (Dekorator evaluiert bei Import).
 - **`@listen` Stacking — BROKEN** — `@listen(A)` + `@listen(B)` auf derselben Methode registriert NUR den äußersten Trigger. Jeder `@listen`-Aufruf erstellt einen neuen `ListenMethod`-Wrapper und setzt `__trigger_methods__` neu — die innere Registration wird überschrieben. Immer `@listen(or_(A, B))` verwenden wenn eine Methode auf mehrere Quellen hören soll. Import: `from crewai.flow.flow import or_`.
-- **`_tool_call_guardrail` — Halluzinations-Blocker** — `research` und `blue` Tasks haben `guardrails=[_tool_call_guardrail]`. Prüft `run_trace._pending` bei Task-Abschluss: wenn leer (kein Subprocess aufgerufen), lehnt der Guardrail beim ERSTEN Auftreten ab (Agent bekommt Feedback). Beim ZWEITEN Auftreten (count≥1 in `run_trace._guardrail_reject_count`) wird der Output akzeptiert — Warm-Memory-Fallback um endlose Retry-Schleifen zu verhindern. `close_phase()` setzt den Counter zurück. Timing: Guardrail läuft VOR `task_callback`/`close_phase()` — `_pending` enthält exakt die Calls der aktuellen Task. Fallback-safe: wenn `run_trace.is_active == False` (Unit-Tests, Standalone), gibt der Guardrail immer `True` zurück.
+- **`_tool_call_guardrail` — Halluzinations-Blocker** — `research` und `blue` Tasks haben `guardrails=[_tool_call_guardrail]`. Prüft `run_trace._pending` bei Task-Abschluss: wenn leer (kein Subprocess aufgerufen), lehnt der Guardrail beim ERSTEN Auftreten ab (Agent bekommt Feedback). Beim ZWEITEN Auftreten (count≥1 in `run_trace._guardrail_reject_count`) wird der Output akzeptiert — No-Tool-Fallback um endlose Retry-Schleifen zu verhindern. `close_phase()` setzt den Counter zurück. Timing: Guardrail läuft VOR `task_callback`/`close_phase()` — `_pending` enthält exakt die Calls der aktuellen Task. Fallback-safe: wenn `run_trace.is_active == False` (Unit-Tests, Standalone), gibt der Guardrail immer `True` zurück.

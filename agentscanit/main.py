@@ -23,14 +23,14 @@ import sys
 import json
 import re
 import os
+import glob
 import time
 import textwrap
 from datetime import datetime
 from pathlib import Path
 
-# Memory patches (suppress LLM-analysis calls + log noise) are applied in
-# crew.py via _apply_memory_patches() at import time — co-located with the
-# Memory configuration that needs them.
+# CrewAI-Console-Patch (Event-Bus-Stille) wird in crew.py via
+# _apply_crewai_patches() bei Import gesetzt. Memory-Subsystem entfernt (Phase 7, 3b).
 
 from rich.console import Console
 from rich.panel import Panel
@@ -43,7 +43,7 @@ from config import (
     ACTIVE_ANALYSIS, ACTIVE_CODE, ACTIVE_RESEARCH, ACTIVE_BASE_URL,
     OLLAMA_API_KEY, EMBED_MODEL, EMBED_BASE_URL,
 )
-from crew import AgentScanITCrew, MEMORY_DIR, PHASE_LABEL, VALID_SCOPES, _crew_memory
+from crew import AgentScanITCrew, PHASE_LABEL, VALID_SCOPES
 from tools.trace import run_trace
 
 console = Console()
@@ -146,24 +146,17 @@ def run(target: str, objective: str = "", scope: str = "full") -> object:
     scanner = AgentScanITCrew(target, objective, scope)
     target, objective, scope = scanner.target, scanner.objective, scanner.scope
 
-    # Pre-run shallow recall: vector search for the target name — no LLM call.
-    # A "hit" requires at least one returned memory whose content mentions the
-    # target name; generic memories from other targets always score ~0.66-0.68
-    # and never contain the target name, avoiding false-positives for new targets.
-    has_prior_data = False
-    try:
-        lancedb_path = MEMORY_DIR / "lancedb"
-        if lancedb_path.exists() and any(lancedb_path.iterdir()):
-            _hits = _crew_memory.recall(target, depth="shallow", limit=3)
-            has_prior_data = any(
-                target.lower() in h.record.content.lower() for h in _hits
-            )
-    except Exception:
-        pass
+    # Prior-Scan-Erkennung (Phase 7, Stufe 3b): logs-basiert, kein Memory.
+    # Crews laufen memory=False — der Agent nutzt Prior-Daten ohnehin nicht.
+    # "Prior" = es existiert bereits ein recon_report für dieses Target in logs/.
+    _safe_target_pre = re.sub(r"[^\w.-]", "_", target)
+    has_prior_data = bool(
+        glob.glob(os.path.join(LOG_DIR, f"recon_report_{_safe_target_pre}_*.md"))
+    )
     db_status = (
-        "[green]warm[/] [dim](prior run data for this target)[/]"
+        "[green]prior scan on disk[/]"
         if has_prior_data
-        else "[yellow]fresh[/] [dim](first run for this target)[/]"
+        else "[yellow]first run for this target[/]"
     )
 
     console.print()
@@ -172,7 +165,7 @@ def run(target: str, objective: str = "", scope: str = "full") -> object:
         f"  [dim]Target:[/]     [bold white]{target}[/]\n"
         f"  [dim]Objective:[/]  {objective}\n"
         f"  [dim]Scope:[/]      [yellow]{scope}[/]   [dim]Model:[/] {ACTIVE_ANALYSIS}\n"
-        f"  [dim]Memory DB:[/]   {db_status}   [dim]Cache:[/] [green]on[/]",
+        f"  [dim]History:[/]    {db_status}   [dim]Cache:[/] [green]on[/]",
         border_style="cyan",
         expand=False,
         padding=(0, 2),
@@ -372,9 +365,6 @@ def _save_outputs(
     vulns        = blue_out.get("vulnerabilities", [])
     findings_out = task_summaries.get("findings", {})
     cves         = findings_out.get("cve_references", [])
-    # Use the pre-run shallow recall result — LLM-reported memory_hit is unreliable
-    # because the deep RecallFlow sub-query analysis may not match stored facts.
-    memory_hit   = has_prior_data
 
     table = Table(show_header=False, box=None, padding=(0, 2, 0, 0))
     table.add_column(style="dim", min_width=14)
@@ -401,13 +391,11 @@ def _save_outputs(
     table.add_row("JSON Log", f"[dim]{json_path}[/]")
     if trace_path:
         table.add_row("Trace",     f"[dim]{trace_path}[/]  [dim](tool calls + raw output)[/]")
-    table.add_row("Memory DB", f"[dim]{MEMORY_DIR / 'lancedb'}[/]  [dim](persisted — reused on next run)[/]")
-    hit_label = (
-        "[green]hit[/] [dim](prior run data was available for this target)[/]"
-        if memory_hit else
-        "[dim]miss[/] [dim](no prior data for this target at run start)[/]"
+    table.add_row(
+        "History",
+        "[green]prior scan on disk[/]" if has_prior_data
+        else "[dim]first run for this target[/]",
     )
-    table.add_row("Memory hit", hit_label)
 
     console.print()
     console.print(Panel(table, title="[bold green]Assessment Complete[/]", border_style="green", padding=(1, 2)))
