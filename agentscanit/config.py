@@ -153,7 +153,7 @@ SEARCHSPLOIT_BIN   = "/usr/local/bin/searchsploit"
 
 TIMEOUT_DEFAULT    = 300
 TIMEOUT_NMAP_DISC  = 360
-TIMEOUT_NMAP_SCAN  = 180   # -A removed; -sV on top-1000 finishes well under 3min
+TIMEOUT_NMAP_SCAN  = 600   # -sV auf gefilterten/ungewöhnlichen Ports (Webmin:10000, alt-SSH:2222) dauert legitim lange; nmap --host-timeout liefert Teilergebnisse vor diesem Wrapper-Limit
 TIMEOUT_NIKTO      = 120   # nikto gets -maxtime 90s, 120s is the safety fallback
 TIMEOUT_TESTSSL    = 300
 TIMEOUT_NUCLEI     = 180

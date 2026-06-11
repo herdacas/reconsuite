@@ -214,6 +214,46 @@ Modell-Auswahl via `models.json` (aus `models.json.example` ableiten).
 
 ## Bekannte Probleme / Offene Punkte
 
+### 📋 Scan-Qualitäts-Findings (westerstede.de full, 2026-06-11) — für später, nicht gefixt
+Beobachtet bei einem sauberen `full`-Scan (4m13s, CLEAN, 20 Tool-Calls). Quelle: `trace_*.json`.
+Verortet im Workflow-Schritt (Pipeline: research → blue → findings → red_scan → red → coding → report):
+
+- **#1 — LLM verstümmelt das Target-Argument (research + blue):** gpt-oss übergibt vereinzelt
+  kaputte Domain-/URL-Werte: `dnsrecon -d wenum?` (research), `theHarvester -d westernde?` (research),
+  `whatweb https://://?` (blue). Betrifft jeweils das Target-Arg. dnsrecon wurde danach korrekt
+  wiederholt (1 Call verschwendet); whatweb-Call nutzlos. Diagnose offen: systematisch vs. sporadisch.
+- **#2 — theHarvester kaputt (research):** Aufruf via `uv run theHarvester`, aber `uv` ist nicht
+  installiert → `[TOOL_ERROR] uv: binary not found` bei JEDEM Aufruf. OSINT-Tool fällt komplett aus.
+  Quick-Fix-Kandidat (Tool ohne `uv` aufrufen oder deaktivieren). Tool-Def: `tools/passive_recon.py`.
+- **#3 — findings-Phase dünn (findings):** nur 2 generische `nvd_cve_search Apache`/`Joomla` (ohne
+  Version), **kein `searchsploit`** obwohl der Task-Prompt es als Schritt A fordert. Banner ohne
+  Version → generische Suche → 0 CVEs. Teils CVE-Erkennungs-Limit, teils Agent nutzt searchsploit nicht.
+- **#4 — Redundanz/Coverage:** `whatweb` 3× auf verwandte Hosts (blue+red_scan). „full" nutzte nur
+  ~6/15 research-Tools + ~7/11 blue-Tools (amass, assetfinder, dnsx, katana, waybackurls, gau,
+  sublist3r, ffuf, testssl, enum4linux ungenutzt — teils bewusst konditional).
+
+Detail-Notiz + Priorisierung: `phase7.md` (Abschnitt „Scan-Qualitäts-Findings").
+
+### 🛠️ Attack-Surface-Coverage Fix (2026-06-11) — Subdomains werden jetzt gescannt
+Befund (futuremultiverse.com full): research fand 12 Subdomains (`auth`, `api.auth`, `backoffice`,
+`cockpit`, `sandbox`, …), aber blue scannte NUR die Apex-Domain → Angriffsfläche komplett verfehlt,
+„nichts gefunden" trotz vorhandener CVEs/Dienste. Umgesetzt:
+- **Deterministischer Subdomain-Fanout** (`tasks.py:_subdomain_fanout_guardrail` auf research-Task):
+  prüft entdeckte Subdomains via httpx auf Liveness (Code, kein LLM), hängt einen Block
+  `=== VERIFIED LIVE HOSTS ===` an den research-Output → fließt via `context=[research]` in blue.
+  Cap `_FANOUT_MAX_SUBS=40` gegen Fake-Subdomain-Fluten. Liest Subdomains aus Pydantic ODER Raw-Fallback.
+- **blue-Prompt geschärft:** MUSS jeden VERIFIED-LIVE-HOST scannen (nicht nur Apex); nmap-Default-Portnamen
+  (`EtherNetIP-1`/`snet-sensor-mgmt`) sind Rate-Namen, nicht Dienste (10000→Webmin, 2222→SSH prüfen).
+- **blue `max_iter` 10→20** (mehr Hosts × Tools). **nmap `TIMEOUT_NMAP_SCAN` 180→600** + `--host-timeout 540s`
+  (langsame `-sV` auf Webmin/odd-Ports lieferte vorher `[TOOL_ERROR]` ohne Daten).
+- **Folge-Design (Backlog, vom User):** bei Domains mit vielen Fake-Subdomains ist „LLM wählt relevante →
+  ggf. durch zusätzliche Einheit bestätigen → nur relevante scannen" der bessere Weg. Aktuell: httpx-Liveness
+  aller (gecappten) Subdomains. Nach Test-Scans nachschärfen.
+- Verifiziert (Unit): httpx-Liveness filtert korrekt live-only; Guardrail hängt Block an; verify_phase7 14/14.
+  **E2E-Test (Subdomains tauchen in blue/red-Trace auf) steht aus — vom User.**
+
+---
+
 ### ⭐ Phase-7-Verifikation (2026-06-10) — Pipeline-Crash gefixt + naabu ausgeklammert
 Vollständiger Beweis-Trail: `debugging/DIAGNOSIS.md`. Kurzfassung für die nächste Session:
 
@@ -264,9 +304,10 @@ Vollständiger Beweis-Trail: `debugging/DIAGNOSIS.md`. Kurzfassung für die näc
 ### Flow-Persistence (`@persist`, flow.py)
 - `ReconSuiteFlow` trägt `@persist(SQLiteFlowPersistence(_FLOW_DB), verbose=False)` — nach jedem abgeschlossenen Flow-Schritt wird der State in `logs/flow_state.db` gespeichert.
 - `ScanState.id` (uuid4) ist der `flow_uuid`-Key in der DB. Wird beim Flow-Start angezeigt und am Ende erneut gedruckt.
-- `--resume <flow-id>`: erstellt neue `ReconSuiteFlow`-Instanz, ruft `flow.kickoff(restore_from_state_id=...)` — Flow lädt State aus DB und überspringt bereits abgeschlossene Schritte.
+- `--resume <flow-id>`: erstellt neue `ReconSuiteFlow`-Instanz, ruft `flow.kickoff(restore_from_state_id=...)` — Flow lädt State aus DB.
+- **Resume-Skip-Guards (Phase 7, Stufe 3 Vorstufe):** `@persist` hydratisiert bei Resume zwar den State, **führt die `@listen`-Methoden aber von vorn aus** — ohne Guard würde `run_scan` (der gesamte Team-1-Scan, ~Minuten) erneut laufen. Beweis: Resume eines abgeschlossenen Flows scannte komplett neu. **Fix:** `ScanState.completed_steps: list[str]` + `_step_done()`/`_mark_step()` in `flow.py`. Jede Team-Methode markiert sich bei Abschluss und überspringt sich bei Resume, wenn schon erledigt. Verifiziert: Resume eines fertigen quick-Runs → 5s statt ~60s, `run_scan`/`run_reporting` übersprungen, 0 Scan-Tools. Granularität = Flow-/Team-Ebene (run_scan ist atomar; Abbruch mitten im Scan → run_scan läuft neu; Abbruch zwischen Teams → erledigte Teams werden übersprungen).
 - `--list`: liest `flow_states`-Tabelle direkt per `sqlite3` — zeigt letzten Snapshot pro `flow_uuid` sortiert nach Zeitstempel.
-- **Limitation**: Nur Flow-Level-Persistence (zwischen den Teams). Intra-Crew-Persistence (zwischen Tasks) gibt es nicht mehr — `CheckpointConfig` wurde in Phase 7, Stufe 1 entfernt.
+- **Limitation**: Nur Flow-/Team-Level-Persistence. Intra-Crew-Persistence (zwischen Tasks innerhalb von Team 1) gibt es nicht — `CheckpointConfig` wurde in Phase 7, Stufe 1 entfernt.
 
 ### CVE-Trefferquote bei Cloudflare/CDN-Targets
 - Bremen.de etc. liefern keine CVEs weil Dienste hinter Cloudflare versteckt sind — kein Bug.

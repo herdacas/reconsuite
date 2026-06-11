@@ -118,6 +118,80 @@ def _cve_trace_guardrail(output: Any) -> tuple[bool, Any]:
     return True, output
 
 
+# ─── Subdomain-Fanout (deterministisch) ───────────────────────────────────────
+# Problem: research entdeckt Subdomains (subfinder), aber blue scannte bisher nur
+# die Apex-Domain → die eigentliche Angriffsfläche (auth/api/backoffice/…) wurde nie
+# gescannt. Fix: nach research deterministisch via httpx prüfen welche Subdomains LIVE
+# sind, und einen markierten Block an den research-Output anhängen, den blue über
+# context=[research] erhält. Liveness = Code (deterministisch), kein LLM-Ermessen.
+# Hinweis (Backlog): bei Domains mit vielen Fake-Subdomains ist „LLM wählt relevante →
+# ggf. bestätigen → scannen" der bessere Weg — hier vorerst httpx-Liveness (gecappt).
+
+_FANOUT_MAX_SUBS = 40   # Obergrenze gegen Fake-Subdomain-Fluten
+
+def _httpx_live_hosts(subdomains: list) -> list:
+    """Deterministisch: gibt die per httpx erreichbaren Hosts zurück (live-only)."""
+    subs = [s.strip() for s in subdomains if s and s.strip()][:_FANOUT_MAX_SUBS]
+    if not subs:
+        return []
+    try:
+        import subprocess as _sp
+        from config import HTTPX_BIN
+        proc = _sp.run(
+            [HTTPX_BIN, "-silent", "-no-color"],
+            input="\n".join(subs), capture_output=True, text=True, timeout=120,
+        )
+        live = []
+        for line in proc.stdout.splitlines():
+            host = line.strip().replace("https://", "").replace("http://", "").split("/")[0]
+            if host and host not in live:
+                live.append(host)
+        return live
+    except Exception:
+        return []
+
+
+def _subdomain_fanout_guardrail(output: Any) -> tuple[bool, Any]:
+    """Hängt eine deterministisch ermittelte LIVE-HOSTS-Liste an den research-Output.
+
+    Lehnt NIE ab (gibt immer True zurück) — reine Anreicherung. Liest Subdomains aus
+    dem Pydantic-Output (Fallback: Raw-Text), prüft Liveness via httpx, und ergänzt
+    einen markierten Block, den die blue-Task über context=[research] verbindlich scannt.
+    """
+    try:
+        subs: list = []
+        pd = getattr(output, "pydantic", None)
+        if pd is not None and getattr(pd, "subdomains", None):
+            subs = list(pd.subdomains)
+        else:
+            # Fallback: Subdomains aus dem Raw-Text ziehen (falls Pydantic-Feld leer)
+            raw = getattr(output, "raw", "") or ""
+            subs = list(dict.fromkeys(_re.findall(r'[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9-]+)+', raw, _re.I)))
+            subs = [s for s in subs if s.count(".") >= 2][:_FANOUT_MAX_SUBS]
+
+        if not subs:
+            return True, output
+
+        live = _httpx_live_hosts(subs)
+        if not live:
+            return True, output
+
+        block = (
+            "\n\n=== VERIFIED LIVE HOSTS (deterministic httpx) ===\n"
+            "Diese Hosts sind erreichbar und MÜSSEN von der Scan-Phase abgedeckt werden:\n"
+            + "\n".join(f"- {h}" for h in live)
+        )
+        raw = getattr(output, "raw", "") or ""
+        if "VERIFIED LIVE HOSTS" not in raw:
+            try:
+                object.__setattr__(output, "raw", raw + block)
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return True, output
+
+
 # ─── Output-Modelle ───────────────────────────────────────────────────────────
 
 class ResearchOutput(BaseModel):
@@ -258,7 +332,7 @@ def make_tasks() -> dict:
             "relevante Subdomains (scope-angepasst), DNS-Infos, WHOIS-Infos."
         ),
         output_pydantic=ResearchOutput,
-        guardrails=[_tool_call_guardrail],
+        guardrails=[_tool_call_guardrail, _subdomain_fanout_guardrail],
         guardrail_max_retries=2,
         agent=research_agent,
     )
@@ -268,6 +342,15 @@ def make_tasks() -> dict:
             "Ziel: {target} | Objective: {objective} | Scope: {scope}\n\n"
             "Führe einen autorisierten Sicherheitsscan durch.\n"
             "Nutze die Recon-Ergebnisse als Grundlage.\n\n"
+            "ANGRIFFSFLÄCHE — PFLICHT:\n"
+            "Wenn der Recon-Kontext einen Block 'VERIFIED LIVE HOSTS' enthält, MUSST du "
+            "JEDEN dieser Hosts scannen (httpx + whatweb + nuclei pro Host; nmap/nikto bei "
+            "auffälligen Ports) — NICHT nur die Apex-Domain. Subdomains wie auth/api/backoffice/"
+            "cockpit/sandbox sind oft die eigentliche Angriffsfläche. Apex-only ist unzureichend.\n"
+            "SERVICE-ERKENNUNG: nmap-Default-Portnamen (z.B. 'EtherNetIP-1' auf 2222, "
+            "'snet-sensor-mgmt' auf 10000) sind RATE-NAMEN aus /etc/services, KEINE erkannten "
+            "Dienste. Verifiziere immer mit -sV/httpx: Port 10000 ist meist Webmin, 2222 meist "
+            "SSH. Trage nur tatsächlich erkannte Dienste als Service ein.\n\n"
             "WICHTIG – Tool-Auswahl-Prinzip:\n"
             "Wähle NUR die Tools die direkt zum Objective '{objective}' beitragen.\n"
             "Führe NICHT alle verfügbaren Tools aus. Plane zuerst, dann execute.\n\n"

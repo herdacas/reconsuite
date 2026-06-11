@@ -62,7 +62,8 @@ class NmapTool(BaseTool):
             if not open_ports:
                 return _limit(disc_out or "Keine offenen Ports gefunden", "nmap")
             port_list = ",".join(open_ports[:50])
-            cmd = [NMAP_BIN, "-T4", "-sV", "-p", port_list, "--open", target]
+            cmd = [NMAP_BIN, "-T4", "-sV", "--host-timeout", "540s",
+                   "-p", port_list, "--open", target]
             return _limit(_run(cmd, timeout=TIMEOUT_NMAP_SCAN), "nmap")
 
         cmd = [NMAP_BIN, "-T4"]
@@ -72,7 +73,9 @@ class NmapTool(BaseTool):
             cmd += ["-p", port_val]
         cmd += ["--open"]
         if aggressive:
-            cmd += ["-sV"]
+            # --host-timeout: nmap liefert Teilergebnisse vor dem Wrapper-Limit,
+            # statt bei langsamer Versions-Detection ohne Daten gekillt zu werden.
+            cmd += ["-sV", "--host-timeout", "540s"]
         cmd.append(target)
         return _limit(_run(cmd, timeout=TIMEOUT_NMAP_SCAN), "nmap")
 

@@ -236,7 +236,7 @@ blue_agent = Agent(
     verbose=False,
     memory=False,
     allow_delegation=False,
-    max_iter=10,
+    max_iter=20,   # erhöht von 10: mehrere Live-Subdomains × Tools (Fanout) brauchen Budget
     step_callback=_step_callback,
     respect_context_window=True,
 )
