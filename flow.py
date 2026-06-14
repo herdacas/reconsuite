@@ -357,6 +357,12 @@ if __name__ == "__main__":
         _flow_cmd_score(args[1] if len(args) > 1 else "")
         sys.exit(0)
 
+    if args and args[0] == "--plot":
+        flow = ReconSuiteFlow()
+        out = flow.plot(filename="recon_suite_flow.html", show=False)
+        console.print(f"  [green]✓[/]  Flow-Graph gespeichert: [cyan]{out}[/]")
+        sys.exit(0)
+
     if args and args[0] == "--resume":
         if len(args) < 2:
             console.print("[red]✗[/]  --resume requires a flow ID")
