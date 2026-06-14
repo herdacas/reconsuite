@@ -22,16 +22,16 @@ from knowledge import service_normalization_knowledge
 # `_run(cmd)` calls that helper; `self._run` is the BaseTool interface method (CrewAI).
 # The names are distinct in Python's scoping rules but look identical at a glance.
 from tools import (
-    # blue_agent – Active Scanning
-    nmap_tool, nikto_tool, whatweb_tool, sslscan_tool, testssl_tool,
-    curl_tool, ping_tool, nuclei_tool, ffuf_tool, enum4linux_tool,
-    httpx_tool, naabu_tool,
-    # research_agent – Passive Recon
-    ddg_search_tool, theharvester_tool, sublist3r_tool, subfinder_tool,
-    dnsrecon_tool, dig_tool, whois_tool, amass_tool, assetfinder_tool,
-    dnsx_tool, katana_tool, waybackurls_tool, gau_tool, searchsploit_tool,
-    # nvd
-    nvd_tool,
+    # blue_agent – Active Scanning (10 tools; naabu/ffuf/testssl/enum4linux entfernt Phase 9.1)
+    nmap_tool, nikto_tool, whatweb_tool, sslscan_tool,
+    curl_tool, ping_tool, nuclei_tool,
+    httpx_tool,
+    # research_agent – Passive Recon (9 tools; amass/assetfinder/sublist3r/waybackurls/gau/theHarvester entfernt Phase 9.1)
+    ddg_search_tool, subfinder_tool,
+    dnsrecon_tool, dig_tool, whois_tool,
+    dnsx_tool, katana_tool, searchsploit_tool,
+    # nvd (keyword fallback + CPE tool)
+    nvd_tool, nvd_cpe_tool,
 )
 
 _console = Console()
@@ -180,10 +180,10 @@ research_agent = Agent(
         "publicly available information. Only report tool-confirmed facts."
     ),
     tools=[
-        ddg_search_tool, theharvester_tool, whois_tool, dig_tool,
-        dnsrecon_tool, subfinder_tool, sublist3r_tool, amass_tool,
-        assetfinder_tool, dnsx_tool, katana_tool, waybackurls_tool,
-        gau_tool, searchsploit_tool, nvd_tool,
+        ddg_search_tool, whois_tool, dig_tool,
+        dnsrecon_tool, subfinder_tool,
+        dnsx_tool, katana_tool, searchsploit_tool,
+        nvd_tool, nvd_cpe_tool,
     ],
     knowledge_sources=[service_normalization_knowledge],
     llm=llm_research,
@@ -217,13 +217,10 @@ blue_agent = Agent(
         "sanctioned security assessment. Use the provided tools to scan the target. "
         "Report only tool-confirmed findings."
     ),
-    # naabu_tool vorübergehend ausgeklammert (Full-Port-Scan 1-65535 dauert
-    # mehrere Minuten ohne Output → wirkt wie ein Hang). Port-Discovery läuft
-    # weiter über nmap. Wieder aktivieren: naabu_tool unten in die Liste aufnehmen.
     tools=[
         ping_tool, nmap_tool, httpx_tool, whatweb_tool,
-        curl_tool, nikto_tool, ffuf_tool, sslscan_tool, testssl_tool,
-        nuclei_tool, enum4linux_tool,
+        curl_tool, nikto_tool, sslscan_tool,
+        nuclei_tool,
     ],
     llm=llm_analysis,
     function_calling_llm=llm_analysis,

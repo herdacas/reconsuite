@@ -69,6 +69,60 @@ def _filter_cve_format(cves: List[str]) -> List[str]:
     ]
 
 
+_SCOPE_REQUIRED_TOOLS: dict[str, set[str]] = {
+    "quick":   {"nmap", "httpx"},
+    "web":     {"httpx", "whatweb"},
+    "network": {"nmap", "httpx"},
+    "ssl":     {"sslscan"},
+    "full":    {"nmap", "httpx", "whatweb", "sslscan"},
+}
+
+
+def _scope_coverage_guardrail(output: Any) -> tuple[bool, Any]:
+    """Guardrail: Stellt sicher dass Kern-Tools pro Scope aufgerufen wurden.
+
+    Prüft run_trace._pending (läuft vor close_phase). Gibt beim ERSTEN Fehlen
+    Feedback zurück damit der Agent die fehlenden Tools noch aufrufen kann.
+    Beim zweiten Fehlschlag (count≥1) wird akzeptiert um Endlosschleifen zu vermeiden.
+    """
+    try:
+        from tools.trace import run_trace
+        if not run_trace.is_active:
+            return True, getattr(output, "raw", output)
+
+        # Scope aus dem laufenden kickoff-Input lesen — liegt im _pending nicht direkt
+        # vor. Wir lesen ihn aus dem task description-Template nicht; stattdessen
+        # versuchen wir den Scope aus dem Pydantic-Output (falls befüllt) zu ermitteln,
+        # oder überspringen die Prüfung wenn der Scope nicht bestimmbar ist.
+        # Der Scope wird als {scope} in der Task-Description übergeben — das reicht für
+        # den Guardrail-Feedback-Text nicht; wir lesen ihn aus run_trace._current_scope.
+        scope = getattr(run_trace, "_current_scope", None)
+        if not scope:
+            return True, getattr(output, "raw", output)
+
+        required = _SCOPE_REQUIRED_TOOLS.get(scope, set())
+        if not required:
+            return True, getattr(output, "raw", output)
+
+        used = {c.get("tool_name", "") for c in run_trace._pending}
+        missing = required - used
+
+        if missing:
+            reject_key = f"scope_coverage_{scope}"
+            count = run_trace._guardrail_reject_count
+            if count >= 1:
+                return True, getattr(output, "raw", output)
+            run_trace._guardrail_reject_count += 1
+            return (
+                False,
+                f"SCOPE-GARANTIE VERLETZT (scope={scope}): Pflicht-Tools noch nicht aufgerufen: "
+                f"{sorted(missing)}. Rufe diese Tools jetzt auf bevor du den Output lieferst.",
+            )
+    except Exception:
+        pass
+    return True, getattr(output, "raw", output)
+
+
 def _cve_trace_guardrail(output: Any) -> tuple[bool, Any]:
     """Guardrail: CVE-IDs gegen Session-Trace validieren — Agent erhält Feedback.
 
@@ -404,7 +458,7 @@ def make_tasks() -> dict:
             "offene Ports, erkannte Services und Versionen, bestätigte Findings aus Tool-Output."
         ),
         output_pydantic=BlueOutput,
-        guardrails=[_tool_call_guardrail],
+        guardrails=[_tool_call_guardrail, _scope_coverage_guardrail],
         guardrail_max_retries=2,
         agent=blue_agent,
         context=[research],
@@ -423,14 +477,17 @@ def make_tasks() -> dict:
             "WICHTIG Apache-Coyote: 'Apache-Coyote/1.1' → die Zahl nach dem Schrägstrich ist "
             "die Connector-Version, NICHT die Tomcat-Version. Schreibe 'Apache Tomcat (Version unbekannt)' "
             "— nie 'Apache Tomcat 1.1'. Tomcat-Version nur aus whatweb/nmap-Banner übernehmen.\n\n"
-            "CVE-SUCHE — Reihenfolge:\n"
-            "SCHRITT A: Wenn Versionsnummer bekannt → searchsploit '<service> <version>'.\n"
-            "SCHRITT B: Immer (mit oder ohne Version) → nvd_cve_search aufrufen:\n"
-            "  - Mit Version: 'Apache Tomcat 8.5', 'jQuery 1.8.2', 'OpenSSH 8.2p1'\n"
-            "  - Ohne Version: normalisierter Service-Name ('Apache Tomcat', 'Elasticsearch', 'nginx')\n"
-            "  Ruf nvd_cve_search für JEDEN identifizierten Dienst/Framework auf — "
-            "auch für Frontend-Bibliotheken aus whatweb (jQuery, Bootstrap, Angular).\n"
-            "SCHRITT C: Wenn NVD Treffer liefert → DuckDuckGo '<CVE-ID> exploit PoC' zur Bestätigung.\n\n"
+            "CVE-SUCHE — Reihenfolge (deterministisch, CPE-first):\n"
+            "SCHRITT A: searchsploit '<service> <version>' — lokale Exploit-DB zuerst.\n"
+            "SCHRITT B: nvd_cpe_lookup aufrufen (PRIMÄR — präziser als Keyword-Suche):\n"
+            "  - Übergib den exakten Service-Banner aus dem Scan-Output als 'banner'-Parameter\n"
+            "  - Beispiele: banner='Oracle WebLogic 12.2.1', banner='nginx/1.22.1', banner='OpenSSH 8.2p1'\n"
+            "  - Das Tool mappt deterministisch auf CPE und liefert die NEUESTEN CVEs nach CVSS-Score\n"
+            "  - Ruf nvd_cpe_lookup für JEDEN identifizierten Dienst auf\n"
+            "SCHRITT C: nvd_cve_search als Fallback — NUR wenn nvd_cpe_lookup 'Kein CPE-Mapping' meldet:\n"
+            "  - Mit Version: 'Apache Tomcat 8.5', 'jQuery 1.8.2'\n"
+            "  - Ohne Version: normalisierter Service-Name ('nginx', 'Elasticsearch')\n"
+            "SCHRITT D: Wenn NVD/CPE Treffer liefert → DuckDuckGo '<CVE-ID> exploit PoC' zur Bestätigung.\n\n"
             "RELEVANZ-PRÜFUNG: Prüfe bei jedem Treffer ob Produktname passt. "
             "'Ingress-NGINX' ≠ 'nginx'. 'OpenSSH 7.x' ≠ 'OpenSSH 9.x'. "
             "Ohne bekannte Version: nur HIGH/CRITICAL CVEs aus den letzten 3 Jahren eintragen.\n"
@@ -451,14 +508,14 @@ def make_tasks() -> dict:
             "Keine CVE-IDs aus LLM-Trainingswissen.\n"
             "REGEL: 'risk_summary' enthält ausschließlich direkt beobachtete Fakten aus Tool-Outputs — "
             "keine Einschätzungen, keine Wahrscheinlichkeiten, kein 'may' oder 'could'.\n\n"
-            "SIGNATURE-SERVICES — direkte CVE-Suche bei bekannten Admin-Ports:\n"
-            "Wenn ein Service auf einem bekannten Admin-Port läuft, suche IMMER die bekannte CVE direkt:\n"
-            "  - Port 7001/7002 (Oracle WebLogic) → nvd_cve_search 'CVE-2023-21839' (RCE, aktiv ausgenutzt)\n"
-            "  - Port 7001/7002 (Oracle WebLogic) → nvd_cve_search 'CVE-2020-14882' (RCE, CVSS 9.8)\n"
-            "  - Port 6379 (Redis) → nvd_cve_search 'CVE-2022-0543' (Lua RCE)\n"
-            "  - Port 4848 (GlassFish) → nvd_cve_search 'CVE-2011-0807'\n"
-            "  - Port 8161 (ActiveMQ) → nvd_cve_search 'CVE-2023-46604' (RCE, CVSS 10.0)\n"
-            "Direkte CVE-ID-Suche via nvd_cve_search gibt exakte Daten — keine Keyword-Streuung.\n\n"
+            "SIGNATURE-SERVICES — CPE-Lookup bei bekannten Admin-Ports:\n"
+            "Wenn ein Service auf einem bekannten Admin-Port läuft, nutze nvd_cpe_lookup:\n"
+            "  - Port 7001/7002 → nvd_cpe_lookup banner='Oracle WebLogic' (→ CVE-2023-21839, CVE-2025-21535)\n"
+            "  - Port 6379 → nvd_cpe_lookup banner='Redis' (→ CVE-2022-0543 Lua RCE)\n"
+            "  - Port 4848 → nvd_cpe_lookup banner='GlassFish' (→ CVE-2011-0807)\n"
+            "  - Port 8161 → nvd_cpe_lookup banner='ActiveMQ' (→ CVE-2023-46604 CVSS 10.0)\n"
+            "  - Port 9200 → nvd_cpe_lookup banner='Elasticsearch' (→ aktuelle ES CVEs)\n"
+            "nvd_cpe_lookup liefert immer die neuesten CVEs nach CVSS — kein Keyword-Rauschen.\n\n"
             "HINWEIS FÜR NACHFOLGENDE TASKS:\n"
             "Dokumentiere erkannte Technologien explizit (z.B. 'Apache 2.4.51', 'WordPress 6.1', "
             "'OpenSSH 8.2p1') damit der Red-Scan-Agent nuclei mit den passenden "

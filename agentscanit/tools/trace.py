@@ -43,6 +43,7 @@ class RunTrace:
 
     def __init__(self):
         self._active:              bool            = False
+        self._current_scope:       str             = ""
         self._meta:                dict            = {}
         self._phases:              dict            = {}
         self._pending:             list            = []   # calls not yet attributed to a phase
@@ -59,15 +60,16 @@ class RunTrace:
 
     def activate(self, target: str, objective: str, scope: str, pipeline: list) -> None:
         """Start a new trace for a crew run."""
-        self._active       = True
-        self._meta         = {"target": target, "objective": objective,
-                               "scope": scope,   "pipeline": pipeline}
-        self._phases       = {p: {"tool_calls": [], "structured_output": None}
-                               for p in pipeline}
-        self._pending      = []
+        self._active          = True
+        self._current_scope   = scope   # read by _scope_coverage_guardrail in tasks.py
+        self._meta            = {"target": target, "objective": objective,
+                                  "scope": scope,   "pipeline": pipeline}
+        self._phases          = {p: {"tool_calls": [], "structured_output": None}
+                                  for p in pipeline}
+        self._pending         = []
         self._current_agent_call = None
-        self._run_start    = time.time()
-        self._call_seq     = 0
+        self._run_start       = time.time()
+        self._call_seq        = 0
         self._guardrail_reject_count = 0
 
     @property

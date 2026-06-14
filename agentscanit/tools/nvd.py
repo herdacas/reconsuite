@@ -127,6 +127,66 @@ def fetch_cves(cve_ids: list[str], api_key: Optional[str] = None) -> list[dict]:
     return results
 
 
+def cpe_search_nvd(vendor: str, product: str, version: str = "", max_results: int = 5) -> list[dict]:
+    """Search NVD CVEs via CPE virtualMatchString (precise, version-aware).
+
+    Unlike keyword search (which returns pubDate:asc → oldest first), this function:
+    1. Fetches totalResults to know the list size
+    2. Pages to the END of the pubDate:asc list (= newest CVEs)
+    3. Sorts locally by CVSS score descending
+
+    For Oracle WebLogic (309 CVEs): returns CVE-2025-21535 (CVSS 9.8) instead of
+    CVE-2008-3257 (CVSS 10.0, from 2008) that keyword search returns.
+    """
+    cpe_string = f"cpe:2.3:a:{vendor}:{product}"
+    if version:
+        cpe_string += f":{version}:*:*:*:*:*:*:*"
+
+    delay = _DELAY_API_KEY if _api_key() else _DELAY_NO_KEY
+
+    try:
+        # Step 1: get total count
+        r1 = _get_session().get(
+            NVD_API_URL,
+            params={"virtualMatchString": cpe_string, "resultsPerPage": 1},
+            headers=_headers(),
+            timeout=20,
+        )
+        r1.raise_for_status()
+        total = r1.json().get("totalResults", 0)
+        if total == 0:
+            return [{"error": f"No CVEs for CPE {cpe_string}", "cpe": cpe_string}]
+
+        time.sleep(delay)
+
+        # Step 2: fetch newest 100 (last page of pubDate:asc = most recent).
+        # Pool of 100 ensures CVSS-7.5 CVEs survive the sort even when 6+ CVSS-9.8
+        # entries are present (e.g. Oracle WebLogic has 10+ CVSS-9.8 in recent years).
+        fetch_count = min(100, total)
+        start_index = max(0, total - fetch_count)
+        r2 = _get_session().get(
+            NVD_API_URL,
+            params={
+                "virtualMatchString": cpe_string,
+                "resultsPerPage": fetch_count,
+                "startIndex": start_index,
+            },
+            headers=_headers(),
+            timeout=30,
+        )
+        r2.raise_for_status()
+        vulns = r2.json().get("vulnerabilities", [])
+
+    except requests.HTTPError as e:
+        return [{"error": f"HTTP {e.response.status_code}", "cpe": cpe_string}]
+    except Exception as e:
+        return [{"error": str(e), "cpe": cpe_string}]
+
+    results = [_parse_cve(v["cve"]) for v in vulns]
+    results.sort(key=lambda r: r.get("cvss_score") or 0, reverse=True)
+    return results[:max_results]
+
+
 def search_nvd(keyword: str, max_results: int = 5) -> list[dict]:
     """Search NVD by keyword (product name + optional version).
 
@@ -239,3 +299,123 @@ class NvdSearchTool(BaseTool):
 
 
 nvd_tool = NvdSearchTool()
+
+
+# ---------------------------------------------------------------------------
+# CPE-based CVE lookup tool (Phase 9 — replaces keyword guessing)
+# ---------------------------------------------------------------------------
+
+class NvdCpeInput(BaseModel):
+    banner: str = Field(
+        description=(
+            "Service-Banner oder -Name aus dem Scan-Output, z.B. 'Oracle WebLogic 12.2.1', "
+            "'nginx/1.22.1', 'OpenSSH 8.2p1', 'Apache Tomcat 9.0.65'. "
+            "Wird deterministisch auf CPE vendor:product gemappt — kein Keyword-Rauschen."
+        )
+    )
+    version: str = Field(
+        default="",
+        description="Versionsnummer wenn bekannt, z.B. '8.2', '12.2.1.0'. Leer lassen wenn unbekannt.",
+    )
+    max_results: int = Field(default=5, description="Maximale Anzahl CVEs (1-10)")
+
+
+class NvdCpeTool(BaseTool):
+    name: str = "nvd_cpe_lookup"
+    description: str = (
+        "Präzises CVE-Lookup via NVD CPE-API — deterministisches Banner→CPE-Mapping, "
+        "keine Keyword-Streuung. Liefert die neuesten und schwerwiegendsten CVEs für "
+        "ein Produkt (CVSS-sortiert, neuste zuerst). "
+        "Nutze dieses Tool VOR nvd_cve_search wenn du den Service-Banner kennst. "
+        "Beispiele: banner='Oracle WebLogic 12.2.1' → CVE-2023-21839, CVE-2025-21535. "
+        "banner='OpenSSH 8.2p1' → CVE-2023-38408. "
+        "banner='nginx 1.22.1' → aktuelle nginx CVEs."
+    )
+    args_schema: Type[BaseModel] = NvdCpeInput
+
+    def _run(self, banner: str, version: str = "", max_results: int = 5) -> str:
+        import time as _time
+        from tools.trace import run_trace
+        from tools.cpe_map import banner_to_cpe
+        t0 = _time.time()
+
+        mapping = banner_to_cpe(banner)
+        if not mapping:
+            out = (
+                f"[NVD-CPE] Kein CPE-Mapping für '{banner}'. "
+                f"Fallback: nvd_cve_search verwenden."
+            )
+            run_trace.record_execution(["nvd_cpe_lookup", banner], out, _time.time() - t0)
+            return out
+
+        vendor, product = mapping
+        results = cpe_search_nvd(vendor, product, version=version, max_results=max_results)
+
+        if not results or "error" in results[0]:
+            err = results[0].get("error", "no results") if results else "no results"
+            out = f"[NVD-CPE] Keine CVEs für {vendor}:{product}: {err}"
+            run_trace.record_execution(["nvd_cpe_lookup", banner], out, _time.time() - t0)
+            return out
+
+        cpe_str = f"cpe:2.3:a:{vendor}:{product}"
+        if version:
+            cpe_str += f":{version}"
+        lines = [f"[NVD-CPE] CVEs für {cpe_str} ({len(results)} Top-Treffer nach CVSS):"]
+        for r in results:
+            sev   = r.get("cvss_severity") or "N/A"
+            score = r.get("cvss_score") or "N/A"
+            desc  = (r.get("description") or "")[:200]
+            lines.append(
+                f"\n{r['id']} — CVSS {score} ({sev})\n"
+                f"  Published: {r.get('published', 'N/A')}\n"
+                f"  {desc}"
+            )
+
+        out = "\n".join(lines)
+        run_trace.record_execution(["nvd_cpe_lookup", banner], out, _time.time() - t0)
+        return out
+
+    async def _arun(self, banner: str, version: str = "", max_results: int = 5) -> str:
+        import time as _time
+        from tools.trace import run_trace
+        from tools.cpe_map import banner_to_cpe
+        t0 = _time.time()
+
+        mapping = banner_to_cpe(banner)
+        if not mapping:
+            out = (
+                f"[NVD-CPE] Kein CPE-Mapping für '{banner}'. "
+                f"Fallback: nvd_cve_search verwenden."
+            )
+            run_trace.record_execution(["nvd_cpe_lookup", banner], out, _time.time() - t0)
+            return out
+
+        vendor, product = mapping
+        results = await asyncio.to_thread(cpe_search_nvd, vendor, product, version, max_results)
+
+        if not results or "error" in results[0]:
+            err = results[0].get("error", "no results") if results else "no results"
+            out = f"[NVD-CPE] Keine CVEs für {vendor}:{product}: {err}"
+            run_trace.record_execution(["nvd_cpe_lookup", banner], out, _time.time() - t0)
+            return out
+
+        cpe_str = f"cpe:2.3:a:{vendor}:{product}"
+        if version:
+            cpe_str += f":{version}"
+        lines = [f"[NVD-CPE] CVEs für {cpe_str} ({len(results)} Top-Treffer nach CVSS):"]
+        for r in results:
+            sev   = r.get("cvss_severity") or "N/A"
+            score = r.get("cvss_score") or "N/A"
+            desc  = (r.get("description") or "")[:200]
+            lines.append(
+                f"\n{r['id']} — CVSS {score} ({sev})\n"
+                f"  Published: {r.get('published', 'N/A')}\n"
+                f"  {desc}"
+            )
+
+        out = "\n".join(lines)
+        run_trace.record_execution(["nvd_cpe_lookup", banner], out, _time.time() - t0)
+        return out
+
+
+nvd_cpe_tool = NvdCpeTool()

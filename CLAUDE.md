@@ -9,6 +9,26 @@ Wir arbeiten die Roadmap (`roadmap.md`) phasenweise ab. Im Ablauf wird entschied
 
 **WICHTIG — Keine pauschalen Antworten. Faktenbasierte Responses auf jede Frage.**
 
+### Architektur-Entscheidung (2026-06-14) — Phase 9
+
+Nach systematischer Analyse (24 Scans, pentest-ground.com-Auswertung) wurde erkannt:
+**LLM-basiertes CVE-Keyword-Matching ist strukturell falsch und wird in Phase 9 ersetzt.**
+
+Kern-Problem: NVD Keyword-Search (`nvd_cve_search`) gibt `pubDate:asc` zurück → älteste CVEs zuerst.
+Bei 309 WebLogic-CVEs erscheinen die 5 neuesten nie im Top-5-Ergebnis.
+CVE-2023-21839 (CVSS 7.5, aktiv ausgenutzt) wurde auf pentest-ground.com nicht gefunden.
+
+**Geplante Lösung (Phase 9):**
+- NVD CPE-API (`virtualMatchString`) statt Keyword-Search — liefert versionsspezifische CVEs
+- Deterministisches Banner→CPE-Mapping (`tools/cpe_map.py`) — kein LLM im Matching-Pfad
+- Tool-Bereinigung: 10 tote/nutzlose Tools aus Agent-Listen entfernen
+- Scope-Garantien: Guardrails stellen sicher dass Kern-Tools aufgerufen werden
+
+**Tool-Status (Stand 2026-06-14):**
+- ✅ 17 Tools aktiv + installiert (nmap, httpx, whatweb, nikto, nuclei, sslscan, dig, whois, dnsrecon, subfinder, dnsx, katana, searchsploit, ddg_search, curl, ping, nvd_cve_search)
+- ❌ 3 nicht installiert (testssl.sh, enum4linux-ng, theHarvester) — graceful disabled
+- 🗑 7 zu entfernen aus Tool-Listen (ffuf, gau, waybackurls, amass, assetfinder, sublist3r, naabu)
+
 ### Teilschritte in Phasen
 
 Wenn eine Phase in Teilschritte zerlegt wird, werden diese hier notiert.
