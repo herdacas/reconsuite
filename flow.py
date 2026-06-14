@@ -360,9 +360,11 @@ if __name__ == "__main__":
     if args and args[0] == "--plot":
         import shutil as _shutil
         flow = ReconSuiteFlow()
-        tmp = flow.plot(filename="recon_suite_flow.html", show=False)
+        tmp_html = flow.plot(filename="recon_suite_flow.html", show=False)
+        tmp_dir  = os.path.dirname(tmp_html)
+        for fname in os.listdir(tmp_dir):
+            _shutil.copy2(os.path.join(tmp_dir, fname), os.path.join(LOG_DIR, fname))
         dest = os.path.join(LOG_DIR, "recon_suite_flow.html")
-        _shutil.copy2(tmp, dest)
         console.print(f"  [green]✓[/]  Flow-Graph: [cyan]{dest}[/]")
         sys.exit(0)
 

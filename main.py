@@ -121,9 +121,11 @@ if __name__ == "__main__":
         from flow import ReconSuiteFlow
         _log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
         flow = ReconSuiteFlow()
-        tmp = flow.plot(filename="recon_suite_flow.html", show=False)
+        tmp_html = flow.plot(filename="recon_suite_flow.html", show=False)
+        tmp_dir  = os.path.dirname(tmp_html)
+        for fname in os.listdir(tmp_dir):
+            shutil.copy2(os.path.join(tmp_dir, fname), os.path.join(_log_dir, fname))
         dest = os.path.join(_log_dir, "recon_suite_flow.html")
-        shutil.copy2(tmp, dest)
         console.print(f"  [green]✓[/]  Flow-Graph: [cyan]{dest}[/]")
         sys.exit(0)
 
