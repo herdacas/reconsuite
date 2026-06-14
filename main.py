@@ -106,7 +106,8 @@ def _cmd_score(trace_arg: str = "") -> None:
 
 
 if __name__ == "__main__":
-    args = sys.argv[1:]
+    _log_llm = "--log-llm" in sys.argv
+    args = [a for a in sys.argv[1:] if a != "--log-llm"]
 
     if args and args[0] == "--list":
         _cmd_list()
@@ -173,4 +174,4 @@ if __name__ == "__main__":
         )
         _scope = Prompt.ask("[bold]Scope[/]", default="full")
 
-    run_flow(_target, _objective, _scope)
+    run_flow(_target, _objective, _scope, log_llm=_log_llm)

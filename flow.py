@@ -72,6 +72,7 @@ class ScanState(BaseModel):
     # Wird via @persist mitserialisiert; bei --resume (restore_from_state_id)
     # hydratisiert → erledigte Schritte werden übersprungen statt neu ausgeführt.
     completed_steps:      list[str]  = Field(default_factory=list)
+    log_llm:              bool       = False
 
 
 # ─── Flow ─────────────────────────────────────────────────────────────────────
@@ -120,6 +121,7 @@ class ReconSuiteFlow(Flow[ScanState]):
             self.state.target,
             self.state.objective,
             self.state.scope,
+            log_llm=self.state.log_llm,
         )
 
         # BUG-6 guard: if workflow_last.json was not updated during this run,
@@ -259,11 +261,12 @@ class ReconSuiteFlow(Flow[ScanState]):
 
 # ─── Entry points ─────────────────────────────────────────────────────────────
 
-def run_flow(target: str, objective: str = "", scope: str = "full") -> ReconSuiteFlow:
+def run_flow(target: str, objective: str = "", scope: str = "full", log_llm: bool = False) -> ReconSuiteFlow:
     flow = ReconSuiteFlow()
     flow.state.target    = target
     flow.state.objective = objective
     flow.state.scope     = scope
+    flow.state.log_llm   = log_llm
     console.print(f"\n  [dim]Flow ID:[/]  [cyan]{flow.state.id}[/]  [dim](--resume to resume)[/]")
     flow.kickoff()
     console.print(f"\n  [dim]Flow ID:[/]  [cyan]{flow.state.id}[/]")
@@ -347,7 +350,8 @@ if __name__ == "__main__":
     from agentscanit.main import _validate_target
     from agentscanit.crew import VALID_SCOPES as _VALID_SCOPES
 
-    args = sys.argv[1:]
+    _log_llm = "--log-llm" in sys.argv
+    args = [a for a in sys.argv[1:] if a != "--log-llm"]
 
     if args and args[0] == "--list":
         _flow_cmd_list()
@@ -386,7 +390,7 @@ if __name__ == "__main__":
         else:
             _objective = args[1] if len(args) >= 2 else ""
             _scope     = args[2] if len(args) >= 3 else "full"
-        run_flow(_target, _objective, _scope)
+        run_flow(_target, _objective, _scope, log_llm=_log_llm)
     else:
         # Flush stdin before prompting — stale input from a previous Ctrl+C can
         # pre-fill the first Prompt.ask() and corrupt target/objective values.
@@ -411,4 +415,4 @@ if __name__ == "__main__":
             "[cyan]web[/] · [cyan]network[/] · [cyan]full[/]"
         )
         _scope = Prompt.ask("[bold]Scope[/]", default="full").strip()
-        run_flow(_target, _objective, _scope)
+        run_flow(_target, _objective, _scope, log_llm=_log_llm)

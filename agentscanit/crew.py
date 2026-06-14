@@ -21,7 +21,7 @@ import os
 
 from crewai import Crew, Process
 
-from config import EMBED_MODEL, EMBED_BASE_URL
+from config import EMBED_MODEL, EMBED_BASE_URL, LOG_DIR
 from agents import (
     research_agent, blue_agent, red_agent, coding_agent, reporter_agent,
     llm_planner,
@@ -182,7 +182,7 @@ class AgentScanITCrew:
         self._active_agents: list = []
         self._task_label:    dict  = {}   # id(task) → name, built per-run in crew()
 
-    def crew(self, task_callback=None) -> Crew:
+    def crew(self, task_callback=None, log_llm: bool = False) -> Crew:
         """Ruft den Planner auf, assembliert die Crew und gibt sie zurück.
 
         task_callback:   optionale Funktion die nach jeder Phase aufgerufen wird.
@@ -194,6 +194,14 @@ class AgentScanITCrew:
         """
         self._active_tasks, self._active_agents, self._task_label = plan_tasks(
             self.target, self.objective, self.scope
+        )
+
+        import re as _re
+        from datetime import datetime as _dt
+        _safe = _re.sub(r"[^\w.-]", "_", self.target)
+        _ts   = _dt.now().strftime("%Y%m%d_%H%M%S")
+        _log_file = (
+            os.path.join(LOG_DIR, f"llm_{_safe}_{_ts}.log") if log_llm else None
         )
 
         _knowledge_embedder = {
@@ -220,6 +228,7 @@ class AgentScanITCrew:
                 cache=True,
                 verbose=False,
                 task_callback=task_callback,
+                output_log_file=_log_file,
             )
         else:
             crew_kwargs = dict(
@@ -231,6 +240,7 @@ class AgentScanITCrew:
                 cache=True,
                 verbose=False,
                 task_callback=task_callback,
+                output_log_file=_log_file,
             )
 
         return Crew(**crew_kwargs)

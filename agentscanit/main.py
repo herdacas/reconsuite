@@ -142,7 +142,7 @@ def _warmup_models() -> None:
 
 # ─── run() ───────────────────────────────────────────────────────────────────
 
-def run(target: str, objective: str = "", scope: str = "full") -> object:
+def run(target: str, objective: str = "", scope: str = "full", log_llm: bool = False) -> object:
     scanner = AgentScanITCrew(target, objective, scope)
     target, objective, scope = scanner.target, scanner.objective, scanner.scope
 
@@ -178,7 +178,7 @@ def run(target: str, objective: str = "", scope: str = "full") -> object:
     console.print()
 
     run_start = time.time()
-    crew_obj  = scanner.crew(task_callback=_on_task_done)
+    crew_obj  = scanner.crew(task_callback=_on_task_done, log_llm=log_llm)
     pipeline  = scanner.pipeline
     run_trace.activate(target, objective, scope, pipeline)
 
@@ -443,7 +443,8 @@ def _prompt_target() -> str:
 # ─── CLI ─────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    args = sys.argv[1:]
+    args = [a for a in sys.argv[1:] if a != "--log-llm"]
+    _log_llm = "--log-llm" in sys.argv[1:]
     if len(args) >= 1:
         _target, _err = _validate_target(args[0])
         if _err:
@@ -483,4 +484,4 @@ if __name__ == "__main__":
         )
         _scope = Prompt.ask("[bold]Scope[/]", default="full")
 
-    run(_target, _objective, _scope)
+    run(_target, _objective, _scope, log_llm=_log_llm)
