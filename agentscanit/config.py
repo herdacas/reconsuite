@@ -76,7 +76,7 @@ if OLLAMA_API_KEY:
     ACTIVE_ANALYSIS  = MODEL_ANALYSIS
     ACTIVE_CODE      = MODEL_CODE
     ACTIVE_RESEARCH  = MODEL_RESEARCH
-    ACTIVE_PLANNER   = _m("planner", MODEL_ANALYSIS)   # Remote: Default = Analysis
+    ACTIVE_PLANNER   = LOCAL_MODEL_PLANNER   # Planner immer lokal — remote FC-API nicht unterstützt
 else:
     ACTIVE_BASE_URL  = "http://localhost:11434"
     ACTIVE_ANALYSIS  = LOCAL_MODEL_ANALYSIS

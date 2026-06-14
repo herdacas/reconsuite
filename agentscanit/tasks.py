@@ -37,17 +37,16 @@ def _tool_call_guardrail(output: Any) -> tuple[bool, Any]:
     Tool-Calls der aktuellen Task (close_phase() läuft erst im task_callback
     nach bestandenem Guardrail). _pending == [] bedeutet: kein Subprocess
     wurde gestartet, der Agent hat halluziniert.
+
+    Gibt bei Erfolg (True, raw_string) zurück — CrewAI ruft dann _aexport_output()
+    auf dem String auf und befüllt task_output.pydantic korrekt. Bei (True, TaskOutput)
+    bleibt pydantic=None (CrewAI-Verhalten bei aktiven Guardrails, task.py:684-689).
     """
     try:
         from tools.trace import run_trace
         if run_trace.is_active and len(run_trace._pending) == 0:
             if run_trace._guardrail_reject_count >= 1:
-                # Agent already received one rejection and still produced no tool calls.
-                # This typically means warm memory provided cached context that the agent
-                # used instead of running tools. Accept the output here to break the
-                # warm-memory loop — the CVE trace guardrail downstream enforces
-                # fact-checking at the findings level.
-                return True, output
+                return True, getattr(output, "raw", output)
             run_trace._guardrail_reject_count += 1
             return (
                 False,
@@ -59,7 +58,7 @@ def _tool_call_guardrail(output: Any) -> tuple[bool, Any]:
             )
     except Exception:
         pass
-    return True, output
+    return True, getattr(output, "raw", output)
 
 
 def _filter_cve_format(cves: List[str]) -> List[str]:
@@ -79,11 +78,12 @@ def _cve_trace_guardrail(output: Any) -> tuple[bool, Any]:
     und kann die Task korrigiert wiederholen (guardrail_max_retries=2).
     """
     pydantic_out = getattr(output, "pydantic", None)
+    raw = getattr(output, "raw", output) if not isinstance(output, str) else output
     if not pydantic_out:
-        return True, output
+        return True, raw
     cves = getattr(pydantic_out, "cve_references", None)
     if not cves:
-        return True, output
+        return True, raw
 
     # 1 — Trace cross-check
     try:
@@ -97,7 +97,7 @@ def _cve_trace_guardrail(output: Any) -> tuple[bool, Any]:
                     f"Tool-Output dieser Session. Entferne sie aus 'cve_references'. "
                     f"Tool-bestätigt: {confirmed if confirmed else 'keine'}"
                 )
-            return True, output
+            return True, raw
     except Exception:
         pass
 
@@ -115,7 +115,7 @@ def _cve_trace_guardrail(output: Any) -> tuple[bool, Any]:
     except Exception:
         pass
 
-    return True, output
+    return True, raw
 
 
 # ─── Subdomain-Fanout (deterministisch) ───────────────────────────────────────
@@ -127,7 +127,7 @@ def _cve_trace_guardrail(output: Any) -> tuple[bool, Any]:
 # Hinweis (Backlog): bei Domains mit vielen Fake-Subdomains ist „LLM wählt relevante →
 # ggf. bestätigen → scannen" der bessere Weg — hier vorerst httpx-Liveness (gecappt).
 
-_FANOUT_MAX_SUBS = 40   # Obergrenze gegen Fake-Subdomain-Fluten
+_FANOUT_MAX_SUBS = 15   # Cap nach LLM-Filter (research-Task filtert bereits auf relevante Hosts)
 
 def _httpx_live_hosts(subdomains: list) -> list:
     """Deterministisch: gibt die per httpx erreichbaren Hosts zurück (live-only)."""
@@ -197,9 +197,9 @@ def _subdomain_fanout_guardrail(output: Any) -> tuple[bool, Any]:
 class ResearchOutput(BaseModel):
     target_type: str                    # "domain" oder "ip"
     summary: str
-    subdomains: List[str]
-    technologies: List[str]
-    osint_notes: List[str]
+    subdomains: List[str] = Field(default_factory=list)
+    technologies: List[str] = Field(default_factory=list)
+    osint_notes: List[str] = Field(default_factory=list)
     reverse_dns: Optional[str] = None
     asn_info: Optional[str] = None
 
@@ -220,16 +220,16 @@ class ResearchOutput(BaseModel):
 
 
 class BlueOutput(BaseModel):
-    tools_executed: List[str]
-    open_ports: List[int]
-    services: Dict[str, Any]            # "80" → "Apache 2.4.51" or nested dict
-    vulnerabilities: List[str]
+    tools_executed: List[str] = Field(default_factory=list)
+    open_ports: List[int] = Field(default_factory=list)
+    services: Dict[str, Any] = Field(default_factory=dict)
+    vulnerabilities: List[str] = Field(default_factory=list)
     analysis: str
 
 
 class FindingsOutput(BaseModel):
-    service_versions: List[str]
-    cve_references: List[str]
+    service_versions: List[str] = Field(default_factory=list)
+    cve_references: List[str] = Field(default_factory=list)
     risk_summary: str
 
     @field_validator("cve_references")
@@ -239,16 +239,16 @@ class FindingsOutput(BaseModel):
 
 
 class RedScanOutput(BaseModel):
-    targeted_findings: List[str]        # CVEs/Versionen die diesen Scan ausgelöst haben
-    tools_executed: List[str]
-    open_ports: List[int]
-    vulnerabilities: List[str]
+    targeted_findings: List[str] = Field(default_factory=list)
+    tools_executed: List[str] = Field(default_factory=list)
+    open_ports: List[int] = Field(default_factory=list)
+    vulnerabilities: List[str] = Field(default_factory=list)
     analysis: str
 
 
 class RedOutput(BaseModel):
-    confirmed_attack_surface: List[str]  # only findings confirmed by tool output
-    exploitable_findings: List[str]
+    confirmed_attack_surface: List[str] = Field(default_factory=list)
+    exploitable_findings: List[str] = Field(default_factory=list)
     cve_references: List[str] = Field(
         default_factory=list,
         description="CVE IDs confirmed by searchsploit or DDG tool output in this task.",
@@ -263,8 +263,8 @@ class RedOutput(BaseModel):
 class CodingOutput(BaseModel):
     filename: str
     code: str
-    code_plan: List[str]
-    syntax_valid: bool
+    code_plan: List[str] = Field(default_factory=list)
+    syntax_valid: bool = False
 
 
 class ReportOutput(BaseModel):
@@ -307,13 +307,19 @@ def make_tasks() -> dict:
             "- Nur: dig -x {target} (Reverse-DNS), whois {target} (ASN/ISP)\n\n"
             "SCHRITT 3 – Zusammenfassung:\n"
             "Fasse NUR gefundene Fakten zusammen. Keine Spekulation.\n\n"
-            "SUBDOMAINS-AUSGABE:\n"
-            "Gib im 'subdomains' Feld maximal 20 der relevantesten Subdomains aus. "
-            "Filtere aktiv: KEINE internen Host-IPs (host-195-*, b200srv*, utmi*), "
-            "KEINE Masseninstanzen (026.sixcms.*, 113.sixcms.*), "
-            "KEINE staging-/dev-/test-Hosts außer sie sind explizit Scan-Ziel. "
-            "Priorisiere: bekannte Dienste (mail, gitlab, vpn, serviceportal, api), "
-            "öffentlich relevante Subdomains, auffällige Hostnamen.\n\n"
+            "SUBDOMAINS-AUSGABE — LLM-Filter (PFLICHT):\n"
+            "Trage ins 'subdomains' Feld NUR Subdomains ein die sicherheitsrelevant sind. "
+            "Maximal 15 Einträge. Bewerte JEDEN gefundenen Hostnamen einzeln:\n"
+            "REIN (sicherheitsrelevant): auth, api, admin, backoffice, vpn, mail, "
+            "webmail, gitlab, jenkins, jira, confluence, dev, staging, test, beta, "
+            "portal, login, sso, oauth, dashboard, monitor, grafana, kibana, elastic, "
+            "shop, checkout, payment, upload, files, ftp, remote, citrix, rdp.\n"
+            "RAUS (kein Sicherheitswert): cdn-*, img-*, static-*, assets-*, "
+            "numerische Präfixe (026.*, 113.*), interne Hostnamen (host-*-*, b200srv*, "
+            "utmi*), Masseninstanzen mit Nummern (server42.*, node7.*), "
+            "reine Mail-Server ohne Web (mx1.*, mx2.*).\n"
+            "Wenn unklar: RAUS. Qualität vor Quantität — 5 relevante Hosts sind besser "
+            "als 20 CDN-Instanzen.\n\n"
             "TOOL-PFLICHT:\n"
             "Rufe IMMER mindestens ein Tool auf, auch wenn Memory-Kontext aus vorherigen "
             "Runs vorliegt. Memory-Daten können veraltet sein — aktuelle Tool-Outputs haben Vorrang.\n\n"

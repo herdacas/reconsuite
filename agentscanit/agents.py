@@ -10,7 +10,7 @@ from rich.console import Console
 
 from config import (
     ACTIVE_ANALYSIS, ACTIVE_CODE, ACTIVE_RESEARCH, ACTIVE_PLANNER,
-    ACTIVE_BASE_URL, OLLAMA_API_KEY,
+    ACTIVE_BASE_URL, OLLAMA_API_KEY, PLANNER_BASE_URL,
     TEMP_ANALYSIS, TEMP_CODE, TEMP_RESEARCH,
 )
 
@@ -141,26 +141,21 @@ llm_analysis = _llm(ACTIVE_ANALYSIS, TEMP_ANALYSIS)
 llm_code     = _llm(ACTIVE_CODE,     TEMP_CODE)
 llm_research = _llm(ACTIVE_RESEARCH, TEMP_RESEARCH)
 
-# Planner LLM: verwendet ACTIVE_BASE_URL + ACTIVE_PLANNER — d.h. remote wenn API-Key
-# gesetzt, lokal sonst. Der Planner generiert nur einen JSON-Plan (kein tool-calling),
-# daher funktioniert auch gpt-oss:20b hier zuverlässig. max_tokens=2000 begrenzt
-# die Plan-Ausgabe damit kombinierter Input+Output im Context-Fenster bleibt.
-# Remote: num_ctx=16384 (Planner-Prompt enthält alle 7 Task-Beschreibungen),
-# think=False (gpt-oss Thinking-Modus unterdrücken). Local: 4096 reicht.
-_planner_kwargs: dict = dict(
+# Planner LLM läuft IMMER lokal (localhost:11434) — auch im Remote-Mode.
+# Grund: CrewAI AgentPlanner nutzt call_llm_native_tools (Ollama native FC-API),
+# die remote Modelle (gpt-oss) nicht unterstützen → "Invalid response from LLM call - None or empty."
+# PLANNER_BASE_URL ist hardcoded auf localhost; LOCAL_MODEL_PLANNER = qwen2.5:7b-instruct.
+llm_planner = LLM(
     model=f"ollama/{ACTIVE_PLANNER}",
-    base_url=ACTIVE_BASE_URL,
+    base_url=PLANNER_BASE_URL,
     temperature=0.1,
     max_tokens=2000,
     extra_body={
         "keep_alive": "30m",
-        "num_ctx":    16384 if OLLAMA_API_KEY else 4096,
+        "num_ctx":    4096,
         "think":      False,
     },
 )
-if OLLAMA_API_KEY:
-    _planner_kwargs["api_key"] = OLLAMA_API_KEY
-llm_planner = LLM(**_planner_kwargs)
 
 
 # ─── Agents ───────────────────────────────────────────────────────────────────

@@ -114,24 +114,23 @@ class ReconSuiteFlow(Flow[ScanState]):
             self.state.objective,
             self.state.scope,
         )
-        # CVE/exploit-Flags für Routing
-        if hasattr(result, "tasks_output") and result.tasks_output:
-            for task_out in result.tasks_output:
-                if not (hasattr(task_out, "pydantic") and task_out.pydantic):
-                    continue
-                pd = task_out.pydantic
-                if hasattr(pd, "cve_references") and pd.cve_references:
-                    self.state.has_cve_findings = True
-                if hasattr(pd, "exploitable_findings") and pd.exploitable_findings:
-                    self.state.has_exploitable = True
-
-        # Pfade aus workflow_last.json
+        # CVE/exploit-Flags + Pfade aus workflow_last.json lesen.
+        # workflow_last.json wird von _save_outputs() zuverlässig geschrieben und
+        # enthält die deserialisierten Pydantic-Felder. result.tasks_output.pydantic
+        # kann zu diesem Zeitpunkt None sein (CrewAI gibt es nicht immer zurück).
         try:
             last = os.path.join(LOG_DIR, "workflow_last.json")
             with open(last) as f:
                 summary = json.load(f)
             self.state.scan_report_path = summary.get("report", "")
             self.state.scan_json_path   = last
+            tasks = summary.get("tasks", {})
+            cves = tasks.get("findings", {}).get("cve_references", [])
+            if cves:
+                self.state.has_cve_findings = True
+            attack_surface = tasks.get("red", {}).get("attack_surface_count", 0)
+            if attack_surface and attack_surface > 0:
+                self.state.has_exploitable = True
         except Exception:
             pass
         self._mark_step("run_scan")
