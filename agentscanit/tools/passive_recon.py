@@ -76,8 +76,13 @@ class TheharvesterTool(BaseTool):
     args_schema: Type[BaseModel] = TheharvesterInput
 
     def _run(self, domain: str, sources: str = "crtsh", limit: int = 30) -> str:
-        cmd = ["uv", "run", "theHarvester", "-d", domain,
-               "-b", sources, "-l", str(limit)]
+        # Try direct binary first; fall back to running the script via python
+        # (avoids dependency on `uv` which is not installed in all environments)
+        import shutil
+        if shutil.which("theHarvester"):
+            cmd = ["theHarvester", "-d", domain, "-b", sources, "-l", str(limit)]
+        else:
+            cmd = ["python3", "theHarvester.py", "-d", domain, "-b", sources, "-l", str(limit)]
         out = _run(cmd, timeout=TIMEOUT_MEDIUM, cwd=THEHARVESTER_DIR)
         if "Hosts found:" in out:
             section = out.split("Hosts found:")[1]

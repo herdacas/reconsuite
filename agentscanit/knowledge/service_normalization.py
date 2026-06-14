@@ -18,9 +18,9 @@ or abbreviated service names that do not match NVD/searchsploit product names.
 Always translate before searching CVEs:
 
 ## Java Application Servers
-Apache-Coyote      → Apache Tomcat
-Apache-Coyote/1.1  → Apache Tomcat
-Apache-Coyote/1.0  → Apache Tomcat
+Apache-Coyote      → Apache Tomcat  ⚠ VERSION WARNING: The number after the slash (e.g. /1.1) is the Coyote HTTP connector version, NOT the Tomcat version. Do NOT use it as the Tomcat version. Report the Tomcat version as "unknown" unless whatweb, nmap, or another tool explicitly reports a Tomcat version string.
+Apache-Coyote/1.1  → Apache Tomcat (version unknown — connector v1.1 ≠ Tomcat version)
+Apache-Coyote/1.0  → Apache Tomcat (version unknown — connector v1.0 ≠ Tomcat version)
 
 ## Java Web Servers
 Jetty              → Eclipse Jetty

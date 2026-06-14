@@ -214,13 +214,21 @@ class RiskFlow(Flow[RiskState]):
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
 def _has_in_the_wild(threat_output: str) -> bool:
-    """Heuristik: prüft ob Threat-Intel-Report aktive Exploitation enthält."""
+    """Heuristik: prüft ob Threat-Intel-Report aktive Exploitation enthält.
+
+    Achtung: threat_summary enthält immer "CVEs in-the-wild: N / M" —
+    ein simpler Substring-Match auf "in-the-wild" würde immer True liefern.
+    Deshalb: nur spezifische positive Indikatoren suchen, nie den neutralen
+    Counter-String selbst.
+    """
     if not threat_output:
         return False
     lower = threat_output.lower()
     return any(kw in lower for kw in [
-        "in-the-wild", "in the wild", "aktiv ausgenutzt", "exploited",
-        "has_exploit: true", "🔴",
+        "aktiv in-the-wild",   # OTX: "aktiv in-the-wild" (vs. neutralem "in-the-wild: 0/5")
+        "aktiv ausgenutzt",
+        "has_exploit: true",
+        "🔴",                  # nur gesetzt wenn in_wild=True in threatintel_flow.py:169
     ])
 
 
