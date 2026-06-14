@@ -9,6 +9,7 @@ Usage:
     python3 main.py example.com "full assessment" full
     python3 main.py --resume <flow-id>
     python3 main.py --list
+    python3 main.py --score [trace_file]  → Scan Quality Scorecard
     python3 main.py              → interaktiver Modus
 """
 
@@ -80,11 +81,38 @@ def _cmd_list() -> None:
     console.print()
 
 
+def _cmd_score(trace_arg: str = "") -> None:
+    """Print quality scorecard for a trace file (or the latest scan)."""
+    from agentscanit.quality import score_scan, print_scorecard
+    log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+    if trace_arg:
+        path = trace_arg if os.path.isabs(trace_arg) else os.path.join(log_dir, trace_arg)
+    else:
+        traces = sorted(
+            [f for f in os.listdir(log_dir) if f.startswith("trace_") and f.endswith(".json")],
+            reverse=True,
+        )
+        if not traces:
+            console.print("[red]✗[/]  Keine trace_*.json Dateien in logs/")
+            sys.exit(1)
+        path = os.path.join(log_dir, traces[0])
+    try:
+        report = score_scan(path)
+        print_scorecard(report)
+    except FileNotFoundError:
+        console.print(f"[red]✗[/]  Datei nicht gefunden: {path}")
+        sys.exit(1)
+
+
 if __name__ == "__main__":
     args = sys.argv[1:]
 
     if args and args[0] == "--list":
         _cmd_list()
+        sys.exit(0)
+
+    if args and args[0] == "--score":
+        _cmd_score(args[1] if len(args) > 1 else "")
         sys.exit(0)
 
     if args and args[0] == "--resume":
