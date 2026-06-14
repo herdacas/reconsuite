@@ -238,6 +238,23 @@ class ReconSuiteFlow(Flow[ScanState]):
         )
         self.state.final_report_path = flow.state.final_report_path
         self._mark_step("run_reporting")
+        self._print_score()
+
+    def _print_score(self) -> None:
+        """Scorecard nach Abschluss des Scans ausgeben."""
+        try:
+            from agentscanit.quality import score_scan, print_scorecard
+            import glob as _glob
+            traces = sorted(
+                _glob.glob(os.path.join(LOG_DIR, f"trace_{self.state.target}_*.json")),
+                key=os.path.getmtime, reverse=True,
+            )
+            if not traces:
+                return
+            report = score_scan(traces[0])
+            print_scorecard(report)
+        except Exception:
+            pass  # Score ist optional — nie den Flow unterbrechen
 
 
 # ─── Entry points ─────────────────────────────────────────────────────────────
