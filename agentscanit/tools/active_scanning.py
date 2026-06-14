@@ -51,7 +51,9 @@ class NmapTool(BaseTool):
             port_val = ports
 
         if aggressive and ports in ("1-65535", "0-65535", "all"):
-            disc_cmd = [NMAP_BIN, "-T4", "-p", ports, "--open", "-n",
+            # -Pn: skip host-discovery ping — many hosts block ICMP/SYN-ACK probes
+            # and appear as "down" without it, causing nmap to skip all port scanning.
+            disc_cmd = [NMAP_BIN, "-T4", "-Pn", "-p", ports, "--open", "-n",
                         "--host-timeout", "300s", target]
             disc_out = _run(disc_cmd, timeout=TIMEOUT_NMAP_DISC)
             open_ports = [
@@ -62,19 +64,17 @@ class NmapTool(BaseTool):
             if not open_ports:
                 return _limit(disc_out or "Keine offenen Ports gefunden", "nmap")
             port_list = ",".join(open_ports[:50])
-            cmd = [NMAP_BIN, "-T4", "-sV", "--host-timeout", "540s",
+            cmd = [NMAP_BIN, "-T4", "-Pn", "-sV", "--host-timeout", "540s",
                    "-p", port_list, "--open", target]
             return _limit(_run(cmd, timeout=TIMEOUT_NMAP_SCAN), "nmap")
 
-        cmd = [NMAP_BIN, "-T4"]
+        cmd = [NMAP_BIN, "-T4", "-Pn"]
         if port_arg == "--top-ports":
             cmd += ["--top-ports", port_val]
         else:
             cmd += ["-p", port_val]
         cmd += ["--open"]
         if aggressive:
-            # --host-timeout: nmap liefert Teilergebnisse vor dem Wrapper-Limit,
-            # statt bei langsamer Versions-Detection ohne Daten gekillt zu werden.
             cmd += ["-sV", "--host-timeout", "540s"]
         cmd.append(target)
         return _limit(_run(cmd, timeout=TIMEOUT_NMAP_SCAN), "nmap")
