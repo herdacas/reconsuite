@@ -250,15 +250,23 @@ if __name__ == "__main__":
         _scope     = args[2] if len(args) >= 3 else "full"
         run_flow(_target, _objective, _scope)
     else:
+        import sys as _sys
+        # Flush stdin before prompting — stale input from a previous Ctrl+C can
+        # pre-fill the first Prompt.ask() and corrupt target/objective values.
+        try:
+            import termios
+            termios.tcflush(_sys.stdin, termios.TCIFLUSH)
+        except Exception:
+            pass
         console.print()
-        _target    = Prompt.ask("[bold]Target[/] [dim](domain or IP)[/]")
+        _target    = Prompt.ask("[bold]Target[/] [dim](domain or IP)[/]").strip()
         _objective = Prompt.ask(
             "[bold]Objective[/] [dim](Enter für full scan)[/]", default=""
-        )
+        ).strip()
         console.print(
             "  [dim]Scopes:[/]  "
             "[cyan]osint[/] · [cyan]ssl[/] · [cyan]quick[/] · "
             "[cyan]web[/] · [cyan]network[/] · [cyan]full[/]"
         )
-        _scope = Prompt.ask("[bold]Scope[/]", default="full")
+        _scope = Prompt.ask("[bold]Scope[/]", default="full").strip()
         run_flow(_target, _objective, _scope)

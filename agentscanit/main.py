@@ -193,14 +193,22 @@ def run(target: str, objective: str = "", scope: str = "full") -> object:
     console.print(f"  [dim]Running {len(scanner._active_tasks)} phases — this may take several minutes...[/]")
     console.print()
 
-    for _attempt in range(3):
+    # LLM-Fehler (500er remote, None-Response) bekommen mehr Versuche + Backoff.
+    # Strukturelle Fehler (ValidationError, ConverterError) bleiben bei 3 Versuchen.
+    _LLM_ERRORS   = {"Invalid response from LLM call", "None or empty"}
+    _MAX_RETRIES_LLM        = 5
+    _MAX_RETRIES_STRUCTURAL = 3
+
+    for _attempt in range(_MAX_RETRIES_LLM):
         try:
             result = crew_obj.kickoff(inputs=scanner.inputs)
             break
         except Exception as _exc:
             exc_str      = str(_exc)
             exc_type     = type(_exc).__name__
+            _is_llm_error = any(kw in exc_str for kw in _LLM_ERRORS)
             _is_retryable = (
+                _is_llm_error or
                 "json_invalid"                          in exc_str or
                 "validation error for"                  in exc_str or  # pydantic ValidationError string
                 "ValidationError"                       in exc_type or  # pydantic/crewai class name
@@ -209,22 +217,27 @@ def run(target: str, objective: str = "", scope: str = "full") -> object:
                 "Agent must be provided"                in exc_str or
                 "Field required"                        in exc_str or
                 "ended without reaching a final answer" in exc_str or
-                "Invalid response from LLM call"        in exc_str or
                 "guardrail validation after"            in exc_str
             )
-            if _is_retryable and _attempt < 2:
+            _max_attempts = _MAX_RETRIES_LLM if _is_llm_error else _MAX_RETRIES_STRUCTURAL
+            if _is_retryable and _attempt < _max_attempts - 1:
                 import traceback as _tb
                 console.print(
                     f"  [yellow]⚠[/]  Retryable error ({type(_exc).__name__}): "
                     f"{str(_exc)[:120]}"
                 )
                 console.print(f"  [dim]{_tb.format_exc()[-600:]}[/]")
+                # LLM-Fehler: kurzer Backoff damit der remote Server sich erholen kann
+                if _is_llm_error and _attempt > 0:
+                    _backoff = min(10 * _attempt, 30)
+                    console.print(f"  [dim]Backoff {_backoff}s vor Retry...[/]")
+                    time.sleep(_backoff)
                 # Vollneustart mit frischer Crew-Instanz. Kein Intra-Crew-Resume mehr
                 # (Phase 7, Stufe 1): der nicht-idiomatische Checkpoint-Mechanismus war
                 # race-behaftet + beim Restore kaputt. Zwischen-Team-Resume läuft auf
                 # Flow-Ebene über @persist(SQLiteFlowPersistence).
                 console.print(
-                    f"  [yellow]⚠[/]  LLM error — retry {_attempt + 2}/3 (Vollneustart)..."
+                    f"  [yellow]⚠[/]  LLM error — retry {_attempt + 2}/{_max_attempts} (Vollneustart)..."
                 )
                 crew_obj = scanner.crew(task_callback=_on_task_done)
                 _reset_task_progress(scanner.pipeline, time.time())
