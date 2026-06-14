@@ -358,9 +358,12 @@ if __name__ == "__main__":
         sys.exit(0)
 
     if args and args[0] == "--plot":
+        import shutil as _shutil
         flow = ReconSuiteFlow()
-        out = flow.plot(filename="recon_suite_flow.html", show=False)
-        console.print(f"  [green]✓[/]  Flow-Graph gespeichert: [cyan]{out}[/]")
+        tmp = flow.plot(filename="recon_suite_flow.html", show=False)
+        dest = os.path.join(LOG_DIR, "recon_suite_flow.html")
+        _shutil.copy2(tmp, dest)
+        console.print(f"  [green]✓[/]  Flow-Graph: [cyan]{dest}[/]")
         sys.exit(0)
 
     if args and args[0] == "--resume":
