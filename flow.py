@@ -309,15 +309,15 @@ def _flow_cmd_score(trace_arg: str = "") -> None:
     if trace_arg:
         path = trace_arg if os.path.isabs(trace_arg) else os.path.join(log_dir, trace_arg)
     else:
-        import glob as _glob
-        traces = sorted(
-            [f for f in os.listdir(log_dir) if f.startswith("trace_") and f.endswith(".json")],
-            reverse=True,
-        )
-        if not traces:
+        candidates = [
+            os.path.join(log_dir, f)
+            for f in os.listdir(log_dir)
+            if f.startswith("trace_") and f.endswith(".json")
+        ]
+        if not candidates:
             console.print("[red]✗[/]  Keine trace_*.json Dateien in logs/")
             sys.exit(1)
-        path = os.path.join(log_dir, traces[0])
+        path = max(candidates, key=os.path.getmtime)
     try:
         report = score_scan(path)
         print_scorecard(report)

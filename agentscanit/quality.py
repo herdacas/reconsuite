@@ -345,14 +345,16 @@ def score_scan(trace_path: str) -> ScanQualityReport:
 
 
 def score_latest(log_dir: str = "logs") -> Optional[ScanQualityReport]:
-    """Score des neuesten Scans in log_dir."""
-    traces = sorted(
-        [f for f in os.listdir(log_dir) if f.startswith("trace_") and f.endswith(".json")],
-        reverse=True,
-    )
-    if not traces:
+    """Score des neuesten Scans in log_dir (nach mtime, nicht Dateiname)."""
+    candidates = [
+        os.path.join(log_dir, f)
+        for f in os.listdir(log_dir)
+        if f.startswith("trace_") and f.endswith(".json")
+    ]
+    if not candidates:
         return None
-    return score_scan(os.path.join(log_dir, traces[0]))
+    newest = max(candidates, key=os.path.getmtime)
+    return score_scan(newest)
 
 
 def print_scorecard(report: ScanQualityReport) -> None:
@@ -379,23 +381,24 @@ def print_scorecard(report: ScanQualityReport) -> None:
         f"·  {report.total_tool_calls} Tool-Calls  ·  {report.scan_duration_s}s  "
         f"·  {report.cve_count} CVEs",
         title="[bold]Scan Quality Scorecard[/]",
-        subtitle=f"[dim]{report.trace_path}[/]",
+        subtitle=f"[dim]{os.path.basename(report.trace_path)}[/]",
     ))
 
     # Score-Tabelle
-    table = Table(show_header=True, header_style="bold dim")
-    table.add_column("Dimension",       style="bold",  width=24)
-    table.add_column("Score",           justify="right", width=8)
-    table.add_column("Gewichtet",       justify="right", width=10)
-    table.add_column("Notizen",         width=55)
+    table = Table(show_header=True, header_style="bold dim", min_width=90)
+    table.add_column("Dimension",   style="bold",    min_width=22)
+    table.add_column("Score",       justify="right", min_width=8)
+    table.add_column("Gewichtet",   justify="right", min_width=9)
+    table.add_column("Notizen",     min_width=45)
 
     for d in report.dimensions:
         color = "green" if d.score >= 70 else "yellow" if d.score >= 45 else "red"
+        notes_text = "\n".join(d.notes[:2]) if d.notes else ""
         table.add_row(
             d.name,
             f"[{color}]{d.score:.0f}/100[/]",
             f"{d.weighted:.1f}",
-            "  ".join(d.notes[:2]),
+            notes_text,
         )
 
     con.print(table)
@@ -415,13 +418,14 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         trace_path = sys.argv[1]
     else:
-        traces = sorted(
-            [f for f in os.listdir(log_dir) if f.startswith("trace_") and f.endswith(".json")],
-            reverse=True,
-        )
-        if not traces:
+        candidates = [
+            os.path.join(log_dir, f)
+            for f in os.listdir(log_dir)
+            if f.startswith("trace_") and f.endswith(".json")
+        ]
+        if not candidates:
             print("Keine trace_*.json Dateien in logs/")
             sys.exit(1)
-        trace_path = os.path.join(log_dir, traces[0])
+        trace_path = max(candidates, key=os.path.getmtime)
     report = score_scan(trace_path)
     print_scorecard(report)
