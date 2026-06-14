@@ -109,17 +109,41 @@ class ReconSuiteFlow(Flow[ScanState]):
     def run_scan(self):
         if self._step_done("run_scan"):
             return
-        result = _scan_main.run(
+
+        import time as _time
+        last = os.path.join(LOG_DIR, "workflow_last.json")
+        # Timestamp BEFORE the scan so we can detect whether it was (re)written.
+        _ts_before = os.path.getmtime(last) if os.path.exists(last) else 0.0
+        _scan_start = _time.time()
+
+        _scan_main.run(
             self.state.target,
             self.state.objective,
             self.state.scope,
         )
+
+        # BUG-6 guard: if workflow_last.json was not updated during this run,
+        # the scan silently failed (e.g. remote Ollama returned HTTP 500 during
+        # Blue phase, exception swallowed by CrewAI flow layer).
+        # We check: file must exist AND be newer than our pre-scan timestamp.
+        _ts_after = os.path.getmtime(last) if os.path.exists(last) else 0.0
+        if _ts_after <= _ts_before:
+            elapsed = round(_time.time() - _scan_start, 1)
+            console.print(
+                f"\n  [bold red]✗ BUG-6 DETECTED:[/] workflow_last.json wurde in den letzten "
+                f"{elapsed}s nicht aktualisiert — Scan hat still versagt (HTTP 500 / LLM-Fehler). "
+                f"Starte den Scan neu: [cyan]python3 main.py {self.state.target} {self.state.scope}[/]"
+            )
+            raise RuntimeError(
+                f"run_scan silent failure: workflow_last.json not updated after {elapsed}s "
+                f"(target={self.state.target}, scope={self.state.scope})"
+            )
+
         # CVE/exploit-Flags + Pfade aus workflow_last.json lesen.
         # workflow_last.json wird von _save_outputs() zuverlässig geschrieben und
         # enthält die deserialisierten Pydantic-Felder. result.tasks_output.pydantic
         # kann zu diesem Zeitpunkt None sein (CrewAI gibt es nicht immer zurück).
         try:
-            last = os.path.join(LOG_DIR, "workflow_last.json")
             with open(last) as f:
                 summary = json.load(f)
             self.state.scan_report_path = summary.get("report", "")
