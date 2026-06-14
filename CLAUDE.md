@@ -18,16 +18,18 @@ Kern-Problem: NVD Keyword-Search (`nvd_cve_search`) gibt `pubDate:asc` zurück �
 Bei 309 WebLogic-CVEs erscheinen die 5 neuesten nie im Top-5-Ergebnis.
 CVE-2023-21839 (CVSS 7.5, aktiv ausgenutzt) wurde auf pentest-ground.com nicht gefunden.
 
-**Geplante Lösung (Phase 9):**
-- NVD CPE-API (`virtualMatchString`) statt Keyword-Search — liefert versionsspezifische CVEs
-- Deterministisches Banner→CPE-Mapping (`tools/cpe_map.py`) — kein LLM im Matching-Pfad
-- Tool-Bereinigung: 10 tote/nutzlose Tools aus Agent-Listen entfernen
-- Scope-Garantien: Guardrails stellen sicher dass Kern-Tools aufgerufen werden
+**Umgesetzte Lösung (Phase 9 — 2026-06-14, Commit ff9beb3):**
+- `tools/cpe_map.py` — deterministisches Banner→CPE-Mapping (50+ Einträge, kein LLM)
+- `NvdCpeTool` (`nvd_cpe_lookup`) in `tools/nvd.py` — CPE-API statt Keyword-Search
+- `cpe_search_nvd()`: paginiert zum Ende der pubDate:asc-Liste (Pool=100), sortiert CVSS desc
+- Tool-Bereinigung: research 15→10, blue 11→8 (tote/nicht-installierte Tools raus)
+- `_scope_coverage_guardrail` auf blue-Task: Kern-Tools-Garantie pro Scope
+- findings-Task: nvd_cpe_lookup als Primär-Schritt, nvd_cve_search als Fallback
 
-**Tool-Status (Stand 2026-06-14):**
-- ✅ 17 Tools aktiv + installiert (nmap, httpx, whatweb, nikto, nuclei, sslscan, dig, whois, dnsrecon, subfinder, dnsx, katana, searchsploit, ddg_search, curl, ping, nvd_cve_search)
-- ❌ 3 nicht installiert (testssl.sh, enum4linux-ng, theHarvester) — graceful disabled
-- 🗑 7 zu entfernen aus Tool-Listen (ffuf, gau, waybackurls, amass, assetfinder, sublist3r, naabu)
+**Tool-Status (Stand 2026-06-14, nach Phase 9.1):**
+- ✅ 18 Tools aktiv: nmap, httpx, whatweb, nikto, nuclei, sslscan, dig, whois, dnsrecon, subfinder, dnsx, katana, searchsploit, ddg_search, curl, ping, nvd_cve_search, **nvd_cpe_lookup** (neu)
+- ❌ 3 nicht installiert (testssl.sh, enum4linux-ng, theHarvester) — Klassen bleiben, aus Agent-Listen entfernt
+- 🗑 9 aus Tool-Listen entfernt: ffuf, gau, waybackurls, amass, assetfinder, sublist3r, naabu, testssl, enum4linux (Klassen bleiben für Reversibilität)
 
 ### Teilschritte in Phasen
 
