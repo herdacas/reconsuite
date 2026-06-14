@@ -132,11 +132,15 @@ def search_nvd(keyword: str, max_results: int = 5) -> list[dict]:
 
     Example: search_nvd("Apache 2.4.51") → list of matching CVE dicts.
     Returns up to max_results entries sorted by CVSS score descending.
+    Fetches a larger pool (max_results * 4, min 40) so that the local
+    CVSS sort has enough candidates — NVD API v2 always returns results
+    sorted by pubDate:asc (oldest first, no server-side sort parameter).
     """
+    fetch_count = min(max(max_results * 4, 40), 50)
     try:
         resp = _get_session().get(
             NVD_API_URL,
-            params={"keywordSearch": keyword, "resultsPerPage": min(max_results, 20)},
+            params={"keywordSearch": keyword, "resultsPerPage": fetch_count},
             headers=_headers(),
             timeout=20,
         )

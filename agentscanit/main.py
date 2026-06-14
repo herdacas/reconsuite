@@ -427,9 +427,7 @@ def _validate_target(raw: str) -> tuple[str, str | None]:
         return "", f"Invalid IPv4 address: '{target}'"
     if re.match(r'^(?:[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$', target):
         return target, None
-    if re.match(r'^[a-z0-9][a-z0-9\-]{0,61}$', target):
-        return target, None
-    return "", f"Invalid target '{raw.strip()}' — enter a domain (e.g. heise.de) or IP."
+    return "", f"Invalid target '{raw.strip()}' — enter a domain with TLD (e.g. heise.de) or IP."
 
 
 def _prompt_target() -> str:

@@ -214,6 +214,15 @@ Modell-Auswahl via `models.json` (aus `models.json.example` ableiten).
 
 ## Bekannte Probleme / Offene Punkte
 
+### ⚠️ Stiller Flow-Failure bei transientem 500er (BUG-6, 2026-06-14) — offen
+Wenn der Remote-Ollama-Server während der Blue-Phase einen 500er zurückgibt, endet der Flow mit `exit 0`,
+aber Blue/Findings/Red wurden nicht ausgeführt. Kein neuer Trace, kein neues `recon_report_*.md`.
+**Root Cause:** `AgentExecutor.call_llm_native_tools()` wirft Exception die vom CrewAI-Flow-Layer
+(`_execute_single_listener`) geloggt aber nicht nach außen propagiert wird → `run_scan()` in `flow.py`
+sieht keinen Fehler → `_mark_step("run_scan")` wird aufgerufen → stiller Totalausfall.
+Erkannt: futuremultiverse.com full (2026-06-14, erster Versuch) — Research 118s erfolgreich, dann Stop.
+**Geplanter Fix:** `workflow_last.json`-Alters-Check in `run_scan()` (Phase 8.5 in `roadmap.md`).
+
 ### 📋 Scan-Qualitäts-Findings (westerstede.de full, 2026-06-11) — für später, nicht gefixt
 Beobachtet bei einem sauberen `full`-Scan (4m13s, CLEAN, 20 Tool-Calls). Quelle: `trace_*.json`.
 Verortet im Workflow-Schritt (Pipeline: research → blue → findings → red_scan → red → coding → report):
@@ -222,9 +231,9 @@ Verortet im Workflow-Schritt (Pipeline: research → blue → findings → red_s
   kaputte Domain-/URL-Werte: `dnsrecon -d wenum?` (research), `theHarvester -d westernde?` (research),
   `whatweb https://://?` (blue). Betrifft jeweils das Target-Arg. dnsrecon wurde danach korrekt
   wiederholt (1 Call verschwendet); whatweb-Call nutzlos. Diagnose offen: systematisch vs. sporadisch.
-- **#2 — theHarvester kaputt (research):** Aufruf via `uv run theHarvester`, aber `uv` ist nicht
-  installiert → `[TOOL_ERROR] uv: binary not found` bei JEDEM Aufruf. OSINT-Tool fällt komplett aus.
-  Quick-Fix-Kandidat (Tool ohne `uv` aufrufen oder deaktivieren). Tool-Def: `tools/passive_recon.py`.
+- **#2 — theHarvester (research):** ✅ Gefixt (2026-06-14) — `shutil.which("theHarvester")` gibt
+  `"[theHarvester] nicht installiert — Tool nicht verfügbar."` zurück statt zu crashen. theHarvester
+  ist in der recon-suite nicht installiert; Tool graceful disabled.
 - **#3 — findings-Phase dünn (findings):** nur 2 generische `nvd_cve_search Apache`/`Joomla` (ohne
   Version), **kein `searchsploit`** obwohl der Task-Prompt es als Schritt A fordert. Banner ohne
   Version → generische Suche → 0 CVEs. Teils CVE-Erkennungs-Limit, teils Agent nutzt searchsploit nicht.
