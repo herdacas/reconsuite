@@ -54,6 +54,44 @@ def _apply_crewai_patches() -> None:
 _apply_crewai_patches()
 
 
+# ─── Tool-Usage Event Listener (Phase 8.2) ───────────────────────────────────
+# Gibt bei jedem Tool-Call eine Live-Zeile aus: "  → tool_name  [agent_role]"
+# und hängt die Dauer an wenn der Call abgeschlossen ist.
+# Nutzt CrewAI's BaseEventListener + ToolUsageStartedEvent / ToolUsageFinishedEvent.
+
+try:
+    from rich.console import Console as _RichConsole
+    from crewai.events.base_event_listener import BaseEventListener as _BEL
+    from crewai.events.event_types import ToolUsageStartedEvent, ToolUsageFinishedEvent
+
+    _live_console = _RichConsole(highlight=False)
+
+    class _ToolLiveListener(_BEL):
+        def setup_listeners(self, bus):
+            @bus.on(ToolUsageStartedEvent)
+            def on_start(source, event: ToolUsageStartedEvent):
+                role = (event.agent_role or "").split()[0] if event.agent_role else ""
+                tag  = f"[dim]{role}[/]" if role else ""
+                _live_console.print(
+                    f"    [dim]↳[/] [cyan]{event.tool_name}[/]  {tag}",
+                    highlight=False,
+                )
+
+            @bus.on(ToolUsageFinishedEvent)
+            def on_finish(source, event: ToolUsageFinishedEvent):
+                dur = (event.finished_at - event.started_at).total_seconds()
+                cache = "  [dim][cache][/]" if event.from_cache else ""
+                _live_console.print(
+                    f"    [dim]   {dur:.1f}s{cache}[/]",
+                    highlight=False,
+                )
+
+    _tool_live_listener = _ToolLiveListener()
+
+except Exception:
+    pass  # kein Live-Output wenn Events nicht verfügbar — nie den Scan unterbrechen
+
+
 # ─── Memory ───────────────────────────────────────────────────────────────────
 
 # Memory-Subsystem (Phase 7, Stufe 3b) entfernt: Crews laufen memory=False,
