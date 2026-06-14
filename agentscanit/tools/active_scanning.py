@@ -353,7 +353,9 @@ class HttpxTool(BaseTool):
     name: str = "httpx_prober"
     description: str = (
         "Probt HTTP/HTTPS-Endpunkte: prüft Erreichbarkeit, ermittelt Titel, "
-        "Status-Codes und Technologien. Ideal für schnelles Screening vieler Hosts."
+        "Status-Codes und Technologien. Ideal für schnelles Screening vieler Hosts. "
+        "PFLICHT: 'targets' muss immer angegeben werden (z.B. 'example.com' oder "
+        "'example.com,sub.example.com'). Ohne 'targets' liefert das Tool leeren Output."
     )
     args_schema: Type[BaseModel] = HttpxInput
 
