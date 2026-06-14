@@ -261,29 +261,119 @@ def resume_flow(state_id: str) -> ReconSuiteFlow:
     return flow
 
 
+def _flow_cmd_list() -> None:
+    """Print recent flow runs (mirrors main.py _cmd_list but standalone)."""
+    import sqlite3 as _sqlite3, json as _json
+    if not os.path.exists(_FLOW_DB):
+        console.print("  [dim]Keine gespeicherten Flows gefunden.[/]")
+        return
+    try:
+        with _sqlite3.connect(_FLOW_DB, timeout=10) as conn:
+            rows = conn.execute(
+                "SELECT flow_uuid, method_name, timestamp, state_json "
+                "FROM flow_states "
+                "WHERE id IN (SELECT MAX(id) FROM flow_states GROUP BY flow_uuid) "
+                "ORDER BY timestamp DESC LIMIT 20"
+            ).fetchall()
+    except Exception as exc:
+        console.print(f"[red]✗[/]  DB-Lesefehler: {exc}")
+        return
+    if not rows:
+        console.print("  [dim]Keine gespeicherten Flows gefunden.[/]")
+        return
+    from rich.table import Table as _Table
+    table = _Table(title="Gespeicherte Flows", border_style="cyan", show_lines=False)
+    table.add_column("Flow ID", style="cyan", no_wrap=True)
+    table.add_column("Target", style="bold")
+    table.add_column("Scope")
+    table.add_column("Letzter Schritt")
+    table.add_column("Zeitstempel", style="dim")
+    for flow_uuid, method_name, timestamp, state_json in rows:
+        try:
+            state = _json.loads(state_json)
+        except Exception:
+            state = {}
+        table.add_row(flow_uuid, state.get("target", "?"), state.get("scope", "?"),
+                      method_name, timestamp[:19].replace("T", " "))
+    console.print()
+    console.print(table)
+    console.print()
+    console.print("  [dim]Fortsetzen:[/]  python3 flow.py --resume <Flow ID>")
+    console.print()
+
+
+def _flow_cmd_score(trace_arg: str = "") -> None:
+    """Print quality scorecard for a trace file (or the latest scan)."""
+    from agentscanit.quality import score_scan, print_scorecard
+    log_dir = os.path.join(_SUITE_DIR, "logs")
+    if trace_arg:
+        path = trace_arg if os.path.isabs(trace_arg) else os.path.join(log_dir, trace_arg)
+    else:
+        import glob as _glob
+        traces = sorted(
+            [f for f in os.listdir(log_dir) if f.startswith("trace_") and f.endswith(".json")],
+            reverse=True,
+        )
+        if not traces:
+            console.print("[red]✗[/]  Keine trace_*.json Dateien in logs/")
+            sys.exit(1)
+        path = os.path.join(log_dir, traces[0])
+    try:
+        report = score_scan(path)
+        print_scorecard(report)
+    except FileNotFoundError:
+        console.print(f"[red]✗[/]  Datei nicht gefunden: {path}")
+        sys.exit(1)
+
+
 if __name__ == "__main__":
+    from agentscanit.main import _validate_target
+    from agentscanit.crew import VALID_SCOPES as _VALID_SCOPES
+
     args = sys.argv[1:]
+
+    if args and args[0] == "--list":
+        _flow_cmd_list()
+        sys.exit(0)
+
+    if args and args[0] == "--score":
+        _flow_cmd_score(args[1] if len(args) > 1 else "")
+        sys.exit(0)
+
     if args and args[0] == "--resume":
         if len(args) < 2:
             console.print("[red]✗[/]  --resume requires a flow ID")
             sys.exit(1)
         resume_flow(args[1])
-    elif len(args) >= 1:
-        _target    = args[0]
-        _objective = args[1] if len(args) >= 2 else ""
-        _scope     = args[2] if len(args) >= 3 else "full"
+        sys.exit(0)
+
+    if len(args) >= 1:
+        _target, _err = _validate_target(args[0])
+        if _err:
+            console.print(f"[red]✗[/]  {_err}")
+            sys.exit(1)
+        if len(args) == 2 and args[1].lower() in _VALID_SCOPES:
+            _objective = ""
+            _scope     = args[1].lower()
+        else:
+            _objective = args[1] if len(args) >= 2 else ""
+            _scope     = args[2] if len(args) >= 3 else "full"
         run_flow(_target, _objective, _scope)
     else:
-        import sys as _sys
         # Flush stdin before prompting — stale input from a previous Ctrl+C can
         # pre-fill the first Prompt.ask() and corrupt target/objective values.
         try:
             import termios
-            termios.tcflush(_sys.stdin, termios.TCIFLUSH)
+            termios.tcflush(sys.stdin, termios.TCIFLUSH)
         except Exception:
             pass
         console.print()
-        _target    = Prompt.ask("[bold]Target[/] [dim](domain or IP)[/]").strip()
+        while True:
+            raw = Prompt.ask("[bold]Target[/] [dim](domain or IP)[/]").strip()
+            _target, _err = _validate_target(raw)
+            if not _err:
+                break
+            console.print(f"  [red]✗[/]  {_err}")
         _objective = Prompt.ask(
             "[bold]Objective[/] [dim](Enter für full scan)[/]", default=""
         ).strip()
