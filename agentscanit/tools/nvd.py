@@ -183,9 +183,37 @@ def cpe_search_nvd(vendor: str, product: str, version: str = "", max_results: in
         return [{"error": str(e), "cpe": cpe_string}]
 
     results = [_parse_cve(v["cve"]) for v in vulns]
+
+    try:
+        from agentscanit.tools.cpe_map import NOTABLE_CVES
+    except ImportError:
+        from tools.cpe_map import NOTABLE_CVES  # fallback when run from agentscanit/
+    notable_ids = NOTABLE_CVES.get((vendor, product), [])
+
+    # Fetch any notable CVEs missing from the pool entirely
+    pool_ids = {r["id"] for r in results}
+    for cve_id in notable_ids:
+        if cve_id not in pool_ids:
+            time.sleep(delay)
+            extra = lookup_cve(cve_id)
+            if "error" not in extra:
+                results.append(extra)
+                pool_ids.add(cve_id)
+
     results.sort(key=lambda r: r.get("cvss_score") or 0, reverse=True)
-    # max_results kann bis 20 gehen — Pool=100 stellt sicher dass genug Kandidaten vorhanden
-    return results[:min(max_results, 20)]
+    cap = min(max_results, 20)
+    top = results[:cap]
+
+    # Guarantee notable CVEs appear in the output even if crowded out by CVSS sort.
+    # They are appended after the sorted slice — agent sees both high-CVSS and pinned entries.
+    top_ids = {r["id"] for r in top}
+    for cve_id in notable_ids:
+        if cve_id not in top_ids:
+            for r in results:
+                if r["id"] == cve_id:
+                    top.append(r)
+                    break
+    return top
 
 
 def search_nvd(keyword: str, max_results: int = 5) -> list[dict]:

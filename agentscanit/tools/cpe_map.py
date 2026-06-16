@@ -79,6 +79,18 @@ CPE_MAP: list[tuple[str, tuple[str, str]]] = [
 ]
 
 
+# Notable CVEs per (vendor, product) that are actively exploited and relevant
+# for pentest targets but may not appear in the top-N CVSS sort because many
+# higher-CVSS entries exist for the same product. These are fetched directly
+# via cveId API in cpe_search_nvd() and merged into the result pool.
+NOTABLE_CVES: dict[tuple[str, str], list[str]] = {
+    ("oracle",  "weblogic_server"): ["CVE-2023-21839", "CVE-2020-14882", "CVE-2019-2725"],
+    ("redis",   "redis"):           ["CVE-2022-0543"],
+    ("apache",  "http_server"):     ["CVE-2021-41773", "CVE-2021-42013"],
+    ("apache",  "log4j"):           ["CVE-2021-44228"],
+}
+
+
 def banner_to_cpe(banner: str) -> tuple[str, str] | None:
     """Map a service banner/header string to (vendor, product) CPE components.
 
