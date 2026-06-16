@@ -505,8 +505,11 @@ def make_tasks() -> dict:
             "PLATTFORM-FILTER: Wenn die NVD-Beschreibung explizit 'on Windows' enthält "
             "und es keine Evidenz gibt dass der Ziel-Server Windows nutzt (Apache/nginx/Linux-Banner "
             "weisen auf Linux hin), trage die CVE NICHT in cve_references ein.\n"
-            "REGEL: Trage in 'cve_references' NUR CVE-IDs ein die nach obiger Prüfung bestätigt sind. "
-            "Keine CVE-IDs aus LLM-Trainingswissen.\n"
+            "REGEL: Trage in 'cve_references' JEDE CVE-ID ein die ein Tool in dieser Session "
+            "zurückgegeben hat — searchsploit, nvd_cve_search ODER nvd_cpe_lookup zählen alle als Bestätigung. "
+            "Wenn nvd_cpe_lookup für 'Oracle WebLogic' CVE-2023-21839 zurückgibt → in cve_references eintragen. "
+            "Wenn nvd_cpe_lookup für 'Redis' CVE-2022-0543 zurückgibt → in cve_references eintragen. "
+            "Keine CVE-IDs aus LLM-Trainingswissen die KEIN Tool zurückgegeben hat.\n"
             "REGEL: 'risk_summary' enthält ausschließlich direkt beobachtete Fakten aus Tool-Outputs — "
             "keine Einschätzungen, keine Wahrscheinlichkeiten, kein 'may' oder 'could'.\n\n"
             "SIGNATURE-SERVICES — CPE-Lookup bei bekannten Admin-Ports:\n"
@@ -523,8 +526,8 @@ def make_tasks() -> dict:
             "Tags ('apache', 'wordpress', 'openssh') und 'severity=critical,high' aufrufen kann."
         ),
         expected_output=(
-            "Extrahierte Service-Versionen, CVE-IDs (nur tool-bestätigt), "
-            "faktische Zusammenfassung der beobachteten Findings."
+            "Extrahierte Service-Versionen, alle CVE-IDs die searchsploit/nvd_cve_search/nvd_cpe_lookup "
+            "zurückgegeben haben (vollständig in cve_references), faktische Zusammenfassung."
         ),
         output_pydantic=FindingsOutput,
         guardrails=[_cve_trace_guardrail],
