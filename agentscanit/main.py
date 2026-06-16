@@ -338,7 +338,7 @@ def _save_outputs(
             pd = t.pydantic
             if hasattr(pd, "open_ports"):      entry["open_ports"]      = pd.open_ports
             if hasattr(pd, "vulnerabilities"): entry["vulnerabilities"] = pd.vulnerabilities[:5]
-            if hasattr(pd, "cve_references"):  entry["cve_references"]  = pd.cve_references[:5]
+            if hasattr(pd, "cve_references"):  entry["cve_references"]  = pd.cve_references
             if hasattr(pd, "confirmed_attack_surface"): entry["attack_surface_count"] = len(pd.confirmed_attack_surface)
             if hasattr(pd, "exploitable_findings"):    entry["exploitable_findings_count"] = len(pd.exploitable_findings)
             if hasattr(pd, "memory_hit"):      entry["memory_hit"]      = pd.memory_hit
