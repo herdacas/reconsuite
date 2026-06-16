@@ -119,14 +119,17 @@ if __name__ == "__main__":
 
     if args and args[0] == "--plot":
         import shutil
+        from datetime import datetime as _dt
         from flow import ReconSuiteFlow
         _log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
-        flow = ReconSuiteFlow()
+        _ts      = _dt.now().strftime("%Y%m%d_%H%M%S")
+        flow     = ReconSuiteFlow()
         tmp_html = flow.plot(filename="recon_suite_flow.html", show=False)
         tmp_dir  = os.path.dirname(tmp_html)
         for fname in os.listdir(tmp_dir):
-            shutil.copy2(os.path.join(tmp_dir, fname), os.path.join(_log_dir, fname))
-        dest = os.path.join(_log_dir, "recon_suite_flow.html")
+            _base, _ext = os.path.splitext(fname)
+            shutil.copy2(os.path.join(tmp_dir, fname), os.path.join(_log_dir, f"{_base}_{_ts}{_ext}"))
+        dest = os.path.join(_log_dir, f"recon_suite_flow_{_ts}.html")
         console.print(f"  [green]✓[/]  Flow-Graph: [cyan]{dest}[/]")
         sys.exit(0)
 

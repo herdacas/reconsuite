@@ -195,7 +195,9 @@ def run(target: str, objective: str = "", scope: str = "full", log_llm: bool = F
 
     # LLM-Fehler (500er remote, None-Response) bekommen mehr Versuche + Backoff.
     # Strukturelle Fehler (ValidationError, ConverterError) bleiben bei 3 Versuchen.
-    _LLM_ERRORS   = {"Invalid response from LLM call", "None or empty"}
+    _LLM_ERRORS   = {"Invalid response from LLM call", "None or empty",
+                     "Internal Server Error", "InternalServerError",
+                     "Error code: 500", "status_code=500"}
     _MAX_RETRIES_LLM        = 5
     _MAX_RETRIES_STRUCTURAL = 3
 
@@ -206,7 +208,10 @@ def run(target: str, objective: str = "", scope: str = "full", log_llm: bool = F
         except Exception as _exc:
             exc_str      = str(_exc)
             exc_type     = type(_exc).__name__
-            _is_llm_error = any(kw in exc_str for kw in _LLM_ERRORS)
+            _is_llm_error = (
+                any(kw in exc_str  for kw in _LLM_ERRORS) or
+                any(kw in exc_type for kw in ("InternalServerError", "APIStatusError", "APIError"))
+            )
             _is_retryable = (
                 _is_llm_error or
                 "json_invalid"                          in exc_str or
@@ -239,7 +244,7 @@ def run(target: str, objective: str = "", scope: str = "full", log_llm: bool = F
                 console.print(
                     f"  [yellow]⚠[/]  LLM error — retry {_attempt + 2}/{_max_attempts} (Vollneustart)..."
                 )
-                crew_obj = scanner.crew(task_callback=_on_task_done)
+                crew_obj = scanner.crew(task_callback=_on_task_done, log_llm=log_llm)
                 _reset_task_progress(scanner.pipeline, time.time())
             else:
                 raise
@@ -335,6 +340,7 @@ def _save_outputs(
             if hasattr(pd, "vulnerabilities"): entry["vulnerabilities"] = pd.vulnerabilities[:5]
             if hasattr(pd, "cve_references"):  entry["cve_references"]  = pd.cve_references[:5]
             if hasattr(pd, "confirmed_attack_surface"): entry["attack_surface_count"] = len(pd.confirmed_attack_surface)
+            if hasattr(pd, "exploitable_findings"):    entry["exploitable_findings_count"] = len(pd.exploitable_findings)
             if hasattr(pd, "memory_hit"):      entry["memory_hit"]      = pd.memory_hit
             # Feed structured Pydantic output into the trace for validation
             run_trace.set_phase_output(name, pd.model_dump())

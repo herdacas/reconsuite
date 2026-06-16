@@ -154,8 +154,9 @@ class ReconSuiteFlow(Flow[ScanState]):
             cves = tasks.get("findings", {}).get("cve_references", [])
             if cves:
                 self.state.has_cve_findings = True
-            attack_surface = tasks.get("red", {}).get("attack_surface_count", 0)
-            if attack_surface and attack_surface > 0:
+            exploitable = tasks.get("red", {}).get("exploitable_findings_count", 0)
+            red_cves    = tasks.get("red", {}).get("cve_references", [])
+            if exploitable > 0 or red_cves:
                 self.state.has_exploitable = True
         except Exception:
             pass
@@ -363,12 +364,15 @@ if __name__ == "__main__":
 
     if args and args[0] == "--plot":
         import shutil as _shutil
-        flow = ReconSuiteFlow()
+        from datetime import datetime as _dt
+        _ts   = _dt.now().strftime("%Y%m%d_%H%M%S")
+        flow  = ReconSuiteFlow()
         tmp_html = flow.plot(filename="recon_suite_flow.html", show=False)
         tmp_dir  = os.path.dirname(tmp_html)
         for fname in os.listdir(tmp_dir):
-            _shutil.copy2(os.path.join(tmp_dir, fname), os.path.join(LOG_DIR, fname))
-        dest = os.path.join(LOG_DIR, "recon_suite_flow.html")
+            _base, _ext = os.path.splitext(fname)
+            _shutil.copy2(os.path.join(tmp_dir, fname), os.path.join(LOG_DIR, f"{_base}_{_ts}{_ext}"))
+        dest = os.path.join(LOG_DIR, f"recon_suite_flow_{_ts}.html")
         console.print(f"  [green]✓[/]  Flow-Graph: [cyan]{dest}[/]")
         sys.exit(0)
 

@@ -192,10 +192,12 @@ def _score_cve_quality(trace: dict) -> DimensionScore:
     raw_cves = set(_re.findall(r'CVE-\d{4}-\d{4,7}', all_raw))
 
     if cve_count == 0:
-        # Kein CVE: prüfe ob CVEs im Trace vorhanden aber nicht extrahiert
+        # Kein CVE: prüfe ob CVEs im Trace vorhanden aber nicht extrahiert.
+        # Kein Malus wenn CVEs im Tool-Output verworfen wurden — der Agent kann
+        # legitim CVEs ausschließen (falsche Version, nicht-betroffener Versionsbereich).
         if raw_cves:
-            notes.append(f"CVEs in Tool-Output aber nicht extrahiert: {len(raw_cves)} ({', '.join(sorted(raw_cves)[:3])}…)")
-            score = 20.0
+            notes.append(f"CVEs in Tool-Output, Agent hat {len(raw_cves)} verworfen (Version-Filter oder kein Match)")
+            score = 50.0  # neutral — Verwerfung kann korrekt sein
         else:
             notes.append("Keine CVEs gefunden (Target möglicherweise sauber oder Scope zu eng)")
             score = 50.0  # neutral — kein Befund ≠ schlechter Scan

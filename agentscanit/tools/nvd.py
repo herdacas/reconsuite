@@ -184,7 +184,8 @@ def cpe_search_nvd(vendor: str, product: str, version: str = "", max_results: in
 
     results = [_parse_cve(v["cve"]) for v in vulns]
     results.sort(key=lambda r: r.get("cvss_score") or 0, reverse=True)
-    return results[:max_results]
+    # max_results kann bis 20 gehen — Pool=100 stellt sicher dass genug Kandidaten vorhanden
+    return results[:min(max_results, 20)]
 
 
 def search_nvd(keyword: str, max_results: int = 5) -> list[dict]:
@@ -317,7 +318,7 @@ class NvdCpeInput(BaseModel):
         default="",
         description="Versionsnummer wenn bekannt, z.B. '8.2', '12.2.1.0'. Leer lassen wenn unbekannt.",
     )
-    max_results: int = Field(default=5, description="Maximale Anzahl CVEs (1-10)")
+    max_results: int = Field(default=10, description="Maximale Anzahl CVEs (1-20)")
 
 
 class NvdCpeTool(BaseTool):
