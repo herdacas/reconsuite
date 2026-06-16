@@ -124,12 +124,16 @@ def _scope_coverage_guardrail(output: Any) -> tuple[bool, Any]:
 
 
 def _cve_trace_guardrail(output: Any) -> tuple[bool, Any]:
-    """Guardrail: CVE-IDs gegen Session-Trace validieren — Agent erhält Feedback.
+    """Guardrail: CVE-IDs gegen Session-Trace validieren + NOTABLE_CVES auto-pinnen.
 
     Trace cross-check (primär): ID muss im Raw-Output eines Tool-Calls erscheinen.
     NVD-Fallback: wenn Trace inaktiv (Unit-Tests), prüft NVD-Existenz.
     Bei Failure bekommt der Agent die halluzinierten IDs explizit zurückgemeldet
     und kann die Task korrigiert wiederholen (guardrail_max_retries=2).
+
+    Auto-Pin: NOTABLE_CVES die im Tool-Output dieser Session erscheinen aber nicht
+    in cve_references eingetragen wurden, werden deterministisch hinzugefügt —
+    ohne Agent-Retry (Anreicherung, keine Ablehnung).
     """
     pydantic_out = getattr(output, "pydantic", None)
     raw = getattr(output, "raw", output) if not isinstance(output, str) else output
@@ -151,6 +155,36 @@ def _cve_trace_guardrail(output: Any) -> tuple[bool, Any]:
                     f"Tool-Output dieser Session. Entferne sie aus 'cve_references'. "
                     f"Tool-bestätigt: {confirmed if confirmed else 'keine'}"
                 )
+
+            # Auto-Pin: NOTABLE_CVES im Trace-Output → in cve_references aufnehmen
+            try:
+                from tools.cpe_map import NOTABLE_CVES
+            except ImportError:
+                try:
+                    from agentscanit.tools.cpe_map import NOTABLE_CVES
+                except ImportError:
+                    NOTABLE_CVES = {}
+
+            all_notable = {cve for ids in NOTABLE_CVES.values() for cve in ids}
+            current_ids = {c.upper() for c in cves}
+            to_pin = [
+                cve for cve in all_notable
+                if cve not in current_ids and run_trace.cve_in_raw_outputs(cve)
+            ]
+            if to_pin:
+                updated = list(cves) + to_pin
+                try:
+                    object.__setattr__(pydantic_out, "cve_references", updated)
+                except Exception:
+                    pass
+                import json as _json
+                try:
+                    raw_dict = _json.loads(raw)
+                    raw_dict["cve_references"] = updated
+                    raw = _json.dumps(raw_dict, ensure_ascii=False)
+                except Exception:
+                    pass
+
             return True, raw
     except Exception:
         pass

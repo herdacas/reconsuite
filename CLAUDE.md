@@ -31,6 +31,36 @@ CVE-2023-21839 (CVSS 7.5, aktiv ausgenutzt) wurde auf pentest-ground.com nicht g
 - ❌ 3 nicht installiert (testssl.sh, enum4linux-ng, theHarvester) — Klassen bleiben, aus Agent-Listen entfernt
 - 🗑 9 aus Tool-Listen entfernt: ffuf, gau, waybackurls, amass, assetfinder, sublist3r, naabu, testssl, enum4linux (Klassen bleiben für Reversibilität)
 
+---
+
+### Phase 8 — Verifikation (2026-06-16/17)
+
+**Verifikationsziel:** pentest-ground.com (intentionell verwundbar, bekannte CVEs pro Service)
+
+| Test | Status | Commit | Befund |
+|---|---|---|---|
+| V-1: `quick` Scan durchläuft, Scorecard auto | ✅ Bestätigt | — | Grade A, 5 Phasen, Scorecard sichtbar |
+| V-2: `--score` zeigt neuesten Trace | ✅ Bestätigt | — | Korrekte mtime-Sortierung |
+| V-3: `--plot` erzeugt 3 Dateien mit Timestamp | ✅ Bestätigt | `3a91884` | HTML/CSS/JS in logs/ mit `_<ts>`-Suffix |
+| V-4: Ports 4280/5013/6379/7001 gefunden | ✅ Bestätigt | `a7ec771` | BUG-10 gefixt: `-p 1-65535` statt top-1000 |
+| V-5: CVE-2022-0543 (Redis) im Final Report | ✅ Bestätigt | `c422e71`+`fc5b25a` | BUG-11+12b gefixt: Notable-Pinning + [:5]-Limit entfernt |
+| V-6: CVE-2023-21839 (WebLogic) im Final Report | ⏳ Offen | — | nvd_cpe_lookup ruft WebLogic auf, CVE im Tool-Output, aber Agent trägt sie nicht in `cve_references` ein |
+
+**Bugs gefixt in Phase 8 (2026-06-16/17):**
+
+| Bug | Beschreibung | Fix | Commit |
+|---|---|---|---|
+| BUG-8 | `has_exploitable` immer True (nutzte `attack_surface_count` statt exploitable findings) | `flow.py` + `main.py`: `exploitable_findings_count > 0 OR red_cves non-empty` | `a7ec771` |
+| BUG-9 | Scorecard 20/100 wenn Agent CVEs korrekt verwirft (kein Version-Match) | `quality.py`: neutral 50/100 statt Malus | `a7ec771` |
+| BUG-10 | `full`/`network` scope: nmap top-1000 → Ports 4280/5013/6379 verpasst | `tasks.py`: `-p 1-65535` in full-scope-Prompt explizit | `a7ec771` |
+| BUG-11 | `nvd_cpe_lookup` schnitt CVE-2023-21839 ab (Rang #34, max_results=10) | `nvd.py`+`cpe_map.py`: NOTABLE_CVES Pinning — bekannte CVEs garantiert im Output | `7e1cf26` |
+| BUG-12 | findings-Prompt ließ nvd_cpe_lookup-CVEs raus (nur searchsploit als "Bestätigung") | `tasks.py`: REGEL erweitert — alle 3 NVD-Tools zählen als Bestätigung | `fc5b25a` |
+| BUG-12b | `main.py`: `pd.cve_references[:5]` schnitt alle CVEs ab Position 6 ab | `main.py` Zeile 341: `[:5]` entfernt | `c422e71` |
+
+**Offen:**
+- V-6 (CVE-2023-21839 im Report): `full`-Scope schlägt auf Remote-Ollama-API mit 500er fehl (findings-Phase zu viel Kontext). `network`-Scope findet WebLogic-CVEs im findings-Trace aber Agent überträgt nicht alle in `cve_references`. Noch nicht abgeschlossen.
+- Remote-Ollama-API instabil bei `full`-Scope (HTTP 500, "None or empty" — findings-Phase mit großem Kontext).
+
 ### Teilschritte in Phasen
 
 Wenn eine Phase in Teilschritte zerlegt wird, werden diese hier notiert.
