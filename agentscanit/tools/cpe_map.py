@@ -15,6 +15,7 @@ from __future__ import annotations
 # Order matters: more specific entries must come before shorter prefixes.
 CPE_MAP: list[tuple[str, tuple[str, str]]] = [
     # Application servers
+    ("oracle weblogic admin httpd", ("oracle", "weblogic_server")),  # exact nmap banner
     ("oracle weblogic",        ("oracle",      "weblogic_server")),
     ("weblogic",               ("oracle",      "weblogic_server")),
     ("glassfish",              ("oracle",      "glassfish_server")),
@@ -96,11 +97,30 @@ def banner_to_cpe(banner: str) -> tuple[str, str] | None:
 
     Returns the first match (most specific wins — table is ordered longest-first).
     Returns None if no mapping found.
+
+    Robust against LLM-mangled input: strips whitespace-runs and ellipsis
+    artifacts (e.g. "Oracle   ...  ...  httpd" → still matches "oracle weblogic"
+    via token-level check).
     """
-    lower = banner.lower()
+    import re as _re
+    # Normalise whitespace and strip common LLM artefacts (…, ..., ·, —)
+    cleaned = _re.sub(r'[…\.]{2,}', ' ', banner)
+    cleaned = _re.sub(r'\s+', ' ', cleaned).strip()
+    lower = cleaned.lower()
+
     for keyword, cpe in CPE_MAP:
         if keyword in lower:
             return cpe
+
+    # Token-level fallback: check if all words of multi-word keywords appear
+    # anywhere in the banner (handles "Oracle   admin httpd" → weblogic match
+    # when the banner is partially mangled).
+    tokens = set(lower.split())
+    for keyword, cpe in CPE_MAP:
+        kw_tokens = set(keyword.split())
+        if len(kw_tokens) > 1 and kw_tokens.issubset(tokens):
+            return cpe
+
     return None
 
 

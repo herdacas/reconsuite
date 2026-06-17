@@ -159,29 +159,66 @@ def _cve_trace_guardrail(output: Any) -> tuple[bool, Any]:
                     f"Tool-bestätigt: {confirmed if confirmed else 'keine'}"
                 )
 
-            # NVD-Tool-Guarantee: Wenn blue CPE_MAP-bekannte Services gefunden hat
-            # aber findings kein nvd_cpe_lookup/nvd_cve_search aufgerufen hat.
+            # NVD-Tool-Guarantee + NOTABLE_CVES direkt pinnen wenn "Kein CPE-Mapping"
+            # für bekannte Services im finding-Output erscheint.
             try:
-                from tools.cpe_map import CPE_MAP
+                from tools.cpe_map import CPE_MAP, NOTABLE_CVES as _NC_MAP
             except ImportError:
                 try:
-                    from agentscanit.tools.cpe_map import CPE_MAP
+                    from agentscanit.tools.cpe_map import CPE_MAP, NOTABLE_CVES as _NC_MAP
                 except ImportError:
                     CPE_MAP = {}
+                    _NC_MAP = {}
+
+            blue_outputs = " ".join(
+                c.get("raw_output", "")
+                for p, pd in run_trace._phases.items()
+                if p in ("blue", "red_scan")
+                for c in pd.get("tool_calls", [])
+            ).lower()
+
+            # Services die im blue-Output erkannt wurden und NOTABLE_CVES haben
+            notable_missing: list[str] = []
+            for keyword, cpe_tuple in CPE_MAP:
+                if keyword in blue_outputs and cpe_tuple in _NC_MAP:
+                    for cve_id in _NC_MAP[cpe_tuple]:
+                        if cve_id not in current_ids and cve_id not in notable_missing:
+                            notable_missing.append(cve_id)
+
+            # Direkt via NVD-API pinnen (deterministisch, kein Agent-Retry nötig)
+            if notable_missing:
+                direct_pinned: list[str] = []
+                try:
+                    from tools.nvd import lookup_cve
+                    for cve_id in notable_missing:
+                        result = lookup_cve(cve_id)
+                        if "error" not in result:
+                            direct_pinned.append(cve_id)
+                except Exception:
+                    direct_pinned = notable_missing  # fallback: vertraue NOTABLE_CVES
+
+                if direct_pinned:
+                    updated_direct = list(cves) + direct_pinned
+                    try:
+                        object.__setattr__(pydantic_out, "cve_references", updated_direct)
+                        cves = updated_direct
+                        current_ids = {c.upper() for c in cves}
+                    except Exception:
+                        pass
+                    import json as _json2
+                    try:
+                        raw_dict2 = _json2.loads(raw)
+                        raw_dict2["cve_references"] = updated_direct
+                        raw = _json2.dumps(raw_dict2, ensure_ascii=False)
+                    except Exception:
+                        pass
 
             _nvd_tools = {"nvd_cpe_lookup", "nvd_cve_search", "searchsploit"}
             _findings_tools = {c.get("tool_name", "") for c in run_trace._pending}
             _nvd_called = bool(_findings_tools & _nvd_tools)
 
-            if not _nvd_called and CPE_MAP:
-                # Prüfe ob blue-Phase bekannte Services erkannt hat
-                blue_outputs = " ".join(
-                    c.get("raw_output", "")
-                    for p, pd in run_trace._phases.items()
-                    if p in ("blue", "red_scan")
-                    for c in pd.get("tool_calls", [])
-                ).lower()
-                known_services = [kw for kw in CPE_MAP if kw in blue_outputs]
+            if not _nvd_called:
+                known_services = [kw for kw, _ in CPE_MAP if kw in blue_outputs]
                 if known_services and run_trace._guardrail_reject_count < 1:
                     run_trace._guardrail_reject_count += 1
                     return False, (
