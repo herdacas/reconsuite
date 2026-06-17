@@ -81,9 +81,21 @@ Neu: `Agent.planning=True` (Agent-Level Reflection) — nicht aktiviert, da `thi
 - Externes Team → Suite: ✅ Alle Team-Flows sind `Flow[State]`-Subklassen mit stabilen `run_*()`-Entry-Points — direkt als `@listen`-Methoden integrierbar.
 - Einschränkung: Team 1 kommuniziert über `workflow_last.json` (Filesystem) statt State-Objekt — hemmt vollständige programmatische Integration von außen.
 
+**Phase 9 — E2E-Verifikation (2026-06-17):**
+
+| Test | Status | Befund |
+|---|---|---|
+| pentest-ground.com network | ✅ Bestätigt | CVE-2023-21839 (WebLogic CVSS 7.5) + CVE-2022-0543 (Redis CVSS 10.0) — 39 CVEs, Grade A 99.7/100 |
+| futuremultiverse.com network (1. Scan) | ⚠️ Bug | CVE-2023-38408 (OpenSSH) fehlt — BUG-13 |
+| futuremultiverse.com network (nach Fix) | ✅ Bestätigt | CVE-2023-38408 (OpenSSH CVSS 9.8) im Report — 33 CVEs, Grade A 93.4/100 |
+
+**BUG-13 (2026-06-17):** OpenSSH fehlte in `NOTABLE_CVES` → kein deterministisches Pinning. `NvdCpeTool._run/_arun` hatte `max_results=5` als Hard-Default (statt 10 aus Schema) → CVE-2023-38408 (Rang 6) abgeschnitten.
+Fix: `cpe_map.py` — `("openbsd","openssh"): ["CVE-2023-38408"]` + `nvd.py` — `_run/_arun` Default auf 10.
+**Phase 9 vollständig abgeschlossen (2026-06-17).**
+
 **Offen:**
 - Remote-Ollama-API Instabilität: HTTP 429 Session-Limit nach mehreren Scans, HTTP 500 bei full-Scope (großer Kontext findings-Phase).
-- Regressions-Check futuremultiverse.com (OpenSSH CVEs nach CPE-Umstellung) steht noch aus.
+- Effizienz futuremultiverse.com: Laufzeit 934–1009s (56–68% über Ziel) wegen LLM-Errors in Blue-Phase + langer nmap-Scans auf Webmin/Ollama-Ports.
 
 ### Teilschritte in Phasen
 

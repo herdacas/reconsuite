@@ -89,6 +89,7 @@ NOTABLE_CVES: dict[tuple[str, str], list[str]] = {
     ("redis",   "redis"):           ["CVE-2022-0543"],
     ("apache",  "http_server"):     ["CVE-2021-41773", "CVE-2021-42013"],
     ("apache",  "log4j"):           ["CVE-2021-44228"],
+    ("openbsd", "openssh"):         ["CVE-2023-38408"],
 }
 
 

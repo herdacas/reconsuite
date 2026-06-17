@@ -362,7 +362,7 @@ class NvdCpeTool(BaseTool):
     )
     args_schema: Type[BaseModel] = NvdCpeInput
 
-    def _run(self, banner: str, version: str = "", max_results: int = 5) -> str:
+    def _run(self, banner: str, version: str = "", max_results: int = 10) -> str:
         import time as _time
         from tools.trace import run_trace
         from tools.cpe_map import banner_to_cpe
@@ -404,7 +404,7 @@ class NvdCpeTool(BaseTool):
         run_trace.record_execution(["nvd_cpe_lookup", banner], out, _time.time() - t0)
         return out
 
-    async def _arun(self, banner: str, version: str = "", max_results: int = 5) -> str:
+    async def _arun(self, banner: str, version: str = "", max_results: int = 10) -> str:
         import time as _time
         from tools.trace import run_trace
         from tools.cpe_map import banner_to_cpe
