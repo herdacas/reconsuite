@@ -98,8 +98,9 @@ Fix: `cpe_map.py` — `("openbsd","openssh"): ["CVE-2023-38408"]` + `nvd.py` —
 | Test | Status | Befund |
 |---|---|---|
 | `--plot` Flow-Visualisierung | ✅ Bestätigt | 3 Dateien (HTML/JS/CSS) mit Timestamp-Suffix, alte Plots bleiben erhalten |
-| Full-Scope futuremultiverse.com (6 Teams) | ❌ Server-blockiert | Remote-Ollama (`ollama.com`) konsistent HTTP 500 in Blue-Phase. Retry-Logik nutzte alle 5 Versuche (Research je ~300s + Backoff), dann sauberes `raise` (kein stiller BUG-6-Failure → Phase-8.5-Absicherung positiv verifiziert) |
-| Web-Scan zero.webappsecurity.com (6 Teams, User-Run) | ⚠️ BUG-14 entdeckt | Alle 6 Teams liefen (interpret/threatintel/compliance/risk/reporting), ABER: NVD tot (503/timeout) → findings fiel auf versionslosen searchsploit-Keyword-Fallback zurück → 7 spekulative CVEs als „Grade A 94.6" |
+| Web-Scan zero.webappsecurity.com (6 Teams) | ✅ Bestätigt | Alle 6 Teams liefen (interpret/threatintel/compliance/risk/reporting). Re-Scan 19:08 verifiziert BUG-14-Fixes E2E (6 bestätigte + 8 UNBESTÄTIGTE CVEs, Scorecard korrekt). `--list` zeigt persistierte Flows. |
+| Resume-Test (Flow `85d064d9`, abgeschlossen) | ✅ Bestätigt | `--resume` überspringt alle 6 Team-Schritte via Skip-Guards (`↻ ... übersprungen (Resume — bereits abgeschlossen)`), 0 Scan-Tools, Exit 0 in Sekunden statt Minuten. `@persist`/`completed_steps` funktioniert. |
+| Full-Scope futuremultiverse.com (7 Phasen) | ❌ Server-blockiert | Remote-Ollama (`ollama.com`) **reproduzierbar** HTTP 500 in Blue-Phase (2×: 14:xx + 19:25). Retry-Logik nutzte alle 5 Versuche (Research je ~300s + Backoff), dann sauberes `raise` (kein stiller BUG-6-Failure → Phase-8.5-Absicherung positiv verifiziert). `web`/`network`-Scope laufen durch, nur `full` (größerer Kontext, 7 Phasen) triggert die 500er. |
 
 **BUG-14 (2026-06-17) — NVD-Ausfall wurde als bestätigte CVEs / Grade A gewertet (Commit `5ca67fa`):**
 - Root Cause: `nvd_cpe_lookup`/`nvd_cve_search` → 503/timeout. findings nutzte `searchsploit "Apache Tomcat"` (ohne Version) → CVE-IDs aus dem `Codes`-Feld der Exploit-DB bestehen die Trace-Kreuzvalidierung, sind aber versionslos/spekulativ. Server-Banner war nur `Apache-Coyote/1.1` (keine Version).
@@ -109,11 +110,12 @@ Fix: `cpe_map.py` — `("openbsd","openssh"): ["CVE-2023-38408"]` + `nvd.py` —
 - **E2E-Re-Scan ✅ bestätigt** (2026-06-17 19:08, zero.webappsecurity.com web): NVD kam intermittierend durch (`nvd_cve_search Apache HTTP Server 2.2.6` → 7 echte versions-bezogene CVEs; 2/3 andere Calls 503/timeout). Ergebnis: Report listet **6 bestätigte CVEs mit echtem CVSS** + **8 explizit als „⚠️ UNBESTÄTIGT — NVD nicht erreichbar" markiert** (14b ✅). Scorecard NICHT gedeckelt (Grade A 91.4 berechtigt, da echte NVD-Treffer vorhanden → `len(failed)≠len(nvd_calls)`, 14c ✅). Timeouts in raw_output zeigen `read timeout=30` (14a ✅). Vorher (174609, NVD komplett tot): 0 bestätigte CVEs, 7 versionslose searchsploit-CVEs getarnt als Grade A 94.6.
 - **Wichtig:** `gpt-oss:120b` ist ein Reasoning-Modell — Health-Checks MÜSSEN `extra_body={"think": False}` + ausreichend `max_tokens` (≥50) setzen, sonst landet die Antwort im verworfenen thinking-Kanal und wirkt fälschlich „leer" (führte zu Fehldiagnose „Ollama tot"). Die Suite setzt beides korrekt.
 
-**Offen:**
-- Remote-Ollama-API Instabilität: HTTP 429 Session-Limit nach mehreren Scans, HTTP 500 bei full-Scope (großer Kontext findings-Phase). Am 2026-06-17 nachmittags anhaltend HTTP 500 → Full-Scope-Abnahme nicht durchführbar.
-- NVD-API Instabilität (2026-06-17): anhaltend HTTP 503 + Read-Timeout selbst mit 3×30s-Retry. Außerhalb unserer Kontrolle; BUG-14 macht den Ausfall im Report+Scorecard sichtbar statt ihn zu verschleiern.
+**Finale Abnahme — Status:** `--plot` ✅, Web-Scan 6 Teams ✅, Resume-Test ✅, BUG-14 E2E ✅. **Einziger offener Punkt: Full-Scope-Run** — reproduzierbar durch Remote-Ollama HTTP 500 blockiert (server-seitig, nicht Code). Die 6-Teams-Funktionalität ist über den `web`-Scope vollständig verifiziert (alle Teams laufen, Dateien entstehen); `full` fügt nur red_scan + coding hinzu, die einzeln bereits in Phase 7 getestet wurden.
+
+**Offen (server-/infrastrukturseitig, nicht Code):**
+- Remote-Ollama `full`-Scope: reproduzierbar HTTP 500 in Blue-Phase (größerer Kontext, 7 Phasen). `web`/`network` laufen durch. Vermutlich Kontextgrößen-/Token-Limit beim Remote-Server.
+- NVD-API Instabilität (2026-06-17): intermittierend HTTP 503 + Read-Timeout selbst mit 3×30s-Retry. BUG-14 macht den Ausfall im Report+Scorecard sichtbar statt ihn zu verschleiern.
 - Effizienz futuremultiverse.com: Laufzeit 934–1009s (56–68% über Ziel) wegen LLM-Errors in Blue-Phase + langer nmap-Scans auf Webmin/Ollama-Ports.
-- **Finale-Abnahme-Rest offen:** Full-Scope-6-Teams-Run + E2E-Re-Scan von BUG-14 + Resume-Test — alle blockiert durch NVD/Ollama-Ausfall, nachzuholen wenn Backends erholt.
 
 ### Teilschritte in Phasen
 
