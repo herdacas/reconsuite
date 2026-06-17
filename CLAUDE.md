@@ -57,9 +57,14 @@ CVE-2023-21839 (CVSS 7.5, aktiv ausgenutzt) wurde auf pentest-ground.com nicht g
 | BUG-12 | findings-Prompt ließ nvd_cpe_lookup-CVEs raus (nur searchsploit als "Bestätigung") | `tasks.py`: REGEL erweitert — alle 3 NVD-Tools zählen als Bestätigung | `fc5b25a` |
 | BUG-12b | `main.py`: `pd.cve_references[:5]` schnitt alle CVEs ab Position 6 ab | `main.py` Zeile 341: `[:5]` entfernt | `c422e71` |
 
+**Bugfixes für V-6 (2026-06-17, commits `0327478` + `972fe5a`):**
+- **Auto-Pin** (`0327478`): `_cve_trace_guardrail` pinnt NOTABLE_CVES deterministisch wenn sie im Tool-Output stehen aber nicht in `cve_references` — auch wenn `cve_references` leer ist.
+- **NVD-Tool-Guarantee** (`972fe5a`): wenn blue-Phase CPE_MAP-bekannte Services erkannt hat (weblogic, redis, openssh) aber findings kein nvd_cpe_lookup/nvd_cve_search aufruft, wird beim ersten Guardrail-Fehler abgelehnt mit explizitem Feedback.
+- **Simulation bestätigt** (trace `014035`): `cve_in_raw_outputs("CVE-2023-21839") = True` → Auto-Pin würde CVE-2023-21839 + CVE-2020-14882 + CVE-2019-2725 korrekt hinzufügen.
+
 **Offen:**
-- V-6 (CVE-2023-21839 im Report): `full`-Scope schlägt auf Remote-Ollama-API mit 500er fehl (findings-Phase zu viel Kontext). `network`-Scope findet WebLogic-CVEs im findings-Trace aber Agent überträgt nicht alle in `cve_references`. Noch nicht abgeschlossen.
-- Remote-Ollama-API instabil bei `full`-Scope (HTTP 500, "None or empty" — findings-Phase mit großem Kontext).
+- V-6 E2E-Verifikation: Remote-Ollama Rate-Limit (HTTP 429 Session-Limit) verhindert weiteren Scan heute. Logik verifiziert durch Simulation. Nächste Session: frischer Scan wenn Limit zurückgesetzt.
+- Remote-Ollama-API Instabilität: HTTP 429 Session-Limit nach mehreren Scans, HTTP 500 bei full-Scope (großer Kontext findings-Phase).
 
 ### Teilschritte in Phasen
 
