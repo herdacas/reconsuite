@@ -227,6 +227,8 @@ class AgentScanITCrew:
                 embedder=_knowledge_embedder,
                 cache=True,
                 verbose=False,
+                planning=True,
+                planning_llm=llm_planner,
                 task_callback=task_callback,
                 output_log_file=_log_file,
             )
@@ -239,6 +241,8 @@ class AgentScanITCrew:
                 embedder=_knowledge_embedder,
                 cache=True,
                 verbose=False,
+                planning=True,
+                planning_llm=llm_planner,
                 task_callback=task_callback,
                 output_log_file=_log_file,
             )

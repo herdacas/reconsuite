@@ -63,8 +63,27 @@ CVE-2023-21839 (CVSS 7.5, aktiv ausgenutzt) wurde auf pentest-ground.com nicht g
 - **Direkte NOTABLE_CVES-Injection** (`c4510e4`): Guardrail erkennt bekannte Services im blue-Output (z.B. `"oracle weblogic admin httpd"`) und holt NOTABLE_CVES direkt per `lookup_cve()` aus NVD — unabhängig davon ob Agent-Input an nvd_cpe_lookup korrekt war. Auch: `banner_to_cpe()` robuster gegen LLM-mangled Input (Whitespace-Normalisierung, Token-Fallback, exakter nmap-Banner-Alias).
 - **V-6 E2E-Bestätigt** (2026-06-17, network scan): CVE-2023-21839 (WebLogic CVSS 7.5, CISA KEV), 39 CVEs total, 20 Critical, Grade A 100/100.
 
+**Nachgelagerte Analyse (2026-06-17) — nach Phase-8-Abschluss:**
+
+**CrewAI-Update:** 1.14.6 → 1.14.7 (keine Breaking Changes, alle Imports stabil).
+Neu: `Agent.planning=True` (Agent-Level Reflection) — nicht aktiviert, da `think: False` via `extra_body` gesetzt ist.
+
+**Bugs gefixt im Zuge der Framework-Konformitätsprüfung:**
+
+| Bug | Beschreibung | Fix |
+|---|---|---|
+| `current_ids` NameError | `_cve_trace_guardrail`: `current_ids` in Direct-Injection-Loop (Zeile 185) undefiniert — im `try/except` still geschluckt → Direct-Injection nie aktiv | `current_ids` direkt nach `cves = list(...)` definiert (`tasks.py:147`) |
+| `exploitable_findings_count` fehlt | `RedOutput` hatte kein `exploitable_findings_count`-Feld → `flow.py:157` las immer 0 → `has_exploitable` nur via `red_cves` gesetzt, nie via Exploitability-Count | `model_validator` in `RedOutput`: `count = len(exploitable_findings)` deterministisch; `flow.py` mit Fallback auf `len(exploitable_findings)` für alte JSONs |
+| `planning=True` nicht aktiv | `llm_planner` in `agents.py` konfiguriert aber `planning=True`/`planning_llm=` fehlten in `crew_kwargs` → AgentPlanner wurde nie genutzt | `planning=True, planning_llm=llm_planner` in beiden `crew_kwargs`-Blöcken (sequential + hierarchical) |
+
+**Interoperabilitäts-Status (2026-06-17):**
+- Suite → externes Framework: ✅ `AgentScanITCrew.crew()` gibt echtes `crewai.Crew`-Objekt zurück — direkt in externe Flows einhängbar.
+- Externes Team → Suite: ✅ Alle Team-Flows sind `Flow[State]`-Subklassen mit stabilen `run_*()`-Entry-Points — direkt als `@listen`-Methoden integrierbar.
+- Einschränkung: Team 1 kommuniziert über `workflow_last.json` (Filesystem) statt State-Objekt — hemmt vollständige programmatische Integration von außen.
+
 **Offen:**
 - Remote-Ollama-API Instabilität: HTTP 429 Session-Limit nach mehreren Scans, HTTP 500 bei full-Scope (großer Kontext findings-Phase).
+- Regressions-Check futuremultiverse.com (OpenSSH CVEs nach CPE-Umstellung) steht noch aus.
 
 ### Teilschritte in Phasen
 

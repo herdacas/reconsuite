@@ -154,8 +154,9 @@ class ReconSuiteFlow(Flow[ScanState]):
             cves = tasks.get("findings", {}).get("cve_references", [])
             if cves:
                 self.state.has_cve_findings = True
-            exploitable = tasks.get("red", {}).get("exploitable_findings_count", 0)
-            red_cves    = tasks.get("red", {}).get("cve_references", [])
+            red_task    = tasks.get("red", {})
+            exploitable = red_task.get("exploitable_findings_count") or len(red_task.get("exploitable_findings", []))
+            red_cves    = red_task.get("cve_references", [])
             if exploitable > 0 or red_cves:
                 self.state.has_exploitable = True
         except Exception:

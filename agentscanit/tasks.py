@@ -22,7 +22,7 @@ Inputs für kickoff():
 import re as _re
 
 from crewai import Task
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import Any, List, Dict, Optional
 
 # ─── CVE-Format-Validator + Guardrails ────────────────────────────────────────
@@ -144,6 +144,7 @@ def _cve_trace_guardrail(output: Any) -> tuple[bool, Any]:
     if not pydantic_out:
         return True, raw
     cves = list(getattr(pydantic_out, "cve_references", None) or [])
+    current_ids = {c.upper() for c in cves}
 
     # 1 — Trace cross-check + NVD-Tool-Guarantee + Auto-Pin
     try:
@@ -410,6 +411,10 @@ class RedScanOutput(BaseModel):
 class RedOutput(BaseModel):
     confirmed_attack_surface: List[str] = Field(default_factory=list)
     exploitable_findings: List[str] = Field(default_factory=list)
+    exploitable_findings_count: int = Field(
+        default=0,
+        description="Derived from len(exploitable_findings) — do not set manually.",
+    )
     cve_references: List[str] = Field(
         default_factory=list,
         description="CVE IDs confirmed by searchsploit or DDG tool output in this task.",
@@ -419,6 +424,11 @@ class RedOutput(BaseModel):
     @classmethod
     def validate_cve_format(cls, v: List[str]) -> List[str]:
         return _filter_cve_format(v)
+
+    @model_validator(mode="after")
+    def derive_count(self) -> "RedOutput":
+        self.exploitable_findings_count = len(self.exploitable_findings)
+        return self
 
 
 class CodingOutput(BaseModel):
