@@ -255,7 +255,7 @@ class ReconSuiteFlow(Flow[ScanState]):
             )
             if not traces:
                 return
-            report = score_scan(traces[0])
+            report = score_scan(traces[0], nvd_results=self.state.nvd_results)
             print_scorecard(report)
         except Exception:
             pass  # Score ist optional — nie den Flow unterbrechen

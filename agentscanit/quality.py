@@ -171,7 +171,7 @@ def _score_tool_coverage(trace: dict, scope: str) -> DimensionScore:
     )
 
 
-def _score_cve_quality(trace: dict) -> DimensionScore:
+def _score_cve_quality(trace: dict, nvd_results: list | None = None) -> DimensionScore:
     notes = []
     # CVEs aus findings + red zusammenzählen
     phases = trace.get("phases", {})
@@ -216,24 +216,42 @@ def _score_cve_quality(trace: dict) -> DimensionScore:
     # NICHT: eine Wand aus NVD-503/timeout-Fehlern bedeutet, dass die CVEs versionslos
     # und unverifiziert sind. Wenn die NVD-Tool-Calls überwiegend Fehler lieferten,
     # wird die CVE-Qualität gedeckelt — ein 503-Ausfall darf nie Grade A ergeben.
+    #
+    # BUG-15 — Ausnahme: Wenn die CVEs im FINALEN NVD-Enrichment (interpret-Flow,
+    # nvd_results) echtes CVSS bekamen, sind sie verifiziert — auch wenn die
+    # findings-Phase-NVD-Calls scheiterten (NVD kam beim späteren lookup_cve durch).
+    # Nur dann deckeln, wenn die CVEs NIRGENDS NVD-bestätigt wurden.
     if cve_count > 0:
         nvd_calls = [
             c for p in phases.values() for c in p.get("tool_calls", [])
             if "nvd_cpe_lookup" in (c.get("tool_name", "") or "")
             or "nvd_cve_search" in (c.get("tool_name", "") or "")
         ]
-        if nvd_calls:
+        # Final via interpret-Flow NVD-bestätigte CVE-IDs (echtes CVSS, kein Fehler)
+        confirmed_nvd_ids = {
+            (r.get("id") or "").upper()
+            for r in (nvd_results or [])
+            if "error" not in r and r.get("cvss_score") is not None
+        }
+        all_cve_ids = {c.upper() for c in all_cves}
+        nvd_confirmed = all_cve_ids & confirmed_nvd_ids
+        if nvd_calls and not nvd_confirmed:
             _nvd_err = ("Keine CVEs", "HTTP 503", "HTTP 502", "HTTP 504",
                         "HTTP 429", "timed out", "timeout", "Read timed out")
             failed = [c for c in nvd_calls
                       if any(e in (c.get("raw_output", "") or "") for e in _nvd_err)]
             if failed and len(failed) == len(nvd_calls):
-                # ALLE NVD-Lookups gescheitert → CVEs stammen aus unverifiziertem Fallback
+                # ALLE NVD-Lookups gescheitert UND keine finale NVD-Bestätigung
+                # → CVEs stammen aus unverifiziertem Fallback
                 notes.append(
                     f"⚠️ NVD nicht erreichbar ({len(failed)}/{len(nvd_calls)} Lookups gescheitert) "
                     f"— CVEs unverifiziert (versionsloser searchsploit-Fallback)"
                 )
                 score = min(score, 40.0)
+        elif nvd_confirmed:
+            notes.append(
+                f"{len(nvd_confirmed)} CVE(s) final NVD-bestätigt (echtes CVSS)"
+            )
 
     # Bonus: nvd_cpe_lookup verwendet (CPE-first Architektur) — nur wenn es echte
     # Daten lieferte (nicht bei reinen Fehler-Antworten).
@@ -330,8 +348,13 @@ def _score_efficiency(trace: dict) -> DimensionScore:
     )
 
 
-def score_scan(trace_path: str) -> ScanQualityReport:
-    """Berechnet den Quality-Score für einen Scan anhand seiner trace_*.json Datei."""
+def score_scan(trace_path: str, nvd_results: list | None = None) -> ScanQualityReport:
+    """Berechnet den Quality-Score für einen Scan anhand seiner trace_*.json Datei.
+
+    nvd_results: optionale final NVD-bestätigte CVEs (aus dem interpret-Flow). Wird
+    genutzt damit CVE-Qualität (BUG-15) nicht fälschlich deckelt wenn die findings-
+    Phase-NVD-Calls scheiterten aber das spätere Enrichment die CVEs bestätigte.
+    """
     with open(trace_path) as f:
         trace = json.load(f)
 
@@ -341,7 +364,7 @@ def score_scan(trace_path: str) -> ScanQualityReport:
     dims = [
         _score_phase_completeness(trace, scope),
         _score_tool_coverage(trace, scope),
-        _score_cve_quality(trace),
+        _score_cve_quality(trace, nvd_results),
         _score_error_rate(trace),
         _score_efficiency(trace),
     ]
