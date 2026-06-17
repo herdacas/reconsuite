@@ -131,6 +131,10 @@ def _cve_trace_guardrail(output: Any) -> tuple[bool, Any]:
     Bei Failure bekommt der Agent die halluzinierten IDs explizit zurückgemeldet
     und kann die Task korrigiert wiederholen (guardrail_max_retries=2).
 
+    NVD-Tool-Guarantee: Wenn CPE_MAP-bekannte Services im blue-Trace erkannt wurden
+    aber kein nvd_cpe_lookup/nvd_cve_search in der findings-Phase aufgerufen wurde,
+    wird abgelehnt (ERSTER Fehler) und Agent aufgefordert die NVD-Tools zu nutzen.
+
     Auto-Pin: NOTABLE_CVES die im Tool-Output dieser Session erscheinen aber nicht
     in cve_references eingetragen wurden, werden deterministisch hinzugefügt —
     ohne Agent-Retry (Anreicherung, keine Ablehnung).
@@ -139,14 +143,13 @@ def _cve_trace_guardrail(output: Any) -> tuple[bool, Any]:
     raw = getattr(output, "raw", output) if not isinstance(output, str) else output
     if not pydantic_out:
         return True, raw
-    cves = getattr(pydantic_out, "cve_references", None)
-    if not cves:
-        return True, raw
+    cves = list(getattr(pydantic_out, "cve_references", None) or [])
 
-    # 1 — Trace cross-check
+    # 1 — Trace cross-check + NVD-Tool-Guarantee + Auto-Pin
     try:
         from tools.trace import run_trace
         if run_trace.is_active:
+            # Halluzinations-Check: CVEs die nicht im Trace-Output erscheinen
             confirmed    = [c for c in cves if run_trace.cve_in_raw_outputs(c)]
             hallucinated = [c for c in cves if c not in confirmed]
             if hallucinated:
@@ -156,7 +159,40 @@ def _cve_trace_guardrail(output: Any) -> tuple[bool, Any]:
                     f"Tool-bestätigt: {confirmed if confirmed else 'keine'}"
                 )
 
-            # Auto-Pin: NOTABLE_CVES im Trace-Output → in cve_references aufnehmen
+            # NVD-Tool-Guarantee: Wenn blue CPE_MAP-bekannte Services gefunden hat
+            # aber findings kein nvd_cpe_lookup/nvd_cve_search aufgerufen hat.
+            try:
+                from tools.cpe_map import CPE_MAP
+            except ImportError:
+                try:
+                    from agentscanit.tools.cpe_map import CPE_MAP
+                except ImportError:
+                    CPE_MAP = {}
+
+            _nvd_tools = {"nvd_cpe_lookup", "nvd_cve_search", "searchsploit"}
+            _findings_tools = {c.get("tool_name", "") for c in run_trace._pending}
+            _nvd_called = bool(_findings_tools & _nvd_tools)
+
+            if not _nvd_called and CPE_MAP:
+                # Prüfe ob blue-Phase bekannte Services erkannt hat
+                blue_outputs = " ".join(
+                    c.get("raw_output", "")
+                    for p, pd in run_trace._phases.items()
+                    if p in ("blue", "red_scan")
+                    for c in pd.get("tool_calls", [])
+                ).lower()
+                known_services = [kw for kw in CPE_MAP if kw in blue_outputs]
+                if known_services and run_trace._guardrail_reject_count < 1:
+                    run_trace._guardrail_reject_count += 1
+                    return False, (
+                        f"PFLICHT: Für erkannte Services {known_services[:5]} MÜSSEN "
+                        f"CVE-Lookups durchgeführt werden. Rufe jetzt auf: "
+                        f"nvd_cpe_lookup oder nvd_cve_search für jeden Service. "
+                        f"searchsploit als Ergänzung. Ohne NVD-Lookup ist diese Task unvollständig."
+                    )
+
+            # Auto-Pin: NOTABLE_CVES die im Trace stehen aber nicht in cve_references
+            # Gilt auch wenn cve_references leer ist (Agent hat Tool-Output ignoriert).
             try:
                 from tools.cpe_map import NOTABLE_CVES
             except ImportError:
