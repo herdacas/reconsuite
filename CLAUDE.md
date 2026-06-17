@@ -44,7 +44,7 @@ CVE-2023-21839 (CVSS 7.5, aktiv ausgenutzt) wurde auf pentest-ground.com nicht g
 | V-3: `--plot` erzeugt 3 Dateien mit Timestamp | ✅ Bestätigt | `3a91884` | HTML/CSS/JS in logs/ mit `_<ts>`-Suffix |
 | V-4: Ports 4280/5013/6379/7001 gefunden | ✅ Bestätigt | `a7ec771` | BUG-10 gefixt: `-p 1-65535` statt top-1000 |
 | V-5: CVE-2022-0543 (Redis) im Final Report | ✅ Bestätigt | `c422e71`+`fc5b25a` | BUG-11+12b gefixt: Notable-Pinning + [:5]-Limit entfernt |
-| V-6: CVE-2023-21839 (WebLogic) im Final Report | ⏳ Offen | — | nvd_cpe_lookup ruft WebLogic auf, CVE im Tool-Output, aber Agent trägt sie nicht in `cve_references` ein |
+| V-6: CVE-2023-21839 (WebLogic) im Final Report | ✅ Bestätigt | `0327478`+`972fe5a`+`c4510e4` | Direkte NOTABLE_CVES-Injection aus blue-Output — 39 CVEs, 20 Critical, Grade A |
 
 **Bugs gefixt in Phase 8 (2026-06-16/17):**
 
@@ -57,13 +57,13 @@ CVE-2023-21839 (CVSS 7.5, aktiv ausgenutzt) wurde auf pentest-ground.com nicht g
 | BUG-12 | findings-Prompt ließ nvd_cpe_lookup-CVEs raus (nur searchsploit als "Bestätigung") | `tasks.py`: REGEL erweitert — alle 3 NVD-Tools zählen als Bestätigung | `fc5b25a` |
 | BUG-12b | `main.py`: `pd.cve_references[:5]` schnitt alle CVEs ab Position 6 ab | `main.py` Zeile 341: `[:5]` entfernt | `c422e71` |
 
-**Bugfixes für V-6 (2026-06-17, commits `0327478` + `972fe5a`):**
+**Bugfixes für V-6 (2026-06-17, commits `0327478` + `972fe5a` + `c4510e4`):**
 - **Auto-Pin** (`0327478`): `_cve_trace_guardrail` pinnt NOTABLE_CVES deterministisch wenn sie im Tool-Output stehen aber nicht in `cve_references` — auch wenn `cve_references` leer ist.
 - **NVD-Tool-Guarantee** (`972fe5a`): wenn blue-Phase CPE_MAP-bekannte Services erkannt hat (weblogic, redis, openssh) aber findings kein nvd_cpe_lookup/nvd_cve_search aufruft, wird beim ersten Guardrail-Fehler abgelehnt mit explizitem Feedback.
-- **Simulation bestätigt** (trace `014035`): `cve_in_raw_outputs("CVE-2023-21839") = True` → Auto-Pin würde CVE-2023-21839 + CVE-2020-14882 + CVE-2019-2725 korrekt hinzufügen.
+- **Direkte NOTABLE_CVES-Injection** (`c4510e4`): Guardrail erkennt bekannte Services im blue-Output (z.B. `"oracle weblogic admin httpd"`) und holt NOTABLE_CVES direkt per `lookup_cve()` aus NVD — unabhängig davon ob Agent-Input an nvd_cpe_lookup korrekt war. Auch: `banner_to_cpe()` robuster gegen LLM-mangled Input (Whitespace-Normalisierung, Token-Fallback, exakter nmap-Banner-Alias).
+- **V-6 E2E-Bestätigt** (2026-06-17, network scan): CVE-2023-21839 (WebLogic CVSS 7.5, CISA KEV), 39 CVEs total, 20 Critical, Grade A 100/100.
 
 **Offen:**
-- V-6 E2E-Verifikation: Remote-Ollama Rate-Limit (HTTP 429 Session-Limit) verhindert weiteren Scan heute. Logik verifiziert durch Simulation. Nächste Session: frischer Scan wenn Limit zurückgesetzt.
 - Remote-Ollama-API Instabilität: HTTP 429 Session-Limit nach mehreren Scans, HTTP 500 bei full-Scope (großer Kontext findings-Phase).
 
 ### Teilschritte in Phasen
