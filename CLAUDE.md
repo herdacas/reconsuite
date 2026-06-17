@@ -26,8 +26,8 @@ CVE-2023-21839 (CVSS 7.5, aktiv ausgenutzt) wurde auf pentest-ground.com nicht g
 - `_scope_coverage_guardrail` auf blue-Task: Kern-Tools-Garantie pro Scope
 - findings-Task: nvd_cpe_lookup als Primär-Schritt, nvd_cve_search als Fallback
 
-**Tool-Status (Stand 2026-06-14, nach Phase 9.1):**
-- ✅ 18 Tools aktiv: nmap, httpx, whatweb, nikto, nuclei, sslscan, dig, whois, dnsrecon, subfinder, dnsx, katana, searchsploit, ddg_search, curl, ping, nvd_cve_search, **nvd_cpe_lookup** (neu)
+**Tool-Status (Stand 2026-06-17, nach Phase 9 E2E-Verifikation):**
+- ✅ 18 Tools aktiv: nmap, httpx, whatweb, nikto, nuclei, sslscan, dig, whois, dnsrecon, subfinder, dnsx, katana, searchsploit, ddg_search, curl, ping, nvd_cve_search, **nvd_cpe_lookup**
 - ❌ 3 nicht installiert (testssl.sh, enum4linux-ng, theHarvester) — Klassen bleiben, aus Agent-Listen entfernt
 - 🗑 9 aus Tool-Listen entfernt: ffuf, gau, waybackurls, amass, assetfinder, sublist3r, naabu, testssl, enum4linux (Klassen bleiben für Reversibilität)
 
