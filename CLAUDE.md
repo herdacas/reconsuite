@@ -106,7 +106,8 @@ Fix: `cpe_map.py` — `("openbsd","openssh"): ["CVE-2023-38408"]` + `nvd.py` —
 - **14a** (`nvd.py`): zentraler `_nvd_get()`-Helper — Retry/Backoff bei 503/502/504/429 + Read-Timeout, Timeout 15/20→30s. Alle drei NVD-Funktionen nutzen ihn.
 - **14b** (`reporting/reporting_flow.py`): NVD-Transient-Fehler werden als „⚠️ UNBESTÄTIGT — NVD nicht erreichbar" statt „Not found in NVD" dargestellt — explizit als spekulativ markiert.
 - **14c** (`quality.py`): CVE-Qualität deckelt auf 40/100 wenn ALLE NVD-Lookups scheiterten. CPE-first-Bonus nur bei echten CVE-Daten. Verifiziert: alter zero-Trace 94.6 A → 82.6 B; gesunde Scans (pentest-ground/futuremultiverse) bleiben 100/A.
-- **E2E-Re-Scan steht aus** — NVD-API + Remote-Ollama waren am 2026-06-17 nachmittags beide nicht erreichbar.
+- **E2E-Re-Scan ✅ bestätigt** (2026-06-17 19:08, zero.webappsecurity.com web): NVD kam intermittierend durch (`nvd_cve_search Apache HTTP Server 2.2.6` → 7 echte versions-bezogene CVEs; 2/3 andere Calls 503/timeout). Ergebnis: Report listet **6 bestätigte CVEs mit echtem CVSS** + **8 explizit als „⚠️ UNBESTÄTIGT — NVD nicht erreichbar" markiert** (14b ✅). Scorecard NICHT gedeckelt (Grade A 91.4 berechtigt, da echte NVD-Treffer vorhanden → `len(failed)≠len(nvd_calls)`, 14c ✅). Timeouts in raw_output zeigen `read timeout=30` (14a ✅). Vorher (174609, NVD komplett tot): 0 bestätigte CVEs, 7 versionslose searchsploit-CVEs getarnt als Grade A 94.6.
+- **Wichtig:** `gpt-oss:120b` ist ein Reasoning-Modell — Health-Checks MÜSSEN `extra_body={"think": False}` + ausreichend `max_tokens` (≥50) setzen, sonst landet die Antwort im verworfenen thinking-Kanal und wirkt fälschlich „leer" (führte zu Fehldiagnose „Ollama tot"). Die Suite setzt beides korrekt.
 
 **Offen:**
 - Remote-Ollama-API Instabilität: HTTP 429 Session-Limit nach mehreren Scans, HTTP 500 bei full-Scope (großer Kontext findings-Phase). Am 2026-06-17 nachmittags anhaltend HTTP 500 → Full-Scope-Abnahme nicht durchführbar.
