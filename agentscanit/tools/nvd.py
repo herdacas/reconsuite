@@ -35,6 +35,46 @@ def _get_session() -> Session:
     return _SESSION
 
 
+# NVD is frequently slow/overloaded (503 + multi-second latency). A single
+# 15-20s timeout produced empty CVE results, which then forced findings onto a
+# versionless searchsploit keyword fallback (BUG-14). Retry transient failures
+# (503/502/504/429 + read timeouts) with backoff before giving up.
+_NVD_TIMEOUT       = 30
+_NVD_MAX_RETRIES   = 3
+_NVD_RETRY_STATUS  = {502, 503, 504, 429}
+
+
+def _nvd_get(params: dict, *, timeout: int = _NVD_TIMEOUT,
+             api_key: Optional[str] = None) -> requests.Response:
+    """GET against the NVD API with retry/backoff on transient failures.
+
+    Raises the last exception (or HTTPError) if all attempts fail, so callers
+    keep their existing requests.HTTPError / Exception handling.
+    """
+    hdrs = {"apiKey": api_key} if api_key else _headers()
+    last_exc: Optional[Exception] = None
+    for attempt in range(_NVD_MAX_RETRIES):
+        try:
+            resp = _get_session().get(
+                NVD_API_URL, params=params, headers=hdrs, timeout=timeout,
+            )
+            if resp.status_code in _NVD_RETRY_STATUS and attempt < _NVD_MAX_RETRIES - 1:
+                time.sleep(min(4 * (attempt + 1), 12))
+                continue
+            return resp
+        except (requests.Timeout, requests.ConnectionError) as e:
+            last_exc = e
+            if attempt < _NVD_MAX_RETRIES - 1:
+                time.sleep(min(4 * (attempt + 1), 12))
+                continue
+            raise
+    # Exhausted retries on retryable status codes — return the last response so
+    # raise_for_status() surfaces the real HTTP error to the caller.
+    if last_exc is not None:
+        raise last_exc
+    return resp
+
+
 def _api_key() -> Optional[str]:
     return os.environ.get("NVD_API_KEY") or None
 
@@ -95,14 +135,8 @@ def lookup_cve(cve_id: str, api_key: Optional[str] = None) -> dict:
 
     On error: {"id": ..., "error": "<reason>"}
     """
-    hdrs = {"apiKey": api_key} if api_key else _headers()
     try:
-        resp = _get_session().get(
-            NVD_API_URL,
-            params={"cveId": cve_id.strip()},
-            headers=hdrs,
-            timeout=15,
-        )
+        resp = _nvd_get({"cveId": cve_id.strip()}, api_key=api_key)
         resp.raise_for_status()
         vulns = resp.json().get("vulnerabilities", [])
     except requests.HTTPError as e:
@@ -146,12 +180,7 @@ def cpe_search_nvd(vendor: str, product: str, version: str = "", max_results: in
 
     try:
         # Step 1: get total count
-        r1 = _get_session().get(
-            NVD_API_URL,
-            params={"virtualMatchString": cpe_string, "resultsPerPage": 1},
-            headers=_headers(),
-            timeout=20,
-        )
+        r1 = _nvd_get({"virtualMatchString": cpe_string, "resultsPerPage": 1})
         r1.raise_for_status()
         total = r1.json().get("totalResults", 0)
         if total == 0:
@@ -164,16 +193,11 @@ def cpe_search_nvd(vendor: str, product: str, version: str = "", max_results: in
         # entries are present (e.g. Oracle WebLogic has 10+ CVSS-9.8 in recent years).
         fetch_count = min(100, total)
         start_index = max(0, total - fetch_count)
-        r2 = _get_session().get(
-            NVD_API_URL,
-            params={
-                "virtualMatchString": cpe_string,
-                "resultsPerPage": fetch_count,
-                "startIndex": start_index,
-            },
-            headers=_headers(),
-            timeout=30,
-        )
+        r2 = _nvd_get({
+            "virtualMatchString": cpe_string,
+            "resultsPerPage": fetch_count,
+            "startIndex": start_index,
+        })
         r2.raise_for_status()
         vulns = r2.json().get("vulnerabilities", [])
 
@@ -227,12 +251,7 @@ def search_nvd(keyword: str, max_results: int = 5) -> list[dict]:
     """
     fetch_count = min(max(max_results * 4, 40), 50)
     try:
-        resp = _get_session().get(
-            NVD_API_URL,
-            params={"keywordSearch": keyword, "resultsPerPage": fetch_count},
-            headers=_headers(),
-            timeout=20,
-        )
+        resp = _nvd_get({"keywordSearch": keyword, "resultsPerPage": fetch_count})
         resp.raise_for_status()
         vulns = resp.json().get("vulnerabilities", [])
     except requests.HTTPError as e:

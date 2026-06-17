@@ -212,9 +212,36 @@ def _score_cve_quality(trace: dict) -> DimensionScore:
         # Score: bestätigte CVEs zählen, Halluzinationen bestrafen
         score = min(100, len(confirmed) * 15 + (ratio * 30))
 
-    # Bonus: nvd_cpe_lookup verwendet (CPE-first Architektur)
-    if any("nvd_cpe_lookup" in (c.get("tool_name","") or "") or "nvd_cpe" in (c.get("tool_bin","") or "")
-           for p in phases.values() for c in p.get("tool_calls",[])):
+    # BUG-14c — NVD-Bestätigungsrate. "Tool-bestätigt" via searchsploit-Keyword reicht
+    # NICHT: eine Wand aus NVD-503/timeout-Fehlern bedeutet, dass die CVEs versionslos
+    # und unverifiziert sind. Wenn die NVD-Tool-Calls überwiegend Fehler lieferten,
+    # wird die CVE-Qualität gedeckelt — ein 503-Ausfall darf nie Grade A ergeben.
+    if cve_count > 0:
+        nvd_calls = [
+            c for p in phases.values() for c in p.get("tool_calls", [])
+            if "nvd_cpe_lookup" in (c.get("tool_name", "") or "")
+            or "nvd_cve_search" in (c.get("tool_name", "") or "")
+        ]
+        if nvd_calls:
+            _nvd_err = ("Keine CVEs", "HTTP 503", "HTTP 502", "HTTP 504",
+                        "HTTP 429", "timed out", "timeout", "Read timed out")
+            failed = [c for c in nvd_calls
+                      if any(e in (c.get("raw_output", "") or "") for e in _nvd_err)]
+            if failed and len(failed) == len(nvd_calls):
+                # ALLE NVD-Lookups gescheitert → CVEs stammen aus unverifiziertem Fallback
+                notes.append(
+                    f"⚠️ NVD nicht erreichbar ({len(failed)}/{len(nvd_calls)} Lookups gescheitert) "
+                    f"— CVEs unverifiziert (versionsloser searchsploit-Fallback)"
+                )
+                score = min(score, 40.0)
+
+    # Bonus: nvd_cpe_lookup verwendet (CPE-first Architektur) — nur wenn es echte
+    # Daten lieferte (nicht bei reinen Fehler-Antworten).
+    _cpe_calls = [c for p in phases.values() for c in p.get("tool_calls", [])
+                  if "nvd_cpe_lookup" in (c.get("tool_name", "") or "")]
+    if _cpe_calls and any(
+        "CVE-" in (c.get("raw_output", "") or "") for c in _cpe_calls
+    ):
         notes.append("nvd_cpe_lookup verwendet (CPE-first)")
         score = min(100, score + 10)
 

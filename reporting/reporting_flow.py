@@ -102,9 +102,29 @@ class ReportingFlow(Flow[ReportingState]):
                 nvd_lines.append("")
 
         if errors:
-            nvd_lines += ["**Not found in NVD:**"] + [
-                f"- {r['id']} — {r['error']}" for r in errors
-            ] + [""]
+            # Unterscheide NVD-Unerreichbarkeit (503/timeout) von echtem "existiert nicht".
+            # Transiente Fehler bedeuten NICHT, dass die CVE valide ist — sie ist nur
+            # UNBESTÄTIGT. Solche CVEs stammen oft aus versionslosen searchsploit-
+            # Keyword-Treffern (z.B. "Apache Tomcat" ohne Version) und dürfen nicht als
+            # confirmed findings gelesen werden (BUG-14).
+            _transient = ("HTTP 503", "HTTP 502", "HTTP 504", "HTTP 429",
+                          "timed out", "timeout", "ConnectionError", "Connection")
+            unconfirmed = [r for r in errors
+                           if any(t in str(r.get("error", "")) for t in _transient)]
+            not_in_nvd  = [r for r in errors if r not in unconfirmed]
+
+            if unconfirmed:
+                nvd_lines += [
+                    "**⚠️ UNBESTÄTIGT — NVD nicht erreichbar (keine Versions-/CVSS-Bestätigung):**",
+                    "*Diese CVE-IDs stammen aus Tool-Outputs (z.B. searchsploit-Keyword-Suche), "
+                    "konnten aber nicht gegen NVD verifiziert werden. Ohne Versions-Match sind sie "
+                    "spekulativ und KEINE bestätigten Findings.*",
+                    "",
+                ] + [f"- {r['id']} — {r['error']}" for r in unconfirmed] + [""]
+            if not_in_nvd:
+                nvd_lines += ["**Not found in NVD:**"] + [
+                    f"- {r['id']} — {r['error']}" for r in not_in_nvd
+                ] + [""]
 
         # ── Zusammenführen ────────────────────────────────────────────────────
         header = (
