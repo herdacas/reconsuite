@@ -186,15 +186,26 @@ def _cve_trace_guardrail(output: Any) -> tuple[bool, Any]:
                         if cve_id not in current_ids and cve_id not in notable_missing:
                             notable_missing.append(cve_id)
 
-            # Direkt via NVD-API pinnen (deterministisch, kein Agent-Retry nötig)
+            # Direkt pinnen (deterministisch, kein Agent-Retry nötig).
+            # BUG-16: NOTABLE_CVES sind hardcoded bekannte CVEs für erkannte Services.
+            # Das Pinning darf NICHT von NVD-Erreichbarkeit abhängen — bei 503/timeout
+            # wird trotzdem gepinnt (das Enrichment markiert sie dann via BUG-14b als
+            # UNBESTÄTIGT). Nur ein eindeutiges "existiert nicht in NVD" verwirft die ID.
             if notable_missing:
                 direct_pinned: list[str] = []
+                _nvd_transient = ("HTTP 503", "HTTP 502", "HTTP 504", "HTTP 429",
+                                  "timed out", "timeout", "Read timed out",
+                                  "ConnectionError", "Connection")
                 try:
                     from tools.nvd import lookup_cve
                     for cve_id in notable_missing:
                         result = lookup_cve(cve_id)
-                        if "error" not in result:
-                            direct_pinned.append(cve_id)
+                        err = result.get("error", "") if isinstance(result, dict) else ""
+                        if not err:
+                            direct_pinned.append(cve_id)          # NVD-bestätigt
+                        elif any(t in err for t in _nvd_transient):
+                            direct_pinned.append(cve_id)          # NVD tot → trotzdem pinnen
+                        # else: "not found in NVD" → CVE existiert wirklich nicht, verwerfen
                 except Exception:
                     direct_pinned = notable_missing  # fallback: vertraue NOTABLE_CVES
 
