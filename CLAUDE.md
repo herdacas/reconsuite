@@ -9,6 +9,12 @@ Wir arbeiten die Roadmap (`roadmap.md`) phasenweise ab. Im Ablauf wird entschied
 
 **WICHTIG — Keine pauschalen Antworten. Faktenbasierte Responses auf jede Frage.**
 
+### Aktueller Stand (2026-06-18)
+- **Aktives Remote-Worker-Modell: `qwen3-coder:480b`** (ollama.com, Non-Reasoning, agentic Tool-Calling). Ersetzt `gpt-oss:120b` wegen Leerantworten bei tiefen FC-Ketten — siehe BUG-19. Planner läuft weiterhin lokal (qwen2.5:7b).
+- **`full`-Scope läuft stabil durch** (alle 7 Phasen, 6 Teams, 0 Retries) — nach BUG-18 (Planner bei >5 Tasks aus) + BUG-19 (Modellwechsel). Verifiziert demo.testfire.net Grade A 99.8.
+- **Diagnose-Werkzeug:** `RECON_LLM_DEBUG=1 python3 main.py …` schreibt `logs/llm_debug_<pid>.jsonl` (jeder LLM-Call: Agent, Prompt-Größe, Status, Leerantworten). Env-gated, null Overhead ohne die Var.
+- Phasen 1–9 + Finale Abnahme abgeschlossen; offene Punkte siehe „Offen"-Block weiter unten.
+
 ### Architektur-Entscheidung (2026-06-14) — Phase 9
 
 Nach systematischer Analyse (24 Scans, pentest-ground.com-Auswertung) wurde erkannt:
@@ -108,7 +114,7 @@ Fix: `cpe_map.py` — `("openbsd","openssh"): ["CVE-2023-38408"]` + `nvd.py` —
 - **14b** (`reporting/reporting_flow.py`): NVD-Transient-Fehler werden als „⚠️ UNBESTÄTIGT — NVD nicht erreichbar" statt „Not found in NVD" dargestellt — explizit als spekulativ markiert.
 - **14c** (`quality.py`): CVE-Qualität deckelt auf 40/100 wenn ALLE NVD-Lookups scheiterten. CPE-first-Bonus nur bei echten CVE-Daten. Verifiziert: alter zero-Trace 94.6 A → 82.6 B; gesunde Scans (pentest-ground/futuremultiverse) bleiben 100/A.
 - **E2E-Re-Scan ✅ bestätigt** (2026-06-17 19:08, zero.webappsecurity.com web): NVD kam intermittierend durch (`nvd_cve_search Apache HTTP Server 2.2.6` → 7 echte versions-bezogene CVEs; 2/3 andere Calls 503/timeout). Ergebnis: Report listet **6 bestätigte CVEs mit echtem CVSS** + **8 explizit als „⚠️ UNBESTÄTIGT — NVD nicht erreichbar" markiert** (14b ✅). Scorecard NICHT gedeckelt (Grade A 91.4 berechtigt, da echte NVD-Treffer vorhanden → `len(failed)≠len(nvd_calls)`, 14c ✅). Timeouts in raw_output zeigen `read timeout=30` (14a ✅). Vorher (174609, NVD komplett tot): 0 bestätigte CVEs, 7 versionslose searchsploit-CVEs getarnt als Grade A 94.6.
-- **Wichtig:** `gpt-oss:120b` ist ein Reasoning-Modell — Health-Checks MÜSSEN `extra_body={"think": False}` + ausreichend `max_tokens` (≥50) setzen, sonst landet die Antwort im verworfenen thinking-Kanal und wirkt fälschlich „leer" (führte zu Fehldiagnose „Ollama tot"). Die Suite setzt beides korrekt.
+- **Wichtig (historisch, gpt-oss):** `gpt-oss:120b` ist ein Reasoning-Modell — Health-Checks MÜSSEN `extra_body={"think": False}` + ausreichend `max_tokens` (≥50) setzen, sonst landet die Antwort im verworfenen thinking-Kanal und wirkt fälschlich „leer" (führte zu Fehldiagnose „Ollama tot"). Die Suite setzt beides korrekt. **Seit BUG-19 ist das aktive Worker-Modell `qwen3-coder:480b` (Non-Reasoning) — dieses Problem entfällt dort.**
 
 **Finale Abnahme — Status:** `--plot` ✅, Web-Scan 6 Teams ✅, Resume-Test ✅, BUG-14 E2E ✅. **Einziger offener Punkt: Full-Scope-Run** — reproduzierbar durch Remote-Ollama HTTP 500 blockiert (server-seitig, nicht Code). Die 6-Teams-Funktionalität ist über den `web`-Scope vollständig verifiziert (alle Teams laufen, Dateien entstehen); `full` fügt nur red_scan + coding hinzu, die einzeln bereits in Phase 7 getestet wurden.
 
