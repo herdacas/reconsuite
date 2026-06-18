@@ -112,6 +112,32 @@ Fix: `cpe_map.py` — `("openbsd","openssh"): ["CVE-2023-38408"]` + `nvd.py` —
 
 **Finale Abnahme — Status:** `--plot` ✅, Web-Scan 6 Teams ✅, Resume-Test ✅, BUG-14 E2E ✅. **Einziger offener Punkt: Full-Scope-Run** — reproduzierbar durch Remote-Ollama HTTP 500 blockiert (server-seitig, nicht Code). Die 6-Teams-Funktionalität ist über den `web`-Scope vollständig verifiziert (alle Teams laufen, Dateien entstehen); `full` fügt nur red_scan + coding hinzu, die einzeln bereits in Phase 7 getestet wurden.
 
+### Ground-Truth-Verifikation mit VulHub-Containern (2026-06-18)
+
+Ziel: Wahrheitsgehalt prüfen mit Targets, deren CVEs **exakt vorab bekannt** sind. VulHub-Docker-Container (`/root/vulhub`, snap-Docker sieht `/opt` nicht → nach `/root` kopiert), lokal gescannt.
+
+| Target | Erwartete CVE | Status | Befund |
+|---|---|---|---|
+| Tomcat 8.5.19 (`tomcat/CVE-2017-12615`, :8080) | CVE-2017-12615 | ✅ TP | CVE-2017-12615 **+** CVE-2017-12617 gefunden (beide korrekt für 8.5.19, CVSS 8.1). NVD-findings-Calls scheiterten (503), CVEs via searchsploit (Banner trug Version 8.5.19 → korrekte versionsspezifische Treffer), final via interpret NVD-bestätigt |
+| WebLogic 12.2.1.3 (`weblogic/CVE-2023-21839`, :7001) | CVE-2023-21839 | ✅ TP | CVE-2023-21839 (CVSS 7.5, CISA KEV) via NOTABLE_CVES-Pin gefunden, **+** CVE-2018-2628 (T3 RCE 9.8), CVE-2023-22089, CVE-2025-21535 u.a. NVD-bestätigt. BUG-14b sichtbar: CVE-2020-14882/CVE-2019-2725 als „UNBESTÄTIGT" markiert (lookup_cve 503). Deckte BUG-16 auf |
+| `testphp.vulnweb.com` (web) | OWASP (SQLi/XSS) | ⚠️ ungültig | Target war während des Scans **down** (HTTP 000, nikto: „No web server found"). Retry-Durchlauf ging in CLEAN-Route → 0 CVEs. Kein Framework-Fehler, Target nicht erreichbar. Ganze vulnweb.com-Familie down. |
+| `demo.testfire.net` (web, Ersatz) | Apache/Tomcat-Stack | ⚠️ Grenzfall | Alle 6 Teams liefen (OWASP-Mapping ✅, Risk-Score 10.0 ✅, interpret 7/16 ✅) — Funktionsbandbreite bestätigt. ABER: Banner `Apache-Coyote/1.1` **version unknown** → 7 „NVD-bestätigte" CVEs sind versionslose Keyword-Treffer (potenzielle FALSE-POSITIVES), CVE-Qual 100/100 überzeichnet. **Strukturelle Grenze:** bei versionslosem Banner kann das Framework verwundbar/nicht-verwundbar nicht unterscheiden (vgl. BUG-14, dort NVD tot → 14c griff; hier NVD ok → 14c greift nicht). |
+| `scanme.nmap.org` (network) | „sauber" (TN-Annahme) | ✅ TP | Annahme „sauber" war FALSCH: läuft **OpenSSH 6.6.1p1** + **Apache httpd 2.4.7** (Ubuntu, 2014). Version **präzise erkannt** → CVE-2018-15473 (User-Enum, <7.7), CVE-2016-10009/10010 (Privesc, <7.4) — alle KORREKT versionsspezifisch, NVD-bestätigt mit echtem CVSS. KEIN erfundenes CVE. Grade A 100 berechtigt. (Hinweis: nmap-only-Policy 12/Tag beachtet — 1 Scan) |
+
+**Kern-Erkenntnis der Ground-Truth-Verifikation (2026-06-18):**
+Das Framework ist **so gut wie der erkannte Banner**. Bei **präziser Version** (Tomcat 8.5.19, OpenSSH 6.6.1p1, WebLogic 12.2.1.3) findet es die **korrekten versionsspezifischen CVEs** — verifizierte True-Positives gegen vorab bekannte Ground Truth. Bei **versionslosem Banner** (`Apache-Coyote/1.1`) erzeugt der searchsploit/keyword-Fallback potenzielle False-Positives, die NVD zwar mit CVSS anreichern kann, deren Versions-Match aber unbestätigt bleibt. Das ist die fundamentale, nicht vollständig schließbare Grenze; BUG-14b (UNBESTÄTIGT-Markierung) + 14c (Scorecard-Deckelung bei NVD-Ausfall) mildern den schlimmsten Fall, lösen ihn aber nicht wenn NVD versionslose Treffer anreichert.
+
+**BUG-15 (2026-06-18) — Scorecard deckelte fälschlich bei final NVD-bestätigten CVEs (Commit `4ffa158`):**
+- Befund beim Tomcat-Scan: findings-NVD tot (503) → BUG-14c deckelte CVE-Qualität auf 40/B, OBWOHL CVE-2017-12615/12617 final mit echtem CVSS 8.1 im Report standen (interpret-`lookup_cve` kam durch).
+- Unterschied zu BUG-14: Tomcat-Banner trug **konkrete Version** (8.5.19) → searchsploit fand die KORREKTEN versionsspezifischen CVEs (kein versionsloser Müll wie bei zero/Apache-Coyote).
+- Fix: `score_scan(trace_path, nvd_results=...)` — `_score_cve_quality` deckelt nur noch wenn die CVEs NIRGENDS NVD-bestätigt wurden (weder findings-Phase noch finales interpret-Enrichment). `flow.py` reicht `self.state.nvd_results` durch.
+- Verifiziert: Tomcat 40→60/B; BUG-14-Fall (zero, versionslos) bleibt 40/B; gesunde Scans (pentest-ground) bleiben 100/A.
+
+**BUG-16 (2026-06-18) — NOTABLE_CVES-Pinning hing von NVD-Erreichbarkeit ab (Commit `0c95e84`):**
+- Befund beim WebLogic-Scan: 2/3 NOTABLE_CVES gepinnt, aber CVE-2020-14882 fiel raus — die Direct-Injection in `_cve_trace_guardrail` rief `lookup_cve()` und pinnte nur bei `"error" not in result`. Bei NVD-503 fällt eine hardcoded-bekannte NOTABLE-CVE raus.
+- Fix (`tasks.py`): bei transientem NVD-Fehler (503/502/504/429/timeout/connection) wird trotzdem gepinnt (Enrichment markiert via BUG-14b als UNBESTÄTIGT). Nur eindeutiges „not found in NVD" verwirft die ID.
+- Ziel-CVE CVE-2023-21839 wurde unabhängig davon gefunden (Kerntest bestanden); Fix härtet die zusätzlichen NOTABLE-Pins.
+
 **Offen (server-/infrastrukturseitig, nicht Code):**
 - Remote-Ollama `full`-Scope: reproduzierbar HTTP 500 in Blue-Phase (größerer Kontext, 7 Phasen). `web`/`network` laufen durch. Vermutlich Kontextgrößen-/Token-Limit beim Remote-Server.
 - NVD-API Instabilität (2026-06-17): intermittierend HTTP 503 + Read-Timeout selbst mit 3×30s-Retry. BUG-14 macht den Ausfall im Report+Scorecard sichtbar statt ihn zu verschleiern.
