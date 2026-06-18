@@ -109,6 +109,8 @@ cd agentscanit && python3 main.py example.com
 | `network` | nmap · naabu · httpx + CVE + Exploit | 1 → routing → 2–6 → 3 |
 | `full` | Alle Tools + alle Phasen | 1 → routing → 2–6 → 3 |
 
+> **Hinweis zum `full`-Scope:** Der LLM-AgentPlanner (Ausführungs-Optimierung vor den Phasen) ist bei `full` aktuell **deaktiviert**. Grund: Bei 7 Phasen wird der Planner-Prompt so groß (~32k Tokens), dass er das Kontextfenster des lokalen Planner-Modells (qwen2.5:7b, num_ctx 4096) überläuft und den Lauf abbrechen ließ. Die Pipeline läuft dadurch unverändert (alle Phasen/Tools), nur ohne die zusätzliche Planungs-Optimierung. `web`/`network`/`quick` u.a. nutzen den Planner weiterhin. Tracking: BUG-18.
+
 ---
 
 ## Outputs

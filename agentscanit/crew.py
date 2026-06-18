@@ -51,7 +51,69 @@ def _apply_crewai_patches() -> None:
         pass
 
 
+def _install_llm_debug_logger() -> None:
+    """Diagnostisches Roh-Request-Logging (nur bei RECON_LLM_DEBUG=1).
+
+    Umhüllt OpenAICompletion._call_completions und schreibt pro Remote-LLM-Call
+    eine Zeile nach logs/llm_debug_<pid>.jsonl: Agent-Rolle, Prompt-Größe
+    (Anzahl messages + Gesamt-Zeichen), tool-Anzahl, Dauer, Erfolg/Fehler inkl.
+    HTTP-Status. Erfasst AUCH den fehlschlagenden Call (anders als CrewAIs
+    output_log_file, das nur nach Task-Abschluss schreibt) — für die Diagnose
+    des full-Scope 500/empty-Abbruchs. Null Overhead/Risiko wenn die Env-Var
+    nicht gesetzt ist (sofortiges return).
+    """
+    if os.environ.get("RECON_LLM_DEBUG") != "1":
+        return
+    try:
+        from crewai.llms.providers.openai.completion import OpenAICompletion
+    except Exception:
+        return
+    if getattr(OpenAICompletion, "_recon_debug_wrapped", False):
+        return
+
+    import json as _json
+    import time as _time
+
+    _orig = OpenAICompletion._call_completions
+    _path = os.path.join(LOG_DIR, f"llm_debug_{os.getpid()}.jsonl")
+
+    def _wrapped(self, messages, tools=None, available_functions=None,
+                 from_task=None, from_agent=None, response_model=None):
+        rec = {
+            "ts":           _time.strftime("%H:%M:%S"),
+            "agent":        getattr(from_agent, "role", "?"),
+            "n_messages":   len(messages or []),
+            "prompt_chars": sum(len(str(m.get("content") or "")) for m in (messages or [])),
+            "n_tools":      len(tools or []),
+        }
+        _t0 = _time.time()
+        try:
+            out = _orig(self, messages, tools, available_functions,
+                        from_task, from_agent, response_model)
+            rec["status"]     = "ok"
+            rec["resp_chars"] = len(str(out)) if out else 0
+            rec["dur_s"]      = round(_time.time() - _t0, 1)
+            return out
+        except Exception as e:
+            rec["status"]      = "ERROR"
+            rec["dur_s"]       = round(_time.time() - _t0, 1)
+            rec["error_type"]  = type(e).__name__
+            rec["error"]       = str(e)[:300]
+            rec["http_status"] = getattr(getattr(e, "response", None), "status_code", None)
+            raise
+        finally:
+            try:
+                with open(_path, "a", encoding="utf-8") as _f:
+                    _f.write(_json.dumps(rec, ensure_ascii=False) + "\n")
+            except Exception:
+                pass
+
+    OpenAICompletion._call_completions    = _wrapped
+    OpenAICompletion._recon_debug_wrapped = True
+
+
 _apply_crewai_patches()
+_install_llm_debug_logger()
 
 
 
@@ -212,6 +274,29 @@ class AgentScanITCrew:
             },
         }
 
+        # ─── AgentPlanner-Gate (BUG-18, 2026-06-18) ──────────────────────────
+        # Der CrewAI AgentPlanner baut EINEN Plan-Prompt der ALLE Tasks +
+        # Tool-Definitionen + Backstories enthält. Bei full (7 Tasks) ist dieser
+        # Prompt ~129.000 Zeichen ≈ 32k Tokens groß (bewiesen via RECON_LLM_DEBUG,
+        # 2026-06-18: Call #0 "Task Execution Planner", prompt_chars=129302,
+        # dur=237s). Der Planner läuft lokal (qwen2.5:7b, num_ctx=4096) → der
+        # 32k-Prompt überläuft das 4096-Fenster um das ~8-fache → der lokale
+        # Server generiert minutenlang und kippt intermittierend in leere/
+        # fehlerhafte Antworten ("Invalid response from LLM call - None or empty"),
+        # was den GANZEN full-Scan abbrechen ließ. web/network (5 Tasks) bleiben
+        # unter der Schwelle und liefen immer durch.
+        #
+        # Fix: Planner nur bei ≤5 Tasks aktiv. _SCOPE_CEILING legt die Pipeline
+        # ohnehin deterministisch fest — der Planner optimiert nur die AUSFÜHRUNG,
+        # nicht WELCHE Tasks laufen; bei full ist der Verlust also gering.
+        #
+        # TODO (echte Lösung, siehe roadmap "Offen"): Planner-Prompt für große
+        # Scopes verkleinern (Task-Beschreibungen kürzen / Tools aus dem Plan-
+        # Prompt nehmen) ODER Planner-num_ctx an die Prompt-Größe koppeln ODER
+        # ein lokales Planner-Modell mit größerem nativem Kontext. Dann kann das
+        # Gate wieder fallen.
+        _use_planning = len(self._active_tasks) <= 5
+
         # memory=False: LanceDB's Rust embedder callback fires from a background
         # thread without the GIL → PyO3 panic on save → corrupts thread-local
         # state → blue_agent's first LLM call hangs indefinitely.
@@ -227,7 +312,7 @@ class AgentScanITCrew:
                 embedder=_knowledge_embedder,
                 cache=True,
                 verbose=False,
-                planning=True,
+                planning=_use_planning,
                 planning_llm=llm_planner,
                 task_callback=task_callback,
                 output_log_file=_log_file,
@@ -241,7 +326,7 @@ class AgentScanITCrew:
                 embedder=_knowledge_embedder,
                 cache=True,
                 verbose=False,
-                planning=True,
+                planning=_use_planning,
                 planning_llm=llm_planner,
                 task_callback=task_callback,
                 output_log_file=_log_file,

@@ -143,10 +143,19 @@ Das Framework ist **so gut wie der erkannte Banner**. Bei **präziser Version** 
 - Fix (`reporting/reporting_flow.py`): `_version_confirmed_in_scan()` prüft pro CVE ob der Scan für das betroffene Produkt eine konkrete Version (`\d+\.\d+`) erkannt hat (Produkt-Keywords aus `affected_cpe` + Alias-Tabelle http_server→httpd). CVEs ohne Versions-Bestätigung → eigene Sektion „⚠️ CVEs OHNE Versions-Bestätigung" mit FP-Hinweis, getrennt von versions-verifizierten. Generische Tokens (server/http/…) als Solo-Keyword ausgeschlossen; `Apache-Coyote/1.1` wird NICHT als Tomcat-Version fehlgedeutet.
 - Verifiziert 5/5 gegen reale Scans (OpenSSH 6.6.1p1 / httpd 2.4.7 / Tomcat 8.5.19 / WebLogic 12.2 → verifiziert; Apache-Coyote/1.1 → unbestätigt) + E2E-Render. Adressiert die zuvor als „nicht vollständig schließbar" dokumentierte Grenze: das schlimmste FP-Risiko (versionslos als confirmed getarnt) ist jetzt im Report sichtbar getrennt.
 
-**Offen (server-/infrastrukturseitig, nicht Code):**
-- Remote-Ollama `full`-Scope: reproduzierbar HTTP 500 in Blue-Phase (größerer Kontext, 7 Phasen). `web`/`network` laufen durch. Vermutlich Kontextgrößen-/Token-Limit beim Remote-Server.
+**BUG-18 (2026-06-18) — full-Scope-Abbruch: URSACHE WAR DER LOKALE PLANNER, NICHT Remote-Ollama (Commit folgt):**
+- **Frühere Fehldiagnose korrigiert:** Der full-Scope-Abbruch wurde monatelang als „Remote-Ollama HTTP 500 in Blue-Phase / Kontextgröße" dokumentiert. Das war FALSCH. Bewiesen durch ein neues Roh-Request-Logging (`RECON_LLM_DEBUG=1`, Patch in `crew.py`, env-gated):
+  - Der **CrewAI AgentPlanner**-Call (lokal, qwen2.5:7b) war der einzige problematische: **prompt_chars=129302 (~32k Tokens), dur=237s**. Alle anderen Calls 5k–20k chars, <20s.
+  - Der Planner baut EINEN Prompt mit ALLEN Tasks + Tools + Backstories. Bei `full` (7 Tasks) = 32k Tokens. Planner-`num_ctx`=4096 → **8-facher Overflow** → lokaler Server generiert minutenlang und kippt intermittierend in „Invalid response from LLM call - None or empty". Die danach im Log sichtbaren `gpt-oss`-500er waren Folgefehler der Retry-Vollneustarts.
+  - `web`/`network` (5 Tasks) bleiben unter der Schwelle → liefen IMMER durch. Genau das Muster.
+  - Erklärt auch „anfangs ungewöhnlich langwierig" = die 237s Planner-Zeit ganz am Anfang.
+- **Fix (`crew.py`):** AgentPlanner nur bei **≤5 Tasks** aktiv (`_use_planning = len(tasks) <= 5`). Bei `full` (7) deaktiviert. `_SCOPE_CEILING` legt die Pipeline ohnehin fest — Planner optimiert nur Ausführung, nicht Task-Auswahl → Verlust bei full gering. Verifiziert 6/6: full→planning=False, network/web/quick/ssl/osint→planning=True.
+- **Echte Lösung (TODO, damit Planner auch bei full wieder läuft):** Planner-Prompt für große Scopes verkleinern (Task-Beschreibungen kürzen / Tools aus dem Plan-Prompt nehmen) ODER Planner-`num_ctx` an Prompt-Größe koppeln ODER lokales Planner-Modell mit größerem nativem Kontext (verfügbar: `qwen3-coder:30b`, `qwen2.5-coder:14b`). Diagnose-Werkzeug bleibt: `RECON_LLM_DEBUG=1` schreibt `logs/llm_debug_<pid>.jsonl`.
+
+**Offen:**
+- **full-Scope mit Planner** (BUG-18 echte Lösung) — siehe oben. Mit dem Gate läuft full ohne Planner stabil; die Planner-Optimierung für full ist temporär deaktiviert.
 - NVD-API Instabilität (2026-06-17): intermittierend HTTP 503 + Read-Timeout selbst mit 3×30s-Retry. BUG-14 macht den Ausfall im Report+Scorecard sichtbar statt ihn zu verschleiern.
-- Effizienz futuremultiverse.com: Laufzeit 934–1009s (56–68% über Ziel) wegen LLM-Errors in Blue-Phase + langer nmap-Scans auf Webmin/Ollama-Ports.
+- Ground-Truth-Befund demo.testfire.net (2026-06-18): AltoroMutual ist eine **Web-App-Vuln-Demo** (SQLi/XSS auf App-Ebene). Die Suite ist ein Infrastruktur-/CVE-Scanner — sie fand korrekt Security-Header-Mängel + Tomcat-Komponente (OWASP A05/A06), aber NICHT die SQLi/XSS (außerhalb des Scopes, kein DAST). **Wichtig: nichts erfunden.** Bestätigt: Suite stark bei versions-CVE-Matching, nicht für Web-App-Discovery gebaut.
 
 ### Teilschritte in Phasen
 
@@ -264,7 +273,7 @@ recon-suite/
 
 Pipeline-Reihenfolge: `research → blue → findings → red_scan → red → coding → report`
 
-`_SCOPE_CEILING` bestimmt welche Tasks verfügbar sind. `Crew(planning=True)` optimiert wie diese Tasks ausgeführt werden (AgentPlanner).
+`_SCOPE_CEILING` bestimmt welche Tasks verfügbar sind. `Crew(planning=…)` optimiert wie diese Tasks ausgeführt werden (AgentPlanner) — **aktiv nur bei ≤5 Tasks** (BUG-18: der Planner-Prompt bei 7 Tasks/`full` ist ~32k Tokens und sprengt das lokale Planner-`num_ctx`=4096 → full läuft ohne Planner).
 
 ---
 
@@ -478,7 +487,7 @@ Vollständiger Beweis-Trail: `debugging/DIAGNOSIS.md`. Kurzfassung für die näc
 - **`run_trace.get_all_raw_outputs()`** — gibt alle Tool-Raw-Outputs der laufenden Session zurück (closed phases + pending). Genutzt vom CVE-Validator während Pydantic-Parsing.
 - **`interpret_agent/nvd.py`** — Thin Shim, re-exportiert aus `agentscanit.tools.nvd`. Nie direkt editieren.
 - **Strict factual outputs** — Task-Prompts verlangen "nur tool-bestätigte Fakten". CVEs nur wenn Tool-Bestätigung im Trace vorhanden.
-- **`Crew(planning=True, planning_llm=llm_planner)`** — AgentPlanner erstellt vor der ersten Task einen Ausführungsplan. `planning_llm` (`llm_planner`) läuft IMMER lokal (`localhost:11434`, z.B. `qwen2.5:7b-instruct`) — remote Modelle unterstützen Ollama's native function-calling API nicht zuverlässig. `_SCOPE_CEILING` bleibt der Gate-Keeper für welche Tasks überhaupt laufen. **`max_tokens=2000` auf `llm_planner`** — begrenzt Plan-Output auf ~2000 Tokens, damit combined input+output im 4096-Token-Kontext des lokalen Servers bleibt. Ohne diese Begrenzung kann `--context-shift` im Server eine endlose Generierung auslösen (>20 Minuten für 7-Phasen-Plan).
+- **`Crew(planning=_use_planning, planning_llm=llm_planner)`** — AgentPlanner erstellt vor der ersten Task einen Ausführungsplan. `planning_llm` (`llm_planner`) läuft IMMER lokal (`localhost:11434`, z.B. `qwen2.5:7b-instruct`) — remote Modelle unterstützen Ollama's native function-calling API nicht zuverlässig. `_SCOPE_CEILING` bleibt der Gate-Keeper für welche Tasks überhaupt laufen. **`max_tokens=2000` auf `llm_planner`** — begrenzt Plan-Output auf ~2000 Tokens. **BUG-18-Gate: `_use_planning = len(tasks) <= 5`** — der Plan-Prompt skaliert mit der Task-Zahl (alle Task-Beschreibungen + Tools im einen Prompt); bei 7 Tasks (`full`) ~32k Tokens, was das lokale `num_ctx`=4096 um das 8-fache überläuft → minutenlange Generierung + intermittierende Leerantworten (bewiesen via `RECON_LLM_DEBUG`). Deshalb Planner bei `full` aus. Frühere Annahme „`--context-shift` / >20min" war das Symptom desselben Overflows.
 - **Memory** — entfernt (Phase 7, Stufe 3b). Crews laufen `memory=False`; Prior-Scan-Erkennung ist logs-basiert in `main.py`.
 - **reporter_agent max_iter=3** — bewusst niedrig gehalten; der Reporter nutzt keine Tools und soll den Report in einem Durchgang schreiben. Höhere Werte führen zu 400s+ Laufzeiten bei großem Kontext.
 - **Resume** — ausschließlich auf Flow-Ebene über `@persist(SQLiteFlowPersistence)` (`--list`/`--resume`). Intra-Crew-Checkpoint-Resume (`Crew.from_checkpoint()`) wurde in Phase 7, Stufe 1 entfernt.
