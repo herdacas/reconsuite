@@ -15,6 +15,35 @@ Wir arbeiten die Roadmap (`roadmap.md`) phasenweise ab. Im Ablauf wird entschied
 - **Diagnose-Werkzeug:** `RECON_LLM_DEBUG=1 python3 main.py …` schreibt `logs/llm_debug_<pid>.jsonl` (jeder LLM-Call: Agent, Prompt-Größe, Status, Leerantworten). Env-gated, null Overhead ohne die Var.
 - Phasen 1–9 + Finale Abnahme abgeschlossen; offene Punkte siehe „Offen"-Block weiter unten.
 
+### ➡️ NÄCHSTE SESSION — hier weitermachen (Stand 2026-06-18)
+
+**Kontext:** Roadmap (Phasen 1–9 + Finale Abnahme) ist vollständig abgearbeitet. Wir sind in einer
+**Post-Roadmap-Phase**: Aufbau eines systematischen Testkonzepts für Wahrheitsgehalt & Konsistenz
+der Scans. Auslöser: User will belegen, dass das Framework *wahre* + *konsistente* Ergebnisse liefert
+— mit Remote- UND Lokal-Modellen, und mit Prüfung von Tool-**Input** und Tool-**Output** (nicht nur Report).
+
+**Was vorliegt:** [`testing/TESTKONZEPT.md`](testing/TESTKONZEPT.md) — fertiger Entwurf (lokal committet
+`9ff72b7`, NICHT gepusht — soll lokal bleiben). 4 Prüf-Dimensionen, Remote/Lokal-Matrix, methodisch
+fundiert (BFCL/ReliabilityBench/Trajectory-Eval). Größtenteils deterministisch aus vorhandenen
+Artefakten (`trace_*.json` hat `command`/`agent_params`/`raw_output`/`is_error`) messbar.
+
+**Nächster Schritt:** Die **5 Designfragen in Abschnitt 6 des Konzepts** mit dem User klären, DANN das
+Harness bauen (`testing/targets.yaml` + `eval_tool_input.py` + `eval_tool_output.py` +
+`eval_groundtruth.py` + `eval_consistency.py` + `run_matrix.py`). Wiederverwendbare Bausteine:
+`tools/trace.py::cve_in_raw_outputs`, `quality.py::score_scan`, `cpe_map.py`, der `RECON_LLM_DEBUG`-Logger.
+
+**Die 5 offenen Designfragen (vor Code):**
+1. models.json remote↔lokal automatisch umschalten — zwei Profil-Dateien oder Env-Override? (Key gitignored)
+2. CLEAN-Target für True-Negative wählen (verlässlich sauber + scan-erlaubt)
+3. N-Wiederholungen: 3 (schnell) oder 5 (belastbarer)
+4. LLM-Judge für Dim-2-Versions-Treue jetzt oder später (kostet Remote-Calls)
+5. VulHub-Container automatisch starten/stoppen (snap-Docker braucht `/root`-Pfad!) oder manuell
+
+**Zusätzlicher offener Verifikations-Vorbehalt:** qwen3-coder **CVE-Gründlichkeit** noch nicht breit belegt
+(nur 2 Läufe, 1× mit NVD-Ausfall → dünn). Sauberster Test: qwen3-coder gegen VulHub-Container (Tomcat
+8.5.19 → CVE-2017-12615, WebLogic 12.2.1.3 → CVE-2023-21839) — Ziel-CVE exakt bekannt, NVD-unabhängig
+gepinnt. Auch: `dnsx`/`katana` (konditionale Tools) wurden mit qwen3-coder noch nie ausgelöst.
+
 ### Architektur-Entscheidung (2026-06-14) — Phase 9
 
 Nach systematischer Analyse (24 Scans, pentest-ground.com-Auswertung) wurde erkannt:
