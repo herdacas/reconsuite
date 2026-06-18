@@ -152,6 +152,12 @@ Das Framework ist **so gut wie der erkannte Banner**. Bei **präziser Version** 
 - **Fix (`crew.py`):** AgentPlanner nur bei **≤5 Tasks** aktiv (`_use_planning = len(tasks) <= 5`). Bei `full` (7) deaktiviert. `_SCOPE_CEILING` legt die Pipeline ohnehin fest — Planner optimiert nur Ausführung, nicht Task-Auswahl → Verlust bei full gering. Verifiziert 6/6: full→planning=False, network/web/quick/ssl/osint→planning=True.
 - **Echte Lösung (TODO, damit Planner auch bei full wieder läuft):** Planner-Prompt für große Scopes verkleinern (Task-Beschreibungen kürzen / Tools aus dem Plan-Prompt nehmen) ODER Planner-`num_ctx` an Prompt-Größe koppeln ODER lokales Planner-Modell mit größerem nativem Kontext (verfügbar: `qwen3-coder:30b`, `qwen2.5-coder:14b`). Diagnose-Werkzeug bleibt: `RECON_LLM_DEBUG=1` schreibt `logs/llm_debug_<pid>.jsonl`.
 
+**BUG-19 (2026-06-18) — gpt-oss:120b Leerantworten bei tiefen FC-Ketten → Modellwechsel auf qwen3-coder:480b:**
+- Nach dem BUG-18-Fix kam `full` viel weiter, brach aber weiter sporadisch ab. Debug-Log (`RECON_LLM_DEBUG`) zeigte: **9/135 Calls (6.7%) lieferten LEERE Antworten** (`status=ok, resp_chars=0`) — NICHT kontextabhängig (kleine Prompts ~8-13k chars, dur 0.8s = sofort leer), gehäuft bei **Blue (max_iter=20) + Attack Surface/red (max_iter=8)**. Diskriminator: leere Calls hatten Ø10.1 messages (tiefe Multi-Turn-FC-Ketten) vs. Ø6.4 bei Erfolg.
+- Ursache: `gpt-oss:120b` ist ein **Reasoning-Modell** — bei tiefen Tool-Call-Konversationen landet die Antwort sporadisch im (verworfenen) thinking-Kanal → leerer `content`. `think:False`/`max_tokens` widerlegt als Ursache (isolierte Tests 0/N leer; Problem nur im echten Multi-Turn-Kontext). Retry-Vollneustarts würfeln nur neu, senken die 6.7%-Grundrate nicht → bei vielen Calls in `full` scheitern alle 5 Versuche statistisch.
+- **Lösung:** Worker-LLMs (analysis/research/code) in `models.json` von `gpt-oss:120b` auf **`qwen3-coder:480b`** umgestellt — ein **Non-Reasoning** Instruct-Modell auf ollama.com (kein thinking-Kanal). Isoliert verifiziert (0/12 leer bei tiefen FC-Ketten), dann E2E: **full-Scan demo.testfire.net komplett durch, alle 7 Phasen, 0 Retries, 0 Leerantworten (0/35 Calls), Grade A 99.8** (vs. gpt-oss 93.8, Tool-Coverage 100 statt 75). Planner bleibt lokal/unberührt.
+- **Hinweis:** Modellwechsel ändert auch Agent-Verhalten (Tool-Auswahl/JSON). Erste Beobachtung positiv (bessere Tool-Coverage). Bei breiterem Einsatz weitere Scans gegen Ground-Truth-Targets empfohlen.
+
 **Offen:**
 - **full-Scope mit Planner** (BUG-18 echte Lösung) — siehe oben. Mit dem Gate läuft full ohne Planner stabil; die Planner-Optimierung für full ist temporär deaktiviert.
 - NVD-API Instabilität (2026-06-17): intermittierend HTTP 503 + Read-Timeout selbst mit 3×30s-Retry. BUG-14 macht den Ausfall im Report+Scorecard sichtbar statt ihn zu verschleiern.
@@ -427,8 +433,9 @@ Vollständiger Beweis-Trail: `debugging/DIAGNOSIS.md`. Kurzfassung für die näc
 - Prompt-Erwähnungen in `tasks.py` (4 Stellen) + Docstring in `main.py` auf nmap/httpx umgestellt.
 - **Reversibel:** `NaabuTool`-Klasse, Import, `NAABU_BIN` bleiben. Wieder einschalten = `naabu_tool` zurück in die `tools=[]`-Liste des blue_agent.
 
-**Verworfene Hypothese (NICHT erneut verfolgen): „gpt-oss liefert leere Antworten".**
-- Ein Retry-on-empty-Fix (`OpenAICompletion.call`-Patch) wurde gebaut, unit-getestet UND End-to-End widerlegt: das Retry feuerte nie, findings crashte trotzdem. Komplett zurückgenommen. Die leere Antwort ist real (kommt vereinzelt vor), aber NICHT der Crash-Pfad.
+**Verworfene Hypothese (Phase 7, NICHT erneut verfolgen FÜR DEN FINDINGS-CRASH): „gpt-oss liefert leere Antworten".**
+- Ein Retry-on-empty-Fix (`OpenAICompletion.call`-Patch) wurde gebaut, unit-getestet UND End-to-End widerlegt: das Retry feuerte nie, findings crashte trotzdem. Komplett zurückgenommen. Die leere Antwort ist real (kommt vereinzelt vor), aber NICHT der damalige findings-Crash-Pfad.
+- **UPDATE 2026-06-18 (BUG-19):** Die leeren Antworten SIND später als realer Abbruch-Pfad für den `full`-Scope identifiziert worden (6.7% bei tiefen FC-Ketten, gehäuft Blue/red) — gelöst durch Modellwechsel auf das Non-Reasoning-Modell `qwen3-coder:480b`, NICHT durch Retry-on-empty (die damalige Verwerfung des Retry-Ansatzes bleibt korrekt — neu würfeln senkt die Grundrate nicht). Siehe BUG-19 oben.
 
 **Noch offen (nicht angefasst):**
 - „Strg+C wirkt nicht" während langer Tool-Scans = Subprozess-/asyncio-Signalhandling. Prozess ist via `kill` beendbar. Separater Punkt.
