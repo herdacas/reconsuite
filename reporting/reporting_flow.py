@@ -26,6 +26,85 @@ console = Console()
 _SEVERITY_ICON = {"CRITICAL": "🔴", "HIGH": "🟠", "MEDIUM": "🟡", "LOW": "🟢"}
 
 
+def _cve_product_keywords(cve: dict) -> set[str]:
+    """Produkt-Keywords einer CVE aus den affected_cpe-Einträgen extrahieren.
+
+    cpe:2.3:a:openbsd:openssh:* → {'openssh'}, apache:tomcat → {'tomcat'}.
+    Genutzt um zu prüfen ob der Scan für dieses Produkt eine Version erkannt hat.
+    """
+    # Produkt-Aliasse: NVD-CPE-Produktname → Banner-Schreibweise(n) des Scanners.
+    # NVD nennt es "http_server", nmap-Banner sagt "httpd"/"apache httpd".
+    _ALIAS = {
+        "http server": ["httpd"],
+        "weblogic server": ["weblogic"],
+    }
+    # Generische Tokens die als alleiniges Keyword zu breit matchen würden
+    _too_generic = {"server", "http", "https", "service", "manager", "core", "web",
+                    "linux", "enterprise", "framework"}
+    kws: set[str] = set()
+    for cpe in cve.get("affected_cpe", []) or []:
+        parts = cpe.split(":")
+        # cpe:2.3:<part>:<vendor>:<product>:<version>:...
+        if len(parts) >= 5:
+            product = parts[4].replace("_", " ").strip().lower()
+            if not product or product == "*":
+                continue
+            kws.add(product)                           # volles Produkt, z.B. "weblogic server"
+            kws.update(_ALIAS.get(product, []))        # Banner-Aliasse, z.B. "httpd"
+            last = product.split()[-1]
+            if last not in _too_generic:               # last-token nur wenn spezifisch
+                kws.add(last)                          # z.B. "tomcat", "openssh"
+    return kws
+
+
+def _format_cve_entries(cves: list[dict]) -> list[str]:
+    """Markdown-Zeilen für eine Liste NVD-CVE-Dicts (Detail-Darstellung)."""
+    lines: list[str] = []
+    for cve in cves:
+        sev   = (cve.get("cvss_severity") or "N/A").upper()
+        score = cve.get("cvss_score")
+        icon  = _SEVERITY_ICON.get(sev, "⚪")
+        lines += [
+            f"### {icon} {cve['id']} — CVSS {score} ({sev})",
+            f"- **Published:** {cve.get('published', 'N/A')}  "
+            f"**Last Modified:** {cve.get('last_modified', 'N/A')}",
+            f"- **Vector:** `{cve.get('cvss_vector') or 'N/A'}`",
+            "",
+            f"**Description:** {cve.get('description', '')}",
+            "",
+        ]
+        if cve.get("affected_cpe"):
+            lines.append("**Affected Products (CPE):**")
+            lines += [f"- `{cpe}`" for cpe in cve["affected_cpe"][:5]]
+            lines.append("")
+        if cve.get("references"):
+            lines.append("**References:**")
+            lines += [f"- {ref}" for ref in cve["references"]]
+            lines.append("")
+    return lines
+
+
+def _version_confirmed_in_scan(cve: dict, scan_body: str) -> bool:
+    """True wenn der Scan für das CVE-Produkt eine konkrete Version erkannt hat.
+
+    Banner-Versions-Gate (BUG-17): Eine CVE ist nur dann versions-verifizierbar wenn
+    im Scan-Body das Produkt-Keyword von einer Versionsnummer (\\d+\\.\\d+) gefolgt
+    wird (z.B. "OpenSSH 6.6.1p1"). Bei versionslosem Banner ("Apache Tomcat version
+    unknown") bleibt der Versions-Match unbestätigt → potenzielles False-Positive.
+    """
+    if not scan_body:
+        return False
+    body = scan_body.lower()
+    for kw in _cve_product_keywords(cve):
+        if len(kw) < 3:
+            continue
+        # Produkt-Keyword gefolgt (innerhalb ~20 Zeichen) von einer Versionsnummer
+        pattern = re.escape(kw) + r"[^\n]{0,20}?\d+\.\d+"
+        if re.search(pattern, body):
+            return True
+    return False
+
+
 # ─── State ────────────────────────────────────────────────────────────────────
 
 class ReportingState(BaseModel):
@@ -77,29 +156,35 @@ class ReportingFlow(Flow[ReportingState]):
             f"Critical: **{len(critical)}**  High: **{len(high)}**\n",
         ]
 
-        for r in valid:
-            sev   = (r.get("cvss_severity") or "N/A").upper()
-            score = r.get("cvss_score")
-            icon  = _SEVERITY_ICON.get(sev, "⚪")
+        # BUG-17 — Banner-Versions-Gate: trenne versions-verifizierte CVEs von solchen
+        # ohne erkannte Service-Version. Eine CVE mit echtem CVSS ist NICHT automatisch
+        # ein bestätigtes Finding — fehlt die Version (Banner wie "Apache-Coyote/1.1"),
+        # ist der Versions-Match spekulativ (potenzielles False-Positive).
+        version_ok  = [r for r in valid if _version_confirmed_in_scan(r, scan_body)]
+        version_unk = [r for r in valid if r not in version_ok]
+        split_sections = bool(version_ok and version_unk)
+
+        if version_ok:
+            if split_sections:
+                nvd_lines += [
+                    "### ✅ Versions-verifizierte CVEs\n",
+                    "*Service-Version im Scan erkannt und passt zum betroffenen Produkt.*",
+                    "",
+                ]
+            nvd_lines += _format_cve_entries(version_ok)
+        if version_unk:
+            if split_sections:
+                nvd_lines += ["\n### ⚠️ CVEs OHNE Versions-Bestätigung\n"]
+            else:
+                nvd_lines += ["### ⚠️ CVEs OHNE Versions-Bestätigung\n"]
             nvd_lines += [
-                f"### {icon} {r['id']} — CVSS {score} ({sev})",
-                f"- **Published:** {r.get('published', 'N/A')}  "
-                f"**Last Modified:** {r.get('last_modified', 'N/A')}",
-                f"- **Vector:** `{r.get('cvss_vector') or 'N/A'}`",
-                "",
-                f"**Description:** {r.get('description', '')}",
+                "*NVD liefert CVSS, aber der Scan hat KEINE konkrete Produkt-Version "
+                "erkannt (z.B. Banner `Apache-Coyote/1.1` ohne Version). Der Versions-"
+                "Match ist daher SPEKULATIV — diese CVEs sind potenzielle False-"
+                "Positives und KEINE bestätigten Findings ohne manuelle Prüfung.*",
                 "",
             ]
-            if r.get("affected_cpe"):
-                nvd_lines.append("**Affected Products (CPE):**")
-                for cpe in r["affected_cpe"][:5]:
-                    nvd_lines.append(f"- `{cpe}`")
-                nvd_lines.append("")
-            if r.get("references"):
-                nvd_lines.append("**References:**")
-                for ref in r["references"]:
-                    nvd_lines.append(f"- {ref}")
-                nvd_lines.append("")
+            nvd_lines += _format_cve_entries(version_unk)
 
         if errors:
             # Unterscheide NVD-Unerreichbarkeit (503/timeout) von echtem "existiert nicht".
