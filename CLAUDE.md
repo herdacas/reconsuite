@@ -193,6 +193,48 @@ Das Framework ist **so gut wie der erkannte Banner**. Bei **präziser Version** 
 - **Lösung:** Worker-LLMs (analysis/research/code) in `models.json` von `gpt-oss:120b` auf **`qwen3-coder:480b`** umgestellt — ein **Non-Reasoning** Instruct-Modell auf ollama.com (kein thinking-Kanal). Isoliert verifiziert (0/12 leer bei tiefen FC-Ketten), dann E2E: **full-Scan demo.testfire.net komplett durch, alle 7 Phasen, 0 Retries, 0 Leerantworten (0/35 Calls), Grade A 99.8** (vs. gpt-oss 93.8, Tool-Coverage 100 statt 75). Planner bleibt lokal/unberührt.
 - **Hinweis:** Modellwechsel ändert auch Agent-Verhalten (Tool-Auswahl/JSON). Erste Beobachtung positiv (bessere Tool-Coverage). Bei breiterem Einsatz weitere Scans gegen Ground-Truth-Targets empfohlen.
 
+### Modell-Anforderungen — was ein verwendbares LLM können MUSS (Stand 2026-06-18)
+
+Empirisch belegt in dieser Session (gpt-oss / qwen3-coder / gemma4:e2b / div. lokale getestet).
+Diese Sammlung ist Vorarbeit für später formal zu definierende **Mindestanforderungen**.
+
+**Harte Voraussetzungen (sonst läuft das Framework GAR NICHT zuverlässig):**
+1. **Natives Ollama Tool-Calling / Function-Calling.** Der `AgentExecutor` nutzt `call_llm_native_tools`.
+   Modelle ohne sauberes FC liefern „Invalid response from LLM call - None or empty". Belegt:
+   reine Chat-Modelle scheitern; Coder-/Tool-Use-trainierte Modelle bestehen.
+2. **Stabilität bei TIEFEN Multi-Turn-FC-Ketten (≥10 messages).** Das ist der eigentliche Lackmustest,
+   NICHT der Einzel-Call. Diskriminator aus `RECON_LLM_DEBUG`: leere Antworten traten bei Ø10.1 messages
+   auf vs. Ø6.4 bei Erfolg. **Isolierte Einzel-Call-Tests sind NICHT aussagekräftig** — gemma4:e2b und
+   gpt-oss bestehen Einzel-Calls (5/5), scheitern aber im echten Scan-Kontext. Immer im Multi-Turn testen
+   (Test-Pattern: System-Prompt + 6 Tool-Call/Result-Paare + abschließender Turn → muss nicht-leer + korrekt
+   Tool-Call/Content liefern).
+3. **Non-Reasoning ODER `think:False`-konform.** Reasoning-Modelle (gpt-oss, Qwen3-thinking) verlieren bei
+   tiefen FC-Ketten sporadisch die Antwort in den (verworfenen) thinking-Kanal → 6.7% Leerantworten (BUG-19).
+   Non-Reasoning Instruct-/Coder-Modelle (qwen3-coder, qwen2.5-coder, llama3-groq-tool-use) haben diesen
+   Kanal nicht → 0% Leerantworten gemessen. `extra_body={"think": False}` wird bedingungslos gesendet;
+   ein Reasoning-Modell das das ignoriert, ist ungeeignet.
+
+**Quantitative Soll-Werte (gemessen, nicht geraten):**
+| Eigenschaft | Anforderung | Beleg |
+|---|---|---|
+| Leerantwort-Rate (Multi-Turn) | **0%** (Toleranz <1%) | qwen3-coder 0/35 full, 0/21 quick; gpt-oss 9/135 (6.7%) → untauglich |
+| Kontextfenster Worker | ≥ 8k Tokens (Prompts real ~8–18k chars, also ~2–5k Tok; 16k remote / 8k lokal genügt) | größter gemessener Worker-Prompt 31.648 chars |
+| Kontextfenster Planner | ⚠️ Sonderfall: bräuchte ~32k bei full (7 Tasks); deshalb bei >5 Tasks AUS (BUG-18) statt großes Planner-Modell zu fordern | Planner-Prompt 129.302 chars |
+| Tool-Input-Sauberkeit | keine verstümmelten Targets (`?`, `://://`) | qwen3-coder: 31/31 Calls sauber (8com.de-Scan); gpt-oss: vereinzelt verstümmelt |
+
+**Modell-Rollen + getestete Tauglichkeit:**
+- **Remote-Worker (analysis/research/code):** `qwen3-coder:480b` ✅ (aktiv). gpt-oss:120b ❌ (BUG-19).
+- **Lokal-Worker:** `llama3-groq-tool-use:8b` ✅ / `qwen2.5:7b-instruct` ✅ / `qwen3-coder:30b` ✅
+  (alle 0 Leer, 5/5 Tool-Call im Multi-Turn-Test). `gemma4:e2b` ❌ (Gemma-Familie: schwaches agentic FC,
+  scheitert im echten Scan trotz bestandener Einzel-Calls). End-to-End-Lokalscan steht noch aus.
+- **Planner (immer lokal):** `qwen2.5:7b-instruct` ✅ (natives Ollama-FC; remote Modelle taugen NICHT als
+  Planner — die native FC-API wird remote nicht zuverlässig unterstützt).
+
+**Diagnose-Werkzeug für Modell-Eval:** `RECON_LLM_DEBUG=1` → `logs/llm_debug_<pid>.jsonl` (pro Call:
+agent, n_messages, prompt_chars, status, resp_chars, dur_s). `resp_chars=0` bei `status=ok` = Leerantwort.
+Das ist die Metrik zur Modell-Bewertung. Gehört methodisch zur **Lokal-Achse des Testkonzepts**
+([`testing/TESTKONZEPT.md`](testing/TESTKONZEPT.md), Dim 1+4).
+
 **Offen:**
 - **full-Scope mit Planner** (BUG-18 echte Lösung) — siehe oben. Mit dem Gate läuft full ohne Planner stabil; die Planner-Optimierung für full ist temporär deaktiviert.
 - NVD-API Instabilität (2026-06-17): intermittierend HTTP 503 + Read-Timeout selbst mit 3×30s-Retry. BUG-14 macht den Ausfall im Report+Scorecard sichtbar statt ihn zu verschleiern.
