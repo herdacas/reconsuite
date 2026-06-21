@@ -15,34 +15,43 @@ Wir arbeiten die Roadmap (`roadmap.md`) phasenweise ab. Im Ablauf wird entschied
 - **Diagnose-Werkzeug:** `RECON_LLM_DEBUG=1 python3 main.py …` schreibt `logs/llm_debug_<pid>.jsonl` (jeder LLM-Call: Agent, Prompt-Größe, Status, Leerantworten). Env-gated, null Overhead ohne die Var.
 - Phasen 1–9 + Finale Abnahme abgeschlossen; offene Punkte siehe „Offen"-Block weiter unten.
 
-### ➡️ NÄCHSTE SESSION — hier weitermachen (Stand 2026-06-18)
+### ➡️ AKTIVER ARBEITSPLAN — Testkonzept-Harness (Stand 2026-06-18, freigegeben)
 
-**Kontext:** Roadmap (Phasen 1–9 + Finale Abnahme) ist vollständig abgearbeitet. Wir sind in einer
-**Post-Roadmap-Phase**: Aufbau eines systematischen Testkonzepts für Wahrheitsgehalt & Konsistenz
-der Scans. Auslöser: User will belegen, dass das Framework *wahre* + *konsistente* Ergebnisse liefert
-— mit Remote- UND Lokal-Modellen, und mit Prüfung von Tool-**Input** und Tool-**Output** (nicht nur Report).
+**Kontext:** Roadmap (Phasen 1–9 + Finale Abnahme) vollständig durch. Post-Roadmap-Phase: Aufbau des
+Test-Harness zum Konzept [`testing/TESTKONZEPT.md`](testing/TESTKONZEPT.md) (4 Dimensionen, Remote/Lokal-Matrix,
+methodisch fundiert BFCL/ReliabilityBench/Trajectory-Eval). Messbar aus `trace_*.json`
+(`command`/`agent_params`/`raw_output`/`is_error`) + `RECON_LLM_DEBUG`-Logger. Wiederverwendbar:
+`tools/trace.py::cve_in_raw_outputs`, `quality.py::score_scan`, `cpe_map.py`.
 
-**Was vorliegt:** [`testing/TESTKONZEPT.md`](testing/TESTKONZEPT.md) — fertiger Entwurf (lokal committet
-`9ff72b7`, NICHT gepusht — soll lokal bleiben). 4 Prüf-Dimensionen, Remote/Lokal-Matrix, methodisch
-fundiert (BFCL/ReliabilityBench/Trajectory-Eval). Größtenteils deterministisch aus vorhandenen
-Artefakten (`trace_*.json` hat `command`/`agent_params`/`raw_output`/`is_error`) messbar.
+**Geklärte Designentscheidungen (User, 2026-06-18):**
+1. models.json remote↔lokal: **bleibt manuell** — User entfernt Key bei Bedarf für Lokal-Test. (Harness zunächst Remote-only.)
+2. CLEAN/TN-Target: **lokaler `nginx:alpine`-Container** (aktuell/gehärtet → 0 kritische CVEs erwartet, reproduzierbar). Live-Hosts taugen nicht (scanme „sauber"-Annahme war falsch: OpenSSH 6.6.1 verwundbar).
+3. N-Wiederholungen: **4**
+4. LLM-Judge für Dim-2-Versions-Treue: **jetzt** (Schritt 6)
+5. VulHub-Container: **automatisch** starten/stoppen (snap-Docker braucht `/root`-Pfad!)
 
-**Nächster Schritt:** Die **5 Designfragen in Abschnitt 6 des Konzepts** mit dem User klären, DANN das
-Harness bauen (`testing/targets.yaml` + `eval_tool_input.py` + `eval_tool_output.py` +
-`eval_groundtruth.py` + `eval_consistency.py` + `run_matrix.py`). Wiederverwendbare Bausteine:
-`tools/trace.py::cve_in_raw_outputs`, `quality.py::score_scan`, `cpe_map.py`, der `RECON_LLM_DEBUG`-Logger.
+**Targets:** TP-1 VulHub Tomcat 8.5.19 (→CVE-2017-12615/12617) · TP-2 VulHub WebLogic 12.2.1.3
+(→CVE-2023-21839, CVE-2018-2628) · TP-3 scanme.nmap.org (→CVE-2018-15473 u.a., ⚠️ max 12 Scans/Tag)
+· CLEAN nginx:alpine-Container (→0 kritische CVEs).
 
-**Die 5 offenen Designfragen (vor Code):**
-1. models.json remote↔lokal automatisch umschalten — zwei Profil-Dateien oder Env-Override? (Key gitignored)
-2. CLEAN-Target für True-Negative wählen (verlässlich sauber + scan-erlaubt)
-3. N-Wiederholungen: 3 (schnell) oder 5 (belastbarer)
-4. LLM-Judge für Dim-2-Versions-Treue jetzt oder später (kostet Remote-Calls)
-5. VulHub-Container automatisch starten/stoppen (snap-Docker braucht `/root`-Pfad!) oder manuell
+**Arbeitsschritte (autonom, User bestätigt nur Endergebnis):**
+| # | Schritt | Verifikation (Pos+Neg-Kontrolle) | Erwartung |
+|---|---|---|---|
+| 1 | `testing/targets.yaml` — Ground-Truth (Ports/Services/Soll-CVEs/TP-TN/Container-Cmds) | YAML lädt + Schema; Soll-CVEs gegen VulHub-README | 4 Targets sauber, jede Soll-CVE belegt |
+| 2 | `eval_tool_input.py` (Dim 1) — Target-Integrität, Scope-Konformität, Flag-Plausibilität | echte qwen3-Traces (8com/scanme) → ≥0.95; künstl. `https://://?` → erkannt | sauber ~1.0, manipuliert <1.0 |
+| 3 | `eval_tool_output.py` (Dim 2) — Halluzination (`cve_in_raw_outputs`) + Port-Auslassung | 8com-Trace 7/7 CVEs=0 Halluz; injizierte Fake-CVE → erkannt | echte Scans 0 Halluz |
+| 4 | `eval_groundtruth.py` (Dim 3) — Recall/Precision-Proxy/TN gegen targets.yaml | Tomcat-Trace (alt) → Recall 1.0; CLEAN → 0 CVEs | TP Recall 1.0, TN 0 FP |
+| 5 | `eval_consistency.py` (Dim 4, N=4) — cve_jaccard, port_consistency, grade_stddev | synth. 4 identische→1.0; 4 verschiedene→<1.0 | Ports 1.0, CVE-Jaccard ≥0.8 |
+| 6 | LLM-Judge Versions-Treue (Dim 2, nutzt Remote-Modell) | gegen 5 BUG-17-Fälle (OpenSSH verif / Coyote spekulativ) | Judge ≥80% Konsens mit BUG-17-Gate |
+| 7 | `run_matrix.py` — VulHub-Lifecycle auto + {Targets}×{N=4} + ruft eval_*.py | Smoke 1×1; Container start/stop sauber | E2E ohne manuelle Eingriffe, Matrix-Report |
+| 8 | Ausgiebiger Test: volle Matrix 4 Targets × N=4 (=16 Scans) + Scope-Variation | Matrix-Report = Verifikation; schließt qwen3-CVE-Gründlichkeits-Vorbehalt | TP Recall 1.0, CLEAN 0 FP, Konsistenz ≥0.8, 0 Halluz |
 
-**Zusätzlicher offener Verifikations-Vorbehalt:** qwen3-coder **CVE-Gründlichkeit** noch nicht breit belegt
-(nur 2 Läufe, 1× mit NVD-Ausfall → dünn). Sauberster Test: qwen3-coder gegen VulHub-Container (Tomcat
-8.5.19 → CVE-2017-12615, WebLogic 12.2.1.3 → CVE-2023-21839) — Ziel-CVE exakt bekannt, NVD-unabhängig
-gepinnt. Auch: `dnsx`/`katana` (konditionale Tools) wurden mit qwen3-coder noch nie ausgelöst.
+**Verifikations-Philosophie:** Jedes `eval_*.py` mit Positiv- UND Negativ-Kontrolle (misst es wirklich, oder
+immer „grün"?). Eval-Skripte sind **read-only** → keine Auswirkung auf Framework-Output. Nur `run_matrix.py`
+löst echte Scans aus → dort zusätzlich Scorecard prüfen.
+
+**Schließt nebenbei:** offenen Vorbehalt „qwen3-coder CVE-Gründlichkeit dünn" (N=4 gegen VulHub) +
+`dnsx`/`katana` mit qwen3-coder erstmals provozieren.
 
 ### Architektur-Entscheidung (2026-06-14) — Phase 9
 
