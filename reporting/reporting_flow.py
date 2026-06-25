@@ -144,17 +144,7 @@ class ReportingFlow(Flow[ReportingState]):
         # ── NVD-Sektion aufbauen ──────────────────────────────────────────────
         valid    = [r for r in self.state.nvd_results if "error" not in r]
         errors   = [r for r in self.state.nvd_results if "error" in r]
-        critical = [r for r in valid if (r.get("cvss_severity") or "").upper() == "CRITICAL"]
-        high     = [r for r in valid if (r.get("cvss_severity") or "").upper() == "HIGH"]
-
         valid.sort(key=lambda r: r.get("cvss_score") or 0, reverse=True)
-
-        nvd_lines = [
-            "\n## CVE Validation (NVD API v2)\n",
-            f"*Source: https://nvd.nist.gov — {ts_human}*\n",
-            f"- Total: **{len(self.state.nvd_results)}**  "
-            f"Critical: **{len(critical)}**  High: **{len(high)}**\n",
-        ]
 
         # BUG-17 — Banner-Versions-Gate: trenne versions-verifizierte CVEs von solchen
         # ohne erkannte Service-Version. Eine CVE mit echtem CVSS ist NICHT automatisch
@@ -164,6 +154,19 @@ class ReportingFlow(Flow[ReportingState]):
         version_unk = [r for r in valid if r not in version_ok]
         split_sections = bool(version_ok and version_unk)
 
+        # Kopfzeilen-Zählung: nur die TATSÄCHLICH gelisteten CVEs zählen (versions-
+        # verifizierte + KEV-Ausnahmen) — versionslose generische CVEs werden weder
+        # gelistet noch gezählt, sonst täuscht "Critical: 14" eine Bedrohung vor die
+        # nur aus versionsloser Spekulation besteht (User-Entscheidung 2026-06-25).
+        def _sev(r, s): return (r.get("cvss_severity") or "").upper() == s
+        _counted = version_ok  # KEV-Ausnahmen werden unten ergänzt (siehe version_unk_kev)
+
+        nvd_lines = [
+            "\n## CVE Validation (NVD API v2)\n",
+            f"*Source: https://nvd.nist.gov — {ts_human}*\n",
+            "__HEADER_COUNTS__",   # Platzhalter — final ersetzt nachdem KEV bekannt ist
+        ]
+
         if version_ok:
             if split_sections:
                 nvd_lines += [
@@ -172,19 +175,62 @@ class ReportingFlow(Flow[ReportingState]):
                     "",
                 ]
             nvd_lines += _format_cve_entries(version_ok)
-        if version_unk:
-            if split_sections:
-                nvd_lines += ["\n### ⚠️ CVEs OHNE Versions-Bestätigung\n"]
-            else:
-                nvd_lines += ["### ⚠️ CVEs OHNE Versions-Bestätigung\n"]
+
+        # Versionslose CVEs werden NICHT mehr gelistet (User-Entscheidung 2026-06-25):
+        # eine Liste produkt-generischer "alle Critical-CVEs für Apache"-Treffer ohne
+        # erkannte Version hat keinen praktischen Wert (reine Spekulation/Rauschen).
+        # AUSNAHME: aktiv ausgenutzte CVEs (CISA-KEV-Heuristik: "exploited" in der
+        # NVD-Beschreibung) werden als expliziter Hinweis behalten — die sind auch
+        # ohne Versions-Match relevant.
+        def _is_kev(r: dict) -> bool:
+            desc = (r.get("description") or "").lower()
+            return ("exploited in the wild" in desc or "known to be exploited" in desc
+                    or "actively exploited" in desc)
+
+        version_unk_kev = [r for r in version_unk if _is_kev(r)]
+        version_unk_dropped = [r for r in version_unk if not _is_kev(r)]
+
+        # Header-Zählung final: nur gelistete CVEs (verifiziert + KEV-Ausnahmen)
+        _counted = version_ok + version_unk_kev
+        _crit = sum(1 for r in _counted if _sev(r, "CRITICAL"))
+        _high = sum(1 for r in _counted if _sev(r, "HIGH"))
+        _hdr = (f"- Gelistet: **{len(_counted)}**  Critical: **{_crit}**  High: **{_high}**"
+                + (f"  ·  {len(version_unk_dropped)} versionslose generische CVE(s) ausgeblendet"
+                   if version_unk_dropped else "") + "\n")
+        nvd_lines = [(_hdr if ln == "__HEADER_COUNTS__" else ln) for ln in nvd_lines]
+
+        if version_unk_kev:
             nvd_lines += [
-                "*NVD liefert CVSS, aber der Scan hat KEINE konkrete Produkt-Version "
-                "erkannt (z.B. Banner `Apache-Coyote/1.1` ohne Version). Der Versions-"
-                "Match ist daher SPEKULATIV — diese CVEs sind potenzielle False-"
-                "Positives und KEINE bestätigten Findings ohne manuelle Prüfung.*",
+                "\n### ⚠️ Aktiv ausgenutzt — ABER Version unbestätigt\n",
+                "*Diese CVE(s) werden laut NVD aktiv ausgenutzt (KEV) und sind daher auch "
+                "ohne Versions-Match relevant. Der Scan hat KEINE konkrete Produkt-Version "
+                "erkannt — ob die laufende Version betroffen ist, ist UNBESTÄTIGT. Manuelle "
+                "Versionsprüfung empfohlen.*",
                 "",
             ]
-            nvd_lines += _format_cve_entries(version_unk)
+            nvd_lines += _format_cve_entries(version_unk_kev)
+
+        if version_unk_dropped and not version_ok and not version_unk_kev:
+            # Nichts Verwertbares: klarer Hinweis statt einer Fantasie-CVE-Liste
+            prods = sorted({_cve_product_keywords(r) and sorted(_cve_product_keywords(r))[0]
+                            for r in version_unk_dropped if _cve_product_keywords(r)})
+            prod_str = ", ".join(p for p in prods if p) or "die erkannten Dienste"
+            nvd_lines += [
+                "### ℹ️ Keine versionsspezifische CVE-Analyse möglich\n",
+                f"*Für {prod_str} wurde KEINE konkrete Version erkannt (Server-Härtung: "
+                f"Banner ohne Versionsnummer). {len(version_unk_dropped)} produkt-generische "
+                f"CVE(s) wurden daher NICHT gelistet — eine versionslose Liste wäre reine "
+                f"Spekulation ohne praktischen Wert. Empfehlung: interne Versionsprüfung "
+                f"(z.B. `httpd -v`), dann gezielter Re-Scan.*",
+                "",
+            ]
+        elif version_unk_dropped:
+            # Es gibt verwertbare CVEs daneben → nur knapper Vermerk über die verworfenen
+            nvd_lines += [
+                f"\n*({len(version_unk_dropped)} weitere produkt-generische CVE(s) ohne "
+                f"Versions-Match wurden als nicht-verwertbar ausgeblendet.)*",
+                "",
+            ]
 
         if errors:
             # Unterscheide NVD-Unerreichbarkeit (503/timeout) von echtem "existiert nicht".
@@ -238,9 +284,9 @@ class ReportingFlow(Flow[ReportingState]):
         table.add_column(style="dim", min_width=16)
         table.add_column()
         table.add_row("Target",    f"[bold white]{target}[/]")
-        table.add_row("CVEs",      str(len(self.state.nvd_results)))
-        table.add_row("Critical",  f"[red]{len(critical)}[/]")
-        table.add_row("High",      f"[yellow]{len(high)}[/]")
+        table.add_row("CVEs",      str(len(_counted)))
+        table.add_row("Critical",  f"[red]{_crit}[/]")
+        table.add_row("High",      f"[yellow]{_high}[/]")
         table.add_row("", "")
         if self.state.scan_report_path:
             table.add_row("Scan report",   f"[dim]{self.state.scan_report_path}[/]")

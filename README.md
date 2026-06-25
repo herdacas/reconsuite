@@ -81,6 +81,42 @@ cp models.json.example models.json   # Modelle konfigurieren
 
 ---
 
+## Modell-Anforderungen
+
+Das Framework treibt die Agents über **Ollama native Function-Calling**. Nicht jedes LLM ist geeignet —
+die Anforderungen sind empirisch ermittelt (mehrere Modelle gegen echte Scans getestet).
+
+**Ein verwendbares Modell MUSS:**
+1. **Natives Tool-Calling / Function-Calling** beherrschen. Reine Chat-Modelle scheitern mit
+   „Invalid response from LLM call". Geeignet sind Coder-/Tool-Use-trainierte Modelle.
+2. **Stabil bei tiefen Multi-Turn-Tool-Ketten** sein (≥10 Nachrichten). Das ist der eigentliche Test —
+   ein einzelner Tool-Call sagt nichts aus. Manche Modelle bestehen Einzel-Calls, scheitern aber im
+   echten Scan mit leeren Antworten.
+3. **Non-Reasoning sein ODER `think:False` respektieren.** Reasoning-Modelle (z. B. gpt-oss, Qwen3-thinking)
+   verlieren bei tiefen Ketten sporadisch ihre Antwort im verworfenen Reasoning-Kanal.
+
+**Empfohlene Modelle (getestet):**
+
+| Rolle | Modell | Bewertung |
+|---|---|---|
+| **Remote-Worker** | `qwen3-coder:480b` (ollama.com) | ✅ aktiv — Non-Reasoning, agentic, 0 % Leerantworten |
+| **Lokal-Worker** | `qwen2.5:7b-instruct` | ✅ schnellster, solides Tool-Calling |
+| | `llama3-groq-tool-use:8b` | ✅ explizit für Tool-Use trainiert |
+| | `qwen3-coder:30b` | ✅ stärkste lokale Qualität (langsamer) |
+| **Planner** (immer lokal) | `qwen2.5:7b-instruct` | ✅ native Ollama-FC erforderlich |
+
+**Nicht geeignet:** Gemma-Familie (`gemma*:e2b` etc. — schwaches agentic Function-Calling, scheitert im
+echten Scan trotz bestandener Einzel-Calls), reine Reasoning-Modelle ohne `think:False`-Konformität.
+
+**Mindest-Kontextfenster:** Worker ≥ 8k Tokens (reale Prompts ~2–5k), lokal genügen 8k. Der Planner
+ist ein Sonderfall (große Scopes), wird daher bei >5 Tasks automatisch deaktiviert (siehe BUG-18-Hinweis unten).
+
+> **Diagnose-Werkzeug:** `RECON_LLM_DEBUG=1 python3 main.py …` protokolliert jeden LLM-Call
+> (Prompt-Größe, Status, Leerantworten) nach `logs/llm_debug_<pid>.jsonl` — nützlich um ein neues
+> Modell auf Tauglichkeit zu prüfen.
+
+---
+
 ## Schnellstart
 
 ```bash

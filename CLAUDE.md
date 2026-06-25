@@ -9,13 +9,56 @@ Wir arbeiten die Roadmap (`roadmap.md`) phasenweise ab. Im Ablauf wird entschied
 
 **WICHTIG — Keine pauschalen Antworten. Faktenbasierte Responses auf jede Frage.**
 
-### Aktueller Stand (2026-06-18)
+### Aktueller Stand (2026-06-25)
+- **BUG-20 (2026-06-25) — versionslose generische CVEs werden NICHT mehr gelistet** (User-Entscheidung, deterministisch): Befund bei zib.niedersachsen.de — Server sendet nur `Server: Apache` (gehärtet, `ServerTokens Prod`), trotzdem 16 CVEs / 14 Critical gelistet. Alle waren produkt-generische Keyword-Treffer ("alle Apache-Critical-CVEs 2017–2023") ohne Versions-Bezug → wertloses Rauschen. **WICHTIG: reine Prompt-Anweisung (tasks.py) reichte NICHT** — das LLM trug trotzdem 13 generische CVEs ein. Durchsetzungsstarker Fix ist DETERMINISTISCH im reporting: das vorhandene BUG-17-Gate (`_version_confirmed_in_scan`) **entfernt** jetzt versionslose CVEs (statt sie nur als UNBESTÄTIGT zu markieren). AUSNAHME: aktiv ausgenutzte (CISA-KEV-Heuristik: "exploited in the wild" in NVD-Desc) bleiben als expliziter Hinweis. Kopfzeile + Completion-Panel zählen nur noch gelistete CVEs. Verifiziert: zib 16→1 (nur KEV CVE-2021-41773), 14 ausgeblendet; Tomcat 8.5.19 (Version bekannt) behält CVE-2017-12615/12617 unverändert. Lehre: CVE-Kontrolle braucht Guardrail, nicht Prompt-Bitte.
 - **Aktives Remote-Worker-Modell: `qwen3-coder:480b`** (ollama.com, Non-Reasoning, agentic Tool-Calling). Ersetzt `gpt-oss:120b` wegen Leerantworten bei tiefen FC-Ketten — siehe BUG-19. Planner läuft weiterhin lokal (qwen2.5:7b).
 - **`full`-Scope läuft stabil durch** (alle 7 Phasen, 6 Teams, 0 Retries) — nach BUG-18 (Planner bei >5 Tasks aus) + BUG-19 (Modellwechsel). Verifiziert demo.testfire.net Grade A 99.8.
 - **Diagnose-Werkzeug:** `RECON_LLM_DEBUG=1 python3 main.py …` schreibt `logs/llm_debug_<pid>.jsonl` (jeder LLM-Call: Agent, Prompt-Größe, Status, Leerantworten). Env-gated, null Overhead ohne die Var.
 - Phasen 1–9 + Finale Abnahme abgeschlossen; offene Punkte siehe „Offen"-Block weiter unten.
 
-### ➡️ AKTIVER ARBEITSPLAN — Testkonzept-Harness (Stand 2026-06-18, freigegeben)
+### ➡️ AKTIVER ARBEITSPLAN — Testkonzept-Harness (Schritte 1–8 UMGESETZT, Stand 2026-06-23)
+
+**ERGEBNIS-STAND (2026-06-23):** Harness vollständig gebaut + verifiziert (lokal committet `e11209e`).
+Alle 6 Bausteine mit Positiv/Negativ-Kontrolle bestanden. Volle Matrix gelaufen (3 Container-Targets
+× N=4 = 12 Scans, REMOTE qwen3-coder, Container-Lifecycle auto). Auswertung:
+
+| Target | Dim 1 Input | Dim 2 Halluz | Dim 3 Recall | Port-Konsistenz |
+|---|---|---|---|---|
+| Tomcat 8.5.19 (TP) | ✅ 100% | ✅ 0 | ✅ **4/4 Recall 1.0** (CVE-2017-12615/12617) | ✅ 1.0 |
+| WebLogic 12.2.1.3 (TP) | ✅ 100% | ✅ 0 | ✅ **3/4 Recall 1.0** (CVE-2023-21839) | ✅ 1.0 |
+| nginx:alpine (TN) | ✅ 100% | ✅ 0 | ⚠️ echtes nuclei-CVE gefunden (s.u.) | ✅ 1.0 |
+
+**Kern-Erkenntnisse:**
+1. **Tool-Input + Output-Handling makellos** (deine 2 Kernpunkte): 100% saubere Tool-Inputs, 0 Halluzinationen über ALLE Läufe. qwen3-coder erfindet nichts, verstümmelt keine Targets.
+2. **Ziel-CVE-Findung robust** → schließt qwen3-coder-Gründlichkeits-Vorbehalt POSITIV. Designierte CVEs zuverlässig gefunden (Tomcat 4/4, WebLogic 3/4).
+3. **Konsistenz: Ports deterministisch (1.0), CVE-GESAMT-Menge stochastisch** (Jaccard 0.09–0.44). Grund: variierende Begleit-CVEs (großer CPE-Pool + NVD-Ranking-Schwankung), NICHT die Ziel-CVE. Ehrliche Erkenntnis: konsistent bei Kern-CVE, stochastisch bei Vollständigkeit.
+4. **nginx war NICHT 100% clean:** nuclei fand `CVE-2026-42530` (echtes HTTP/3-UAF in nginx 1.31.2) — kein Framework-Fehler, reale tool-bestätigte Schwachstelle. TN-Annahme war zu optimistisch. Framework verarbeitete korrekt (mal verifiziert, mal UNBESTÄTIGT je nach NVD-Status).
+
+**Offene Harness-Schwachpunkte (run_matrix, NICHT Framework — TODO nächste Session):**
+- `run_matrix.py` sollte `exit≠0`-Läufe aus der Auswertung nehmen (sonst greift `_newest` einen alten Report → 2 verfälschte Dim3-Ergebnisse: Tomcat Lauf 4, nginx Lauf 4).
+- CVE-Jaccard auf GESAMT-Menge ist zu streng als Pass-Kriterium. Besser: Jaccard auf **versions-verifizierte** CVEs ODER separater „Ziel-CVE-Konsistenz"-Wert (Recall über N Läufe).
+- TN-Target: nginx:alpine hat ein echtes CVE → entweder akzeptieren (forbid_cves nutzen) oder älteres gehärtetes Image als echtes TN.
+
+**Noch ausstehend:** scanme.nmap.org bewusst NICHT in Matrix (12-Scans/Tag-Limit) → separat mit kleinem N.
+Lokal-Achse (llama3-groq) steht aus (User entfernt Key bei Bedarf). `dnsx`/`katana` weiterhin nicht provoziert.
+
+**GIT-STAND (Entscheidung User, 2026-06-23): ALLES LOKAL — NICHTS GEPUSHT.**
+- `origin/main` ist bei `b9d2edb` (letzter gepushter Stand: Modell-Anforderungen).
+- Lokal voraus (NICHT pushen ohne neue Freigabe): `874873d` (Arbeitsplan), `9ff72b7` (Testkonzept),
+  `e11209e` (Harness-Code), `560b6ce` (Matrix-Ergebnisse), + dieser Doku-Commit.
+- Das gesamte `testing/`-Harness + Testkonzept bleibt vorerst lokal (User-Wunsch). CLAUDE.md-Doku
+  ebenfalls lokal belassen, damit Harness + Doku zusammen bleiben (Commits bauen aufeinander auf).
+- Nächste Session: hier weitermachen. Erst klären ob gepusht werden soll, sonst lokal weiterarbeiten.
+
+**NÄCHSTE SESSION — konkrete nächste Schritte (Priorität):**
+1. Harness-Schwachpunkte fixen (run_matrix exit≠0-Filter + Jaccard-Metrik auf versions-verifizierte CVEs/Ziel-CVE-Recall).
+2. TN-Target sauber machen (nginx forbid_cves ODER anderes Image).
+3. scanme.nmap.org separat (kleines N, Rate-Limit) + Lokal-Achse (llama3-groq, Key entfernen).
+4. Optional: dnsx/katana mit Subdomain-reichem Target provozieren.
+
+---
+
+#### Ursprünglicher Plan (Referenz):
 
 **Kontext:** Roadmap (Phasen 1–9 + Finale Abnahme) vollständig durch. Post-Roadmap-Phase: Aufbau des
 Test-Harness zum Konzept [`testing/TESTKONZEPT.md`](testing/TESTKONZEPT.md) (4 Dimensionen, Remote/Lokal-Matrix,
