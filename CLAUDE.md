@@ -10,6 +10,13 @@ Wir arbeiten die Roadmap (`roadmap.md`) phasenweise ab. Im Ablauf wird entschied
 **WICHTIG — Keine pauschalen Antworten. Faktenbasierte Responses auf jede Frage.**
 
 ### Aktueller Stand (2026-06-25)
+- **PENTEST-SCOPE-REPORTING-UMBAU (2026-06-25)** — drei Audit-Checks (CrewAI-Konformität, Berichts-Detailtiefe, Pentest-Terminologie) durchgeführt. **Check 1: ✅ Framework-konform** (idiomatischer Flow/Router/Guardrails/output_pydantic, gut dokumentiert). **Check 2 + 3 ergaben Handlungsbedarf, umgebaut:**
+  - **compliance_flow.py:** OWASP-Mapping von Audit- auf PENTEST-Terminologie. **Strikte PoC-Schranke deterministisch** (`_extract_nuclei_poc`): nur nuclei-verifizierte Treffer gegen DIESES Target (`[CVE] [http] [critical/high] <url>`) zählen als „nachgewiesen ausnutzbar" — nicht LLM-Einschätzung „PoC existiert irgendwo". Mit PoC → Exploit-Ansatz + Endpunkte/Payloads für Exploit-Entwicklung + Remediation NUR für verifizierte Findings. Ohne PoC → nur Angriffsfläche/Ansatzpunkte, KEINE Härtungsempfehlung, Wortwahl „potenziell" statt „nachgewiesen", Severity max High. Verifiziert: rastede (kein nuclei-PoC) 3→0 „nachgewiesen", Severity≤High; WebLogic (5 nuclei-CVEs) → Exploit-Details mit Endpunkten.
+  - **tasks.py reporter-Task:** „KOMPAKT-PFLICHT max 5 Zeilen / im Zweifel weglassen" → **DETAIL-PFLICHT** für pentest-relevante Infos (exakte Versionen inkl. Patch-Level, Angriffsvektoren wie T3 explizit, exponierte Dienste mit Service-Hypothese, interessante Endpunkte). Verifiziert: WebLogic-Scan zeigt jetzt `OpenSSH 9.6p1 Ubuntu 3ubuntu13.16`, T3 als Vektor markiert, Ollama/OpenClaw-Ports identifiziert, OpenSSH-CVEs mit Beschreibung.
+  - **risk_flow.py `_next_steps`:** Defender-Empfehlungen („isolieren/patchen/Monitoring") → Angriffs-Priorisierung („Exploit entwickeln", „Verkettbarkeit prüfen"). Deterministisch, 0 Defender-Begriffe verifiziert.
+  - **reporting_flow.py:** versionslos-Hinweis von „Server-Härtung" auf Angreifer-Schritt („Version fingerprinten, dann gezielter Re-Scan") umformuliert.
+  - **Prinzip (Pentest-Scope):** Empfehlungen zur Security-Verbesserung NUR bei nachgewiesener Ausnutzbarkeit (PoC). Sonst Fokus auf Ausnutzung/Exploit-Entwicklung/Angriffsfläche. LLM-Mehrwert = Tool-Daten für Exploit-Entwicklung aufbereiten.
+- **setup_tools.sh (2026-06-25):** installiert die 18 externen Scan-Tools (System-Binaries, KEINE Python-Pakete → nicht in requirements.txt). apt + `go install` (ProjectDiscovery) + Git (exploitdb). Idempotent, `--check`-Modus. Wichtig: httpx = ProjectDiscovery-Go, nicht apt/Python-httpx.
 - **BUG-21 (2026-06-25) — findings-Guardrail-Lücke: 0 CVE-Tools → stilles falsches „keine Vulns"** (Lokal-Achsen-Befund): Lokaler Test (llama3-groq-tool-use:8b, web-Scope) zeigte: das schwache 8B-Modell schloss die findings-Phase mit validem JSON („No vulnerabilities found") ab, OHNE ein einziges CVE-Tool (searchsploit/nvd_*) aufzurufen — es urteilte direkt aus dem Banner. Der vorhandene `_cve_trace_guardrail` fängt das NICHT (prüft nur EINGETRAGENE CVEs gegen Trace; bei leerer `cve_references` nichts zu prüfen). **Wichtig: NICHT scope-spezifisch** — der findings-Task ist für web/network IDENTISCH (kein scope-Parameter in `make_tasks()`); Ursache ist 8B-Modell-Schwäche (mal 0 Tools, mal halluzinierte Fake-CVEs `CVE-2021-12345`). Fix: neuer `_cve_tool_used_guardrail` auf findings — erzwingt mind. 1 CVE-Recherche-Tool-Aufruf, sonst Reject (No-Tool-Fallback nach 1 Reject). Wirkung: schwaches Modell bricht jetzt EHRLICH ab statt still „keine Vulns" zu lügen (sicherer). Verifiziert: feuert NICHT bei gesunden Remote-findings (qwen3-coder nutzt Tools), red-Task unberührt. **Lokal-Achsen-Fazit: 8B läuft E2E durch (network ✅, 0 Leerantworten, ~37min), aber findings-CVE-Phase für 8B zu schwach (Tool-Calling unzuverlässig) — für verlässliche CVE-Analyse stärkeres lokales Modell nötig (qwen3-coder:30b Kandidat).**
 - **BUG-20 (2026-06-25) — versionslose generische CVEs werden NICHT mehr gelistet** (User-Entscheidung, deterministisch): Befund bei zib.niedersachsen.de — Server sendet nur `Server: Apache` (gehärtet, `ServerTokens Prod`), trotzdem 16 CVEs / 14 Critical gelistet. Alle waren produkt-generische Keyword-Treffer ("alle Apache-Critical-CVEs 2017–2023") ohne Versions-Bezug → wertloses Rauschen. **WICHTIG: reine Prompt-Anweisung (tasks.py) reichte NICHT** — das LLM trug trotzdem 13 generische CVEs ein. Durchsetzungsstarker Fix ist DETERMINISTISCH im reporting: das vorhandene BUG-17-Gate (`_version_confirmed_in_scan`) **entfernt** jetzt versionslose CVEs (statt sie nur als UNBESTÄTIGT zu markieren). AUSNAHME: aktiv ausgenutzte (CISA-KEV-Heuristik: "exploited in the wild" in NVD-Desc) bleiben als expliziter Hinweis. Kopfzeile + Completion-Panel zählen nur noch gelistete CVEs. Verifiziert: zib 16→1 (nur KEV CVE-2021-41773), 14 ausgeblendet; Tomcat 8.5.19 (Version bekannt) behält CVE-2017-12615/12617 unverändert. Lehre: CVE-Kontrolle braucht Guardrail, nicht Prompt-Bitte.
 - **Aktives Remote-Worker-Modell: `qwen3-coder:480b`** (ollama.com, Non-Reasoning, agentic Tool-Calling). Ersetzt `gpt-oss:120b` wegen Leerantworten bei tiefen FC-Ketten — siehe BUG-19. Planner läuft weiterhin lokal (qwen2.5:7b).
@@ -43,19 +50,23 @@ Alle 6 Bausteine mit Positiv/Negativ-Kontrolle bestanden. Volle Matrix gelaufen 
 **Noch ausstehend:** scanme.nmap.org bewusst NICHT in Matrix (12-Scans/Tag-Limit) → separat mit kleinem N.
 Lokal-Achse (llama3-groq) steht aus (User entfernt Key bei Bedarf). `dnsx`/`katana` weiterhin nicht provoziert.
 
-**GIT-STAND (Entscheidung User, 2026-06-23): ALLES LOKAL — NICHTS GEPUSHT.**
-- `origin/main` ist bei `b9d2edb` (letzter gepushter Stand: Modell-Anforderungen).
-- Lokal voraus (NICHT pushen ohne neue Freigabe): `874873d` (Arbeitsplan), `9ff72b7` (Testkonzept),
-  `e11209e` (Harness-Code), `560b6ce` (Matrix-Ergebnisse), + dieser Doku-Commit.
-- Das gesamte `testing/`-Harness + Testkonzept bleibt vorerst lokal (User-Wunsch). CLAUDE.md-Doku
-  ebenfalls lokal belassen, damit Harness + Doku zusammen bleiben (Commits bauen aufeinander auf).
-- Nächste Session: hier weitermachen. Erst klären ob gepusht werden soll, sonst lokal weiterarbeiten.
+**GIT-STAND (Stand 2026-06-25, nach Pentest-Scope-Push):**
+- **Gepusht** auf `origin/main`: Programm-Commits (BUG-14 bis BUG-21, Modell-Doku, Pentest-Scope-Umbau,
+  setup_tools.sh, README/CLAUDE-Doku). Das ausgelieferte Programm ist aktuell auf dem Remote.
+- **NUR LOKAL** (bewusst, NICHT pushen ohne Freigabe): das `testing/`-Harness + Matrix-Ergebnisse
+  (Verifikations-Infrastruktur, gehört nicht ins ausgelieferte Programm). Commit-Reihenfolge so umgebaut
+  dass die Programm-Commits VOR dem testing/-Commit liegen → Push nimmt das Harness nicht mit.
+- roadmap.md + models.json bleiben gitignored.
 
-**NÄCHSTE SESSION — konkrete nächste Schritte (Priorität):**
-1. Harness-Schwachpunkte fixen (run_matrix exit≠0-Filter + Jaccard-Metrik auf versions-verifizierte CVEs/Ziel-CVE-Recall).
-2. TN-Target sauber machen (nginx forbid_cves ODER anderes Image).
-3. scanme.nmap.org separat (kleines N, Rate-Limit) + Lokal-Achse (llama3-groq, Key entfernen).
-4. Optional: dnsx/katana mit Subdomain-reichem Target provozieren.
+**NÄCHSTE SESSION — offene Punkte (Priorität):**
+1. **Gesamt-E2E-Beweis Pentest-Scope:** ein voller Scan (z.B. rastede.de full, Remote) der zeigt dass ALLE
+   4 Reports im Zusammenspiel sauber Pentest-Sprache liefern (compliance+reporter+risk+final). Einzeln verifiziert,
+   Zusammenspiel noch nicht.
+2. **Lokal-Achse abschließen:** llama3-groq E2E-Scan (network lief durch; findings-CVE-Phase für 8B zu schwach,
+   BUG-21-Guardrail greift → ehrlicher Abbruch). Stärkeres lokales Modell testen (qwen3-coder:30b Kandidat).
+3. **Testkonzept-Harness-Schwachpunkte** (testing/, lokal): run_matrix exit≠0-Filter + Jaccard-Metrik auf
+   versions-verifizierte/Ziel-CVEs. TN-Target sauber (nginx forbid_cves). scanme separat (Rate-Limit).
+4. **Optional:** dnsx/katana mit Subdomain-reichem Target provozieren (mit qwen3-coder noch nie ausgelöst).
 
 ---
 

@@ -14,6 +14,14 @@ Threat Intel  →  Compliance-Mapping  →  Risk-Scoring  →  Final Report
 
 Jede Phase ist ein eigenständiger CrewAI-Flow oder deterministischer Prozess. Ein LLM-Planner wählt anhand von Scope und Objective die relevanten Phasen aus. Das Routing nach dem Scan entscheidet dynamisch welche Teams aktiv werden.
 
+### Report-Scope: Pentest, nicht Audit
+
+Die Berichte sind auf einen **Penetrationstest** ausgerichtet, nicht auf ein defensives Audit:
+
+- **Fokus auf Ausnutzung** — die Reports bereiten die Tool-Daten so auf, dass sie zur Exploit-Entwicklung weiterverwendet werden können (exakte Versionen inkl. Patch-Level, Angriffsvektoren, exponierte Endpunkte, Payloads).
+- **Security-/Remediation-Empfehlungen NUR bei nachgewiesener Ausnutzbarkeit (PoC).** „Nachgewiesen" heißt deterministisch: ein aktiver `nuclei`-Treffer gegen das Ziel — nicht „ein PoC existiert irgendwo". Ohne PoC beschreiben die Reports ausschließlich die Angriffsfläche und potenzielle Ausnutzungs-Pfade.
+- **Versionslose generische CVEs** (Banner ohne Version) werden NICHT als Findings gelistet — eine Liste „alle CVEs für Apache" ohne Versions-Match ist wertloses Rauschen. Ausnahme: aktiv ausgenutzte (CISA-KEV).
+
 ---
 
 ## Architektur
@@ -72,12 +80,26 @@ Innerhalb von Team 1 kommunizieren die 5 Agents über den CrewAI Task-Kontext (P
 
 - Python 3.11+
 - Ollama lokal oder remote (API-kompatibler Endpunkt)
-- System-Tools: `nmap`, `nikto`, `whatweb`, `sslscan`, `subfinder`, `nuclei`, `httpx`, `ffuf`, `dnsrecon`, u.a.
+- **Externe Scan-Tools** (System-Binaries, KEINE Python-Pakete): `nmap`, `nikto`, `whatweb`,
+  `sslscan`, `dnsrecon`, `whois`, `dig`, `curl`, `ping` (apt) · `nuclei`, `httpx`, `dnsx`,
+  `katana`, `subfinder` (ProjectDiscovery, Go) · `searchsploit` (exploitdb, Git)
 
 ```bash
+# 1. Python-Abhängigkeiten
 pip install -r requirements.txt
-cp models.json.example models.json   # Modelle konfigurieren
+
+# 2. Externe Scan-Tools (Kali/Debian/Ubuntu) — idempotent, installiert nur Fehlendes
+sudo bash setup_tools.sh
+bash setup_tools.sh --check        # nur prüfen welche Tools fehlen (installiert nichts)
+
+# 3. Modelle konfigurieren
+cp models.json.example models.json
 ```
+
+> **Hinweis:** Die Scan-Tools sind kompilierte Binaries (C/Go), keine Python-Pakete — sie
+> gehören daher NICHT in `requirements.txt`. `setup_tools.sh` installiert sie aus den
+> korrekten Quellen (apt / `go install` / Git). Wichtig: `httpx` ist die **ProjectDiscovery**-
+> Variante (Go), nicht das gleichnamige apt-/Python-Paket.
 
 ---
 

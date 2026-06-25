@@ -217,11 +217,12 @@ class ReportingFlow(Flow[ReportingState]):
             prod_str = ", ".join(p for p in prods if p) or "die erkannten Dienste"
             nvd_lines += [
                 "### ℹ️ Keine versionsspezifische CVE-Analyse möglich\n",
-                f"*Für {prod_str} wurde KEINE konkrete Version erkannt (Server-Härtung: "
-                f"Banner ohne Versionsnummer). {len(version_unk_dropped)} produkt-generische "
-                f"CVE(s) wurden daher NICHT gelistet — eine versionslose Liste wäre reine "
-                f"Spekulation ohne praktischen Wert. Empfehlung: interne Versionsprüfung "
-                f"(z.B. `httpd -v`), dann gezielter Re-Scan.*",
+                f"*Für {prod_str} hat das Ziel KEINE konkrete Version preisgegeben (Banner ohne "
+                f"Versionsnummer — gehärtete Konfiguration). {len(version_unk_dropped)} produkt-"
+                f"generische CVE(s) wurden daher NICHT gelistet (versionslose Treffer sind ohne "
+                f"Versions-Match nicht verwertbar). Nächster Angriffsschritt: Version über andere "
+                f"Wege fingerprinten (Error-Pages, Verhaltens-Unterschiede, Default-Pfade), dann "
+                f"versions-gezielter Re-Scan.*",
                 "",
             ]
         elif version_unk_dropped:

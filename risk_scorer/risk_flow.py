@@ -245,19 +245,27 @@ def _score_to_level(score: float) -> str:
 
 
 def _next_steps(state: RiskState) -> list[str]:
+    """Pentest-Scope (2026-06-25): Priorisierung der ANGRIFFS-Schritte für den
+    Pentester — NICHT defensive Härtungs-/Patch-Empfehlungen. Deterministisch.
+    Remediation gehört nur in den Report wenn die Ausnutzbarkeit nachgewiesen ist
+    (das übernimmt das compliance-Team mit der nuclei-PoC-Schranke), nicht hier.
+    """
     steps = []
-    if state.risk_level in ("CRITICAL", "HIGH"):
-        steps.append("- **Sofortige Maßnahmen:** Betroffene Systeme isolieren oder patchen.")
     if state.has_exploitable:
-        steps.append("- **Exploitable Services:** Aktive Exploitation-Vektoren priorisiert schließen.")
+        steps.append("- **Priorisierte Angriffsvektoren:** Die als ausnutzbar identifizierten "
+                     "Dienste zuerst angehen — Exploit entwickeln/anpassen und Zugang verifizieren.")
     if _has_in_the_wild(state.threat_intel_output):
-        steps.append("- **In-the-Wild:** CVEs werden aktiv ausgenutzt — Patch-Zeitfenster kritisch.")
+        steps.append("- **Aktiv ausgenutzt (in-the-wild):** Für diese CVEs existieren reale "
+                     "Exploits — öffentliche PoCs als Ausgangsbasis für die Ausnutzung prüfen.")
     if state.critical_count > 0:
-        steps.append(f"- **{state.critical_count} Critical CVE(s):** Patch oder Mitigierung innerhalb 24h.")
+        steps.append(f"- **{state.critical_count} Critical CVE(s):** Höchste Priorität für "
+                     "Exploit-Entwicklung — potenzieller Vollzugriff/RCE.")
     if state.high_count > 0:
-        steps.append(f"- **{state.high_count} High CVE(s):** Patch innerhalb 7 Tage.")
+        steps.append(f"- **{state.high_count} High CVE(s):** Sekundäre Angriffsziele — "
+                     "auf Verkettbarkeit mit den Critical-Vektoren prüfen.")
     if not steps:
-        steps.append("- Keine unmittelbaren Maßnahmen erforderlich. Routine-Monitoring fortsetzen.")
+        steps.append("- Keine ausnutzbaren Vektoren in dieser Session bestätigt. "
+                     "Weitere Recon empfohlen (tiefere Enumeration, Subdomains, andere Ports).")
     return steps
 
 
