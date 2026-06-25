@@ -1,0 +1,305 @@
+{
+  "timestamp": "20260622_015428",
+  "n_runs": 4,
+  "targets": {
+    "tomcat-cve-2017-12615": {
+      "kind": "tp",
+      "runs": [
+        {
+          "artifacts": {
+            "trace": "/opt/projects/agentic-ai/recon-suite/logs/trace_127.0.0.1_20260622_020403.json",
+            "report": "/opt/projects/agentic-ai/recon-suite/logs/final_report_127.0.0.1_20260622_020748.md",
+            "crew": "/opt/projects/agentic-ai/recon-suite/logs/crew_127.0.0.1_20260622_020403.json",
+            "debug": "/opt/projects/agentic-ai/recon-suite/logs/llm_debug_2211147.jsonl",
+            "exit": 0,
+            "dur_s": 795.7
+          },
+          "eval": {
+            "dim1_input": {
+              "passed": true,
+              "output": "=== Dim 1: Tool-Input \u2014 trace_127.0.0.1_20260622_020403.json ===\n  target=127.0.0.1 scope=network\n  input_valid_rate = 1.000 (48/48)  PASS (Schwelle 0.95)"
+            },
+            "dim2_output": {
+              "passed": true,
+              "output": "=== Dim 2: Tool-Output \u2014 trace_127.0.0.1_20260622_020403.json ===\n  CVEs: 6 tool-best\u00e4tigt, 0 HALLUZINIERT  PASS"
+            },
+            "dim3_groundtruth": {
+              "passed": true,
+              "output": "=== Dim 3: Ground-Truth \u2014 tomcat-cve-2017-12615 (kind=tp) ===\n  Recall: 1.0  gefunden=['CVE-2017-12615', 'CVE-2017-12617']  fehlt=[]\n  Ports: 8080=\u2713\n  \u2192 PASS"
+            }
+          }
+        },
+        {
+          "artifacts": {
+            "trace": "/opt/projects/agentic-ai/recon-suite/logs/trace_127.0.0.1_20260622_021736.json",
+            "report": "/opt/projects/agentic-ai/recon-suite/logs/final_report_127.0.0.1_20260622_022736.md",
+            "crew": "/opt/projects/agentic-ai/recon-suite/logs/crew_127.0.0.1_20260622_021736.json",
+            "debug": "/opt/projects/agentic-ai/recon-suite/logs/llm_debug_2215504.jsonl",
+            "exit": 0,
+            "dur_s": 1187.6
+          },
+          "eval": {
+            "dim1_input": {
+              "passed": true,
+              "output": "=== Dim 1: Tool-Input \u2014 trace_127.0.0.1_20260622_021736.json ===\n  target=127.0.0.1 scope=network\n  input_valid_rate = 1.000 (50/50)  PASS (Schwelle 0.95)"
+            },
+            "dim2_output": {
+              "passed": true,
+              "output": "=== Dim 2: Tool-Output \u2014 trace_127.0.0.1_20260622_021736.json ===\n  CVEs: 16 tool-best\u00e4tigt, 0 HALLUZINIERT  PASS"
+            },
+            "dim3_groundtruth": {
+              "passed": true,
+              "output": "=== Dim 3: Ground-Truth \u2014 tomcat-cve-2017-12615 (kind=tp) ===\n  Recall: 1.0  gefunden=['CVE-2017-12615', 'CVE-2017-12617']  fehlt=[]\n  Ports: 8080=\u2713\n  \u2192 PASS"
+            }
+          }
+        },
+        {
+          "artifacts": {
+            "trace": "/opt/projects/agentic-ai/recon-suite/logs/trace_127.0.0.1_20260622_023746.json",
+            "report": "/opt/projects/agentic-ai/recon-suite/logs/final_report_127.0.0.1_20260622_025159.md",
+            "crew": "/opt/projects/agentic-ai/recon-suite/logs/crew_127.0.0.1_20260622_023746.json",
+            "debug": "/opt/projects/agentic-ai/recon-suite/logs/llm_debug_2219643.jsonl",
+            "exit": 0,
+            "dur_s": 1463.4
+          },
+          "eval": {
+            "dim1_input": {
+              "passed": true,
+              "output": "=== Dim 1: Tool-Input \u2014 trace_127.0.0.1_20260622_023746.json ===\n  target=127.0.0.1 scope=network\n  input_valid_rate = 1.000 (44/44)  PASS (Schwelle 0.95)"
+            },
+            "dim2_output": {
+              "passed": true,
+              "output": "=== Dim 2: Tool-Output \u2014 trace_127.0.0.1_20260622_023746.json ===\n  CVEs: 23 tool-best\u00e4tigt, 0 HALLUZINIERT  PASS"
+            },
+            "dim3_groundtruth": {
+              "passed": true,
+              "output": "=== Dim 3: Ground-Truth \u2014 tomcat-cve-2017-12615 (kind=tp) ===\n  Recall: 1.0  gefunden=['CVE-2017-12615', 'CVE-2017-12617']  fehlt=[]\n  Ports: 8080=\u2713\n  \u2192 PASS"
+            }
+          }
+        },
+        {
+          "artifacts": {
+            "trace": null,
+            "report": "/opt/projects/agentic-ai/recon-suite/logs/final_report_127.0.0.1_20260622_025159.md",
+            "crew": null,
+            "debug": "/opt/projects/agentic-ai/recon-suite/logs/llm_debug_2223739.jsonl",
+            "exit": 1,
+            "dur_s": 293.7
+          },
+          "eval": {
+            "dim3_groundtruth": {
+              "passed": true,
+              "output": "=== Dim 3: Ground-Truth \u2014 tomcat-cve-2017-12615 (kind=tp) ===\n  Recall: 1.0  gefunden=['CVE-2017-12615', 'CVE-2017-12617']  fehlt=[]\n  \u2192 PASS"
+            }
+          }
+        }
+      ],
+      "consistency": {
+        "passed": false,
+        "output": "=== Dim 4: Konsistenz \u00fcber 3 L\u00e4ufe ===\n  CVE-Jaccard:      0.092  (Ziel \u2265 0.8)  \u2717\n  Port-Consistency: True  (Ziel identisch)  \u2713\n  Grade-StdDev:     5.52  (Ziel \u2264 5.0)  \u2717\n  CVE-Mengen: [['CVE-2017-12615', 'CVE-2017-12617', 'CVE-2022-0543', 'CVE-2025-26466', 'CVE-2025-58364', 'CVE-2026-41079'], ['CVE-2006-5051', 'CVE-2017-12615', 'CVE-2017-12617', 'CVE-2022-0543', 'CVE-2024-47076', 'CVE-2024-47175', 'CVE-2024-47176', 'CVE-2024-47177', 'CVE-2024-6387', 'CVE-2025-26465', 'CVE-2025-63389', 'CVE-2026-27009', 'CVE-2026-32922', 'CVE-2026-34980', 'CVE-2026-41335', 'CVE-2026-45004', 'CVE-2026-50751', 'CVE-2026-50752', 'CVE-2026-5530', 'CVE-2026-7482'], ['CVE-2016-3427', 'CVE-2016-8735', 'CVE-2017-12615', 'CVE-2017-12617', 'CVE-2017-5648', 'CVE-2017-5651', 'CVE-2018-8014', 'CVE-2020-1938', 'CVE-2022-31144', 'CVE-2022-35951', 'CVE-2023-32324', 'CVE-2023-36824', 'CVE-2023-41056', 'CVE-2023-4504', 'CVE-2023-45145', 'CVE-2023-48795', 'CVE-2023-51384', 'CVE-2023-51385', 'CVE-2025-58060', 'CVE-2026-34980', 'CVE-2026-34990', 'CVE-2026-35385', 'CVE-2026-35386', 'CVE-2026-42088']]\n  Port-Mengen: [[22, 631, 6379, 8080, 11434, 18789, 34435, 35559, 39655, 46393, 48904], [22, 631, 6379, 8080, 11434, 18789, 34435, 35559, 39655, 46393, 48904], [22, 631, 6379, 8080, 11434, 18789, 34435, 35559, 39655, 46393, 48904]]\n  \u2192 FAIL"
+      }
+    },
+    "weblogic-cve-2023-21839": {
+      "kind": "tp",
+      "runs": [
+        {
+          "artifacts": {
+            "trace": "/opt/projects/agentic-ai/recon-suite/logs/trace_127.0.0.1_20260622_030617.json",
+            "report": "/opt/projects/agentic-ai/recon-suite/logs/final_report_127.0.0.1_20260622_031112.md",
+            "crew": "/opt/projects/agentic-ai/recon-suite/logs/crew_127.0.0.1_20260622_030617.json",
+            "debug": "/opt/projects/agentic-ai/recon-suite/logs/llm_debug_2227388.jsonl",
+            "exit": 0,
+            "dur_s": 827.6
+          },
+          "eval": {
+            "dim1_input": {
+              "passed": true,
+              "output": "=== Dim 1: Tool-Input \u2014 trace_127.0.0.1_20260622_030617.json ===\n  target=127.0.0.1 scope=network\n  input_valid_rate = 1.000 (53/53)  PASS (Schwelle 0.95)"
+            },
+            "dim2_output": {
+              "passed": true,
+              "output": "=== Dim 2: Tool-Output \u2014 trace_127.0.0.1_20260622_030617.json ===\n  CVEs: 9 tool-best\u00e4tigt, 0 HALLUZINIERT  PASS"
+            },
+            "dim3_groundtruth": {
+              "passed": true,
+              "output": "=== Dim 3: Ground-Truth \u2014 weblogic-cve-2023-21839 (kind=tp) ===\n  Recall: 1.0  gefunden=['CVE-2023-21839']  fehlt=[]\n  Ports: 7001=\u2713\n  \u2192 PASS"
+            }
+          }
+        },
+        {
+          "artifacts": {
+            "trace": "/opt/projects/agentic-ai/recon-suite/logs/trace_127.0.0.1_20260622_032355.json",
+            "report": "/opt/projects/agentic-ai/recon-suite/logs/final_report_127.0.0.1_20260622_033141.md",
+            "crew": "/opt/projects/agentic-ai/recon-suite/logs/crew_127.0.0.1_20260622_032355.json",
+            "debug": "/opt/projects/agentic-ai/recon-suite/logs/llm_debug_2231196.jsonl",
+            "exit": 0,
+            "dur_s": 1228.7
+          },
+          "eval": {
+            "dim1_input": {
+              "passed": true,
+              "output": "=== Dim 1: Tool-Input \u2014 trace_127.0.0.1_20260622_032355.json ===\n  target=127.0.0.1 scope=network\n  input_valid_rate = 1.000 (61/61)  PASS (Schwelle 0.95)"
+            },
+            "dim2_output": {
+              "passed": true,
+              "output": "=== Dim 2: Tool-Output \u2014 trace_127.0.0.1_20260622_032355.json ===\n  CVEs: 12 tool-best\u00e4tigt, 0 HALLUZINIERT  PASS"
+            },
+            "dim3_groundtruth": {
+              "passed": true,
+              "output": "=== Dim 3: Ground-Truth \u2014 weblogic-cve-2023-21839 (kind=tp) ===\n  Recall: 1.0  gefunden=['CVE-2023-21839']  fehlt=[]\n  Ports: 7001=\u2713\n  \u2192 PASS"
+            }
+          }
+        },
+        {
+          "artifacts": {
+            "trace": "/opt/projects/agentic-ai/recon-suite/logs/trace_127.0.0.1_20260622_034428.json",
+            "report": "/opt/projects/agentic-ai/recon-suite/logs/final_report_127.0.0.1_20260622_035223.md",
+            "crew": "/opt/projects/agentic-ai/recon-suite/logs/crew_127.0.0.1_20260622_034428.json",
+            "debug": "/opt/projects/agentic-ai/recon-suite/logs/llm_debug_2235383.jsonl",
+            "exit": 0,
+            "dur_s": 1241.3
+          },
+          "eval": {
+            "dim1_input": {
+              "passed": true,
+              "output": "=== Dim 1: Tool-Input \u2014 trace_127.0.0.1_20260622_034428.json ===\n  target=127.0.0.1 scope=network\n  input_valid_rate = 1.000 (38/38)  PASS (Schwelle 0.95)"
+            },
+            "dim2_output": {
+              "passed": true,
+              "output": "=== Dim 2: Tool-Output \u2014 trace_127.0.0.1_20260622_034428.json ===\n  CVEs: 10 tool-best\u00e4tigt, 0 HALLUZINIERT  PASS"
+            },
+            "dim3_groundtruth": {
+              "passed": false,
+              "output": "=== Dim 3: Ground-Truth \u2014 weblogic-cve-2023-21839 (kind=tp) ===\n  Recall: 0.0  gefunden=[]  fehlt=['CVE-2023-21839']\n  Ports: 7001=\u2713\n  \u2192 FAIL"
+            }
+          }
+        },
+        {
+          "artifacts": {
+            "trace": "/opt/projects/agentic-ai/recon-suite/logs/trace_127.0.0.1_20260622_040234.json",
+            "report": "/opt/projects/agentic-ai/recon-suite/logs/final_report_127.0.0.1_20260622_041006.md",
+            "crew": "/opt/projects/agentic-ai/recon-suite/logs/crew_127.0.0.1_20260622_040234.json",
+            "debug": "/opt/projects/agentic-ai/recon-suite/logs/llm_debug_2239303.jsonl",
+            "exit": 0,
+            "dur_s": 1063.1
+          },
+          "eval": {
+            "dim1_input": {
+              "passed": true,
+              "output": "=== Dim 1: Tool-Input \u2014 trace_127.0.0.1_20260622_040234.json ===\n  target=127.0.0.1 scope=network\n  input_valid_rate = 1.000 (37/37)  PASS (Schwelle 0.95)"
+            },
+            "dim2_output": {
+              "passed": true,
+              "output": "=== Dim 2: Tool-Output \u2014 trace_127.0.0.1_20260622_040234.json ===\n  CVEs: 11 tool-best\u00e4tigt, 0 HALLUZINIERT  PASS"
+            },
+            "dim3_groundtruth": {
+              "passed": true,
+              "output": "=== Dim 3: Ground-Truth \u2014 weblogic-cve-2023-21839 (kind=tp) ===\n  Recall: 1.0  gefunden=['CVE-2023-21839']  fehlt=[]\n  Ports: 7001=\u2713\n  \u2192 PASS"
+            }
+          }
+        }
+      ],
+      "consistency": {
+        "passed": false,
+        "output": "=== Dim 4: Konsistenz \u00fcber 4 L\u00e4ufe ===\n  CVE-Jaccard:      0.351  (Ziel \u2265 0.8)  \u2717\n  Port-Consistency: True  (Ziel identisch)  \u2713\n  Grade-StdDev:     0.95  (Ziel \u2264 5.0)  \u2713\n  CVE-Mengen: [['CVE-2018-2628', 'CVE-2018-2893', 'CVE-2023-21839', 'CVE-2024-47175', 'CVE-2024-47176', 'CVE-2024-6387', 'CVE-2025-46817', 'CVE-2025-46818', 'CVE-2025-46819', 'CVE-2025-49844'], ['CVE-2006-5051', 'CVE-2018-2893', 'CVE-2018-3213', 'CVE-2019-2725', 'CVE-2020-14882', 'CVE-2023-21839', 'CVE-2024-47076', 'CVE-2024-47175', 'CVE-2024-47176', 'CVE-2024-47177', 'CVE-2024-6387', 'CVE-2025-46817', 'CVE-2025-46818', 'CVE-2025-46819', 'CVE-2025-49844'], ['CVE-2006-5051', 'CVE-2017-10352', 'CVE-2018-2628', 'CVE-2018-2893', 'CVE-2018-2894', 'CVE-2018-3191', 'CVE-2024-6387', 'CVE-2025-26465', 'CVE-2025-32728', 'CVE-2026-35385', 'CVE-2026-35414'], ['CVE-2018-2893', 'CVE-2023-21839', 'CVE-2024-6387', 'CVE-2025-26465', 'CVE-2025-32728', 'CVE-2025-46817', 'CVE-2025-46818', 'CVE-2025-46819', 'CVE-2025-49844', 'CVE-2026-35385', 'CVE-2026-35414']]\n  Port-Mengen: [[22, 631, 6379, 7001, 11434, 18789, 34435, 35559, 39655, 46393, 48904], [22, 631, 6379, 7001, 11434, 18789, 34435, 35559, 39655, 46393, 48904], [22, 631, 6379, 7001, 11434, 18789, 34435, 35559, 39655, 46393, 48904], [22, 631, 6379, 7001, 11434, 18789, 34435, 35559, 39655, 46393, 48904]]\n  \u2192 FAIL"
+      }
+    },
+    "nginx-clean-baseline": {
+      "kind": "tn",
+      "runs": [
+        {
+          "artifacts": {
+            "trace": "/opt/projects/agentic-ai/recon-suite/logs/trace_172.17.0.2_20260622_041747.json",
+            "report": "/opt/projects/agentic-ai/recon-suite/logs/final_report_172.17.0.2_20260622_041943.md",
+            "crew": "/opt/projects/agentic-ai/recon-suite/logs/crew_172.17.0.2_20260622_041747.json",
+            "debug": "/opt/projects/agentic-ai/recon-suite/logs/llm_debug_2243399.jsonl",
+            "exit": 0,
+            "dur_s": 572.3
+          },
+          "eval": {
+            "dim1_input": {
+              "passed": true,
+              "output": "=== Dim 1: Tool-Input \u2014 trace_172.17.0.2_20260622_041747.json ===\n  target=172.17.0.2 scope=network\n  input_valid_rate = 1.000 (23/23)  PASS (Schwelle 0.95)"
+            },
+            "dim2_output": {
+              "passed": true,
+              "output": "=== Dim 2: Tool-Output \u2014 trace_172.17.0.2_20260622_041747.json ===\n  CVEs: 2 tool-best\u00e4tigt, 0 HALLUZINIERT  PASS"
+            },
+            "dim3_groundtruth": {
+              "passed": true,
+              "output": "=== Dim 3: Ground-Truth \u2014 nginx-clean-baseline (kind=tn) ===\n  TN-Check: 0 versions-verifizierte CVE(s) (erlaubt: 0) \u2192 CLEAN\n  Ports: 80=\u2713\n  \u2192 PASS"
+            }
+          }
+        },
+        {
+          "artifacts": {
+            "trace": "/opt/projects/agentic-ai/recon-suite/logs/trace_172.17.0.2_20260622_042613.json",
+            "report": "/opt/projects/agentic-ai/recon-suite/logs/final_report_172.17.0.2_20260622_042816.md",
+            "crew": "/opt/projects/agentic-ai/recon-suite/logs/crew_172.17.0.2_20260622_042613.json",
+            "debug": "/opt/projects/agentic-ai/recon-suite/logs/llm_debug_2246393.jsonl",
+            "exit": 0,
+            "dur_s": 512.9
+          },
+          "eval": {
+            "dim1_input": {
+              "passed": true,
+              "output": "=== Dim 1: Tool-Input \u2014 trace_172.17.0.2_20260622_042613.json ===\n  target=172.17.0.2 scope=network\n  input_valid_rate = 1.000 (17/17)  PASS (Schwelle 0.95)"
+            },
+            "dim2_output": {
+              "passed": true,
+              "output": "=== Dim 2: Tool-Output \u2014 trace_172.17.0.2_20260622_042613.json ===\n  CVEs: 2 tool-best\u00e4tigt, 0 HALLUZINIERT  PASS"
+            },
+            "dim3_groundtruth": {
+              "passed": true,
+              "output": "=== Dim 3: Ground-Truth \u2014 nginx-clean-baseline (kind=tn) ===\n  TN-Check: 0 versions-verifizierte CVE(s) (erlaubt: 0) \u2192 CLEAN\n  Ports: 80=\u2713\n  \u2192 PASS"
+            }
+          }
+        },
+        {
+          "artifacts": {
+            "trace": "/opt/projects/agentic-ai/recon-suite/logs/trace_172.17.0.2_20260622_043552.json",
+            "report": "/opt/projects/agentic-ai/recon-suite/logs/final_report_172.17.0.2_20260622_043617.md",
+            "crew": "/opt/projects/agentic-ai/recon-suite/logs/crew_172.17.0.2_20260622_043552.json",
+            "debug": "/opt/projects/agentic-ai/recon-suite/logs/llm_debug_2249624.jsonl",
+            "exit": 0,
+            "dur_s": 480.4
+          },
+          "eval": {
+            "dim1_input": {
+              "passed": true,
+              "output": "=== Dim 1: Tool-Input \u2014 trace_172.17.0.2_20260622_043552.json ===\n  target=172.17.0.2 scope=network\n  input_valid_rate = 1.000 (18/18)  PASS (Schwelle 0.95)"
+            },
+            "dim2_output": {
+              "passed": true,
+              "output": "=== Dim 2: Tool-Output \u2014 trace_172.17.0.2_20260622_043552.json ===\n  CVEs: 1 tool-best\u00e4tigt, 0 HALLUZINIERT  PASS"
+            },
+            "dim3_groundtruth": {
+              "passed": false,
+              "output": "=== Dim 3: Ground-Truth \u2014 nginx-clean-baseline (kind=tn) ===\n  TN-Check: 1 versions-verifizierte CVE(s) (erlaubt: 0) \u2192 VERLETZT: ['CVE-2026-42530']\n  Ports: 80=\u2713\n  \u2192 FAIL"
+            }
+          }
+        },
+        {
+          "artifacts": {
+            "trace": null,
+            "report": "/opt/projects/agentic-ai/recon-suite/logs/final_report_172.17.0.2_20260622_043617.md",
+            "crew": null,
+            "debug": "/opt/projects/agentic-ai/recon-suite/logs/llm_debug_2252576.jsonl",
+            "exit": 1,
+            "dur_s": 352.9
+          },
+          "eval": {
+            "dim3_groundtruth": {
+              "passed": false,
+              "output": "=== Dim 3: Ground-Truth \u2014 nginx-clean-baseline (kind=tn) ===\n  TN-Check: 1 versions-verifizierte CVE(s) (erlaubt: 0) \u2192 VERLETZT: ['CVE-2026-42530']\n  \u2192 FAIL"
+            }
+          }
+        }
+      ],
+      "consistency": {
+        "passed": false,
+        "output": "=== Dim 4: Konsistenz \u00fcber 3 L\u00e4ufe ===\n  CVE-Jaccard:      0.444  (Ziel \u2265 0.8)  \u2717\n  Port-Consistency: True  (Ziel identisch)  \u2713\n  Grade-StdDev:     1.7  (Ziel \u2264 5.0)  \u2713\n  CVE-Mengen: [['CVE-2026-42530', 'CVE-2026-42945'], ['CVE-2026-42530', 'CVE-2026-9256'], ['CVE-2026-42530']]\n  Port-Mengen: [[80], [80], [80]]\n  \u2192 FAIL"
+      }
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "timestamp": "20260622_014520",
+  "n_runs": 1,
+  "targets": {
+    "nginx-clean-baseline": {
+      "kind": "tn",
+      "runs": [
+        {
+          "artifacts": {
+            "trace": "/opt/projects/agentic-ai/recon-suite/logs/trace_172.17.0.2_20260622_015139.json",
+            "report": "/opt/projects/agentic-ai/recon-suite/logs/final_report_172.17.0.2_20260622_015240.md",
+            "crew": "/opt/projects/agentic-ai/recon-suite/logs/crew_172.17.0.2_20260622_015139.json",
+            "debug": "/opt/projects/agentic-ai/recon-suite/logs/llm_debug_2207190.jsonl",
+            "exit": 0,
+            "dur_s": 438.0
+          },
+          "eval": {
+            "dim1_input": {
+              "passed": true,
+              "output": "=== Dim 1: Tool-Input \u2014 trace_172.17.0.2_20260622_015139.json ===\n  target=172.17.0.2 scope=network\n  input_valid_rate = 1.000 (20/20)  PASS (Schwelle 0.95)"
+            },
+            "dim2_output": {
+              "passed": true,
+              "output": "=== Dim 2: Tool-Output \u2014 trace_172.17.0.2_20260622_015139.json ===\n  CVEs: 3 tool-best\u00e4tigt, 0 HALLUZINIERT  PASS"
+            },
+            "dim3_groundtruth": {
+              "passed": true,
+              "output": "=== Dim 3: Ground-Truth \u2014 nginx-clean-baseline (kind=tn) ===\n  TN-Check: 0 versions-verifizierte CVE(s) (erlaubt: 0) \u2192 CLEAN\n  Ports: 80=\u2713\n  \u2192 PASS"
+            }
+          }
+        }
+      ],
+      "consistency": null
+    }
+  }
+}

@@ -1,0 +1,118 @@
+# Ground-Truth-Definitionen für das Truth-&-Consistency-Testkonzept
+# Siehe testing/TESTKONZEPT.md. Jede Soll-CVE ist gegen eine externe Quelle belegt.
+#
+# Feld-Semantik:
+#   kind:            tp (True-Positive: muss CVEs finden) | tn (True-Negative: darf KEINE finden)
+#   scan_target:     Argument für main.py (Host/IP)
+#   scope:           Scan-Scope
+#   expected_ports:  Ports die im Scan auftauchen MÜSSEN (deterministisch prüfbar)
+#   expected_services: Banner-/Service-Strings die erkannt werden sollen
+#   must_find_cves:  CVE-IDs die im Report erscheinen MÜSSEN (Recall=1.0-Ziel)
+#   forbid_cves:     CVE-IDs die NICHT erscheinen dürfen (TN); leer bei TP
+#   version_known:   true wenn der Banner eine konkrete Version trägt (BUG-17-Relevanz)
+#   lifecycle:       docker (auto start/stop) | live (externer Host, kein Lifecycle)
+#   compose_dir:     VulHub-Pfad relativ zu vulhub_root (nur bei docker)
+#   ready_probe:     URL/Port-Check der „Container ist hoch" signalisiert
+#   notes/source:    Beleg der Ground Truth
+
+vulhub_root: /root/vulhub          # snap-Docker sieht nur /root, NICHT /opt (siehe CLAUDE.md)
+vulhub_repo: https://github.com/vulhub/vulhub.git
+
+targets:
+
+  - id: tomcat-cve-2017-12615
+    kind: tp
+    scan_target: 127.0.0.1
+    scope: network
+    expected_ports: [8080]
+    expected_services:
+      - "Apache Tomcat"
+      - "8.5.19"
+    must_find_cves:
+      - CVE-2017-12615       # PUT-Method RCE, betrifft 8.5.0–8.5.22 → 8.5.19 verwundbar
+      - CVE-2017-12617       # verwandter PUT-Bypass, gleiche Versionsspanne
+    forbid_cves: []
+    version_known: true
+    lifecycle: docker_run
+    docker_image: "cve-2017-12615-tomcat:latest"
+    docker_run_cmd: "docker run -d --name recon-test-tomcat -p 8080:8080 cve-2017-12615-tomcat:latest"
+    container_name: "recon-test-tomcat"
+    ready_probe: "http://127.0.0.1:8080/"
+    ready_timeout_s: 60
+    source: "https://github.com/vulhub/vulhub/blob/master/tomcat/CVE-2017-12615/README.md (Tomcat 8.5.19)"
+
+  - id: weblogic-cve-2023-21839
+    kind: tp
+    scan_target: 127.0.0.1
+    scope: network
+    expected_ports: [7001]
+    expected_services:
+      - "WebLogic"
+      - "12.2.1.3"
+    must_find_cves:
+      - CVE-2023-21839       # unauth RCE via T3/IIOP, CISA KEV — NOTABLE_CVES-gepinnt
+    forbid_cves: []
+    version_known: true
+    lifecycle: docker_run
+    docker_image: "vulhub/weblogic:12.2.1.3-2018"
+    docker_run_cmd: "docker run -d --name recon-test-weblogic -p 7001:7001 vulhub/weblogic:12.2.1.3-2018"
+    container_name: "recon-test-weblogic"
+    ready_probe: "http://127.0.0.1:7001/console"
+    ready_timeout_s: 180
+    source: "https://github.com/vulhub/vulhub/blob/master/weblogic/CVE-2023-21839 (WebLogic 12.2.1.3-2018) + eigene Messung Session 2026-06-18 (CVE-2018-2628 zusätzlich gefunden)"
+
+  - id: scanme-nmap-org
+    kind: tp
+    scan_target: scanme.nmap.org
+    scope: network
+    expected_ports: [22, 80]
+    expected_services:
+      - "OpenSSH"
+      - "6.6.1"
+    must_find_cves:
+      - CVE-2018-15473       # OpenSSH User-Enumeration <7.7 → 6.6.1 verwundbar
+    forbid_cves: []
+    version_known: true
+    lifecycle: live
+    rate_limit_note: "Nmap-Projekt erlaubt max. 12 Scans/Tag — bei N=4 sparsam einsetzen!"
+    source: "http://scanme.nmap.org (scan-erlaubt, nur nmap) + eigene Messung 2026-06-18 (OpenSSH 6.6.1p1, Apache httpd 2.4.7)"
+
+  - id: nginx-clean-baseline
+    kind: tn
+    # WICHTIG: scan_target wird zur Laufzeit auf die Container-IP gesetzt (use_container_ip),
+    # NICHT 127.0.0.1 — sonst sieht der Scan die Host-Dienste (Redis 6379 etc.) statt
+    # nur des isolierten nginx-Containers. Auf der Container-IP ist NUR nginx:80 offen.
+    scan_target: "AUTO_CONTAINER_IP"
+    use_container_ip: true
+    scope: network
+    expected_ports: [80]              # nginx im Container auf nativem Port 80
+    expected_services:
+      - "nginx"
+    must_find_cves: []
+    forbid_cves: []                   # TN: KEINE confirmed CVE erwartet; Prüfung = 0 versions-verifizierte CVEs
+    version_known: true               # nginx:alpine sendet "Server: nginx/<version>"
+    lifecycle: docker_run
+    docker_image: "nginx:alpine"
+    docker_run_cmd: "docker run -d --name recon-test-nginx nginx:alpine"   # KEIN Port-Mapping → nur Container-IP
+    container_name: "recon-test-nginx"
+    ready_probe: null                 # Container-IP erst nach Start bekannt → Probe in run_matrix
+    ready_timeout_s: 30
+    source: "Aktuelles offizielles nginx:alpine, isoliert über Container-IP (172.17.x.x). TN-Erwartung: kein kritisches CVE — nur nginx sichtbar, keine Host-Dienste."
+
+# ─── Konsistenz-Parameter ──────────────────────────────────────────────────────
+consistency:
+  n_runs: 4
+  thresholds:
+    cve_jaccard_min: 0.8        # mittlere Jaccard-Ähnlichkeit der CVE-Mengen
+    port_consistency_min: 1.0   # Ports sind deterministisch → muss 1.0 sein
+    grade_stddev_max: 5.0       # Streuung des Scorecard-Gesamtscores
+
+# ─── Modell-Matrix ─────────────────────────────────────────────────────────────
+configs:
+  remote:
+    label: "qwen3-coder:480b (ollama.com)"
+    requires_api_key: true
+  local:
+    label: "llama3-groq-tool-use:8b (localhost)"
+    requires_api_key: false
+    note: "Nur aktiv wenn ollama_api_key in models.json leer (User schaltet manuell)."
