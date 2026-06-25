@@ -454,6 +454,46 @@ class ReportOutput(BaseModel):
     executive_summary: str
 
 
+# CVE-Recherche-Tools die die findings-Phase nutzen MUSS bevor sie ein Urteil fällt.
+_CVE_RESEARCH_TOOLS = {"searchsploit", "nvd_cpe_lookup", "nvd_cve_search", "ddg_search"}
+
+
+def _cve_tool_used_guardrail(output: Any) -> tuple[bool, Any]:
+    """Guardrail (findings): erzwingt mind. EINEN CVE-Recherche-Tool-Aufruf.
+
+    Befund (lokales 8B llama3-groq, 2026-06-25): das Modell schloss die findings-
+    Phase MIT VALIDEM JSON ('No vulnerabilities found') ab, OHNE ein einziges CVE-
+    Tool (searchsploit/nvd_*) aufzurufen — es urteilte direkt aus dem Banner. Der
+    _cve_trace_guardrail fängt das NICHT (er prüft nur eingetragene CVEs gegen den
+    Trace; bei leerer cve_references gibt es nichts zu prüfen). Diese Lücke betrifft
+    JEDES Modell, wird aber nur bei schwächeren (lokal) sichtbar.
+
+    Prüft run_trace._pending (Tool-Calls der aktuellen findings-Phase) auf ein CVE-
+    Recherche-Tool. Reject-Count-Muster wie _tool_call_guardrail (No-Tool-Fallback
+    nach 1 Reject gegen Endlosschleifen).
+    """
+    try:
+        from tools.trace import run_trace
+        if run_trace.is_active:
+            used = {c.get("tool_name", "") for c in run_trace._pending}
+            if not (used & _CVE_RESEARCH_TOOLS):
+                if run_trace._guardrail_reject_count >= 1:
+                    return True, getattr(output, "raw", output)  # Fallback: akzeptieren
+                run_trace._guardrail_reject_count += 1
+                return (
+                    False,
+                    "FEHLER: Du hast die CVE-Analyse abgeschlossen OHNE ein CVE-"
+                    "Recherche-Tool aufzurufen. Ein Urteil ('keine Schwachstellen') "
+                    "allein aus dem Banner ist nicht erlaubt. Rufe JETZT mindestens "
+                    "eines auf: nvd_cpe_lookup (mit Service-Banner), searchsploit "
+                    "('<service> <version>') oder nvd_cve_search. Erst NACH echtem "
+                    "Tool-Output darfst du cve_references füllen oder begründet leer lassen.",
+                )
+    except Exception:
+        pass
+    return True, getattr(output, "raw", output)
+
+
 # ─── Task Factory ─────────────────────────────────────────────────────────────
 # Tasks are created fresh per run via make_tasks() to avoid shared mutable state
 # across retries and concurrent calls. Pydantic output models above are stateless
@@ -667,7 +707,7 @@ def make_tasks() -> dict:
             "zurückgegeben haben (vollständig in cve_references), faktische Zusammenfassung."
         ),
         output_pydantic=FindingsOutput,
-        guardrails=[_cve_trace_guardrail],
+        guardrails=[_cve_tool_used_guardrail, _cve_trace_guardrail],
         guardrail_max_retries=2,
         agent=research_agent,
         context=[research, blue],
