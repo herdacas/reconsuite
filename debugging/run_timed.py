@@ -19,7 +19,7 @@ MAX_TOTAL     = 600  # 10 Minuten absolutes Maximum
 REPO      = Path(__file__).parent.parent
 LOGS      = REPO / "logs"
 CKPT_GLOB = str(LOGS / "checkpoints" / f"*{TARGET.split('.')[0]}*" / "main" / "*.json")
-VENV_PY   = str(REPO / "agentscanit" / "venv" / "bin" / "python3")
+VENV_PY   = str(REPO / "venv" / "bin" / "python3")
 
 TOOL_BINS = {"nmap","nikto","nuclei","sslscan","testssl","testssl.sh","ffuf",
              "whatweb","httpx","naabu","subfinder","amass","dnsrecon","dig",

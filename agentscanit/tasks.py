@@ -365,6 +365,60 @@ def _subdomain_fanout_guardrail(output: Any) -> tuple[bool, Any]:
     return True, output
 
 
+# wafw00f meldet einen konkreten Treffer als "is behind <WAF> WAF".
+# NUR diese Zeile trägt den echten WAF-Namen. Die generische Fallback-Zeile
+# ("seems to be behind a WAF or some sort of security solution") ist KEIN Name,
+# nur ein schwaches Heuristik-Signal → bewusst NICHT als Name extrahiert.
+# Negativ-Markierungen ("No WAF detected", "Number of requests") fallen raus.
+_WAF_HIT_RE = _re.compile(r"\bis behind\b\s+(.+?)\s+WAF\b", _re.I)
+# wafw00f färbt seinen Output (ANSI-Escape-Sequenzen) — vor dem Parsen strippen.
+_ANSI_RE = _re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _waf_detection_guardrail(output: Any) -> tuple[bool, Any]:
+    """Hängt einen WAF/CDN-Hinweis an den blue-Output, wenn wafw00f eine WAF erkannt hat.
+
+    Lehnt NIE ab (reine Anreicherung, wie _subdomain_fanout_guardrail). Liest den
+    wafw00f-Output aus dem Trace DIESER Session und ergänzt — bei Treffer — einen
+    markierten Block '=== WAF/CDN DETECTED ===', der via context=[blue] in findings
+    und in den Final Report fließt. Zweck: leere CVE-Ergebnisse hinter einer WAF
+    sind NICHT als 'Ziel sicher' zu lesen — Banner/CVEs gehören evtl. der WAF, nicht
+    dem Origin. Deterministisch, kein LLM (vgl. BUG-20: CVE-Kontrolle braucht Guardrail).
+    """
+    try:
+        from tools.trace import run_trace
+        if not run_trace.is_active:
+            return True, output
+        outputs = _ANSI_RE.sub("", run_trace.get_all_raw_outputs())
+        if "wafw00f" not in outputs.lower() and "WAF" not in outputs:
+            # wafw00f gar nicht gelaufen → nichts anzuhängen.
+            return True, output
+        wafs: list = []
+        for m in _WAF_HIT_RE.finditer(outputs):
+            tag = m.group(1).strip().rstrip(".")[:80]
+            # Generische Fallback-Phrase ist kein WAF-Name → ausschließen.
+            if tag and "some sort of" not in tag.lower() and tag not in wafs:
+                wafs.append(tag)
+        if not wafs:
+            return True, output
+        block = (
+            "\n\n=== WAF/CDN DETECTED (wafw00f, deterministic) ===\n"
+            "Vor dem Ziel wurde eine WAF/ein CDN erkannt: " + ", ".join(wafs) + ".\n"
+            "WICHTIG für die Bewertung: Server-Banner und CVE-Treffer können die der WAF/des "
+            "CDN sein, NICHT die des Origin-Servers. Ein leeres CVE-Ergebnis bedeutet hier NICHT, "
+            "dass das Ziel sicher ist — die eigentliche Angriffsfläche ist evtl. verdeckt."
+        )
+        raw = getattr(output, "raw", "") or ""
+        if "WAF/CDN DETECTED" not in raw:
+            try:
+                object.__setattr__(output, "raw", raw + block)
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return True, output
+
+
 # ─── Output-Modelle ───────────────────────────────────────────────────────────
 
 class ResearchOutput(BaseModel):
@@ -590,9 +644,23 @@ def make_tasks() -> dict:
             "  (z.B. tags='apache' oder tags='wordpress'). Nutze 'severity=critical,high' "
             "  für gezielte CVE-Suche.\n"
             "- nmap: Nutze 'ports' mit konkreten Ports aus vorheriger nmap-Discovery statt Top-1000.\n\n"
+            "API-ERKENNUNG — NUR wenn das Objective '{objective}' API/REST/GraphQL/Swagger/OpenAPI "
+            "erwähnt (sonst überspringen):\n"
+            "  1. httpx mit 'api_probe=true' aufrufen (targets='{target}') — probt bekannte API-Pfade "
+            "(/api, /graphql, /swagger.json, /openapi.json u.a.) und meldet Status + Content-Type. "
+            "'application/json' auf einem solchen Pfad = API vorhanden.\n"
+            "  2. nuclei mit tags='exposures,graphql,swagger' — findet exponierte API-Doku "
+            "(Swagger-UI, OpenAPI-Spec, GraphQL-Introspection, Spring-Actuator).\n"
+            "  Ziel ist NUR die ERKENNUNG eines API-Service (existiert eine API, welcher Typ, "
+            "Doku exponiert?). KEINE Endpunkt-Enumeration / kein Fuzzing — das ist außerhalb des Scopes.\n\n"
+            "FEHLKONFIGURATIONS-CHECKS — NUR wenn das Objective '{objective}' Fehlkonfiguration/"
+            "CORS/Misconfiguration/Open-Redirect erwähnt (sonst überspringen):\n"
+            "  nuclei mit tags='misconfiguration,cors,redirect' aufrufen — findet CORS-"
+            "Fehlkonfiguration, Open Redirects und sonstige Misconfigurations systematisch. "
+            "Trage nur tool-bestätigte Treffer als Findings ein.\n\n"
             "Tool-Auswahl nach Scope:\n"
             "Scope 'quick':   ping + nmap (Top-100-Ports) + httpx. Fertig.\n"
-            "Scope 'web':     httpx + whatweb + curl + nikto. SSL nur wenn HTTPS aktiv. Kein nmap full-scan.\n"
+            "Scope 'web':     wafw00f (zuerst) + httpx + whatweb + curl + nikto. SSL nur wenn HTTPS aktiv. Kein nmap full-scan.\n"
             "Scope 'network': nmap (alle Ports, -T4) + httpx für offene Web-Ports. "
             "Nach Port-Discovery: nmap erneut mit aggressive=True auf den gefundenen offenen Ports "
             "aufrufen um Versionsinfo (-sV) zu erhalten — ohne Version ist CVE-Analyse unmöglich. "
@@ -604,7 +672,7 @@ def make_tasks() -> dict:
             "                 - PFLICHT nach Port-Discovery: nmap erneut mit aggressive=True NUR auf den "
             "gefundenen offenen Ports aufrufen (z.B. ports='22,80,443,9200') — das liefert -sV Versionsinfo "
             "in unter 30s. Ohne Versionsinfo können nachgelagerte CVE-Tasks nicht arbeiten.\n"
-            "                 - Web-Ports offen → httpx, whatweb, nikto (mit port-Parameter), nuclei (mit tags)\n"
+            "                 - Web-Ports offen → wafw00f (WAF/CDN-Check zuerst), httpx, whatweb, nikto (mit port-Parameter), nuclei (mit tags)\n"
             "                 - HTTPS → sslscan\n"
             "                 - Port 445 → enum4linux\n"
             "                 - Fuzzing NUR wenn Objective es explizit fordert\n\n"
@@ -627,7 +695,7 @@ def make_tasks() -> dict:
             "offene Ports, erkannte Services und Versionen, bestätigte Findings aus Tool-Output."
         ),
         output_pydantic=BlueOutput,
-        guardrails=[_tool_call_guardrail, _scope_coverage_guardrail],
+        guardrails=[_tool_call_guardrail, _scope_coverage_guardrail, _waf_detection_guardrail],
         guardrail_max_retries=2,
         agent=blue_agent,
         context=[research],

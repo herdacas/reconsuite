@@ -22,8 +22,8 @@ from knowledge import service_normalization_knowledge
 # `_run(cmd)` calls that helper; `self._run` is the BaseTool interface method (CrewAI).
 # The names are distinct in Python's scoping rules but look identical at a glance.
 from tools import (
-    # blue_agent – Active Scanning (10 tools; naabu/ffuf/testssl/enum4linux entfernt Phase 9.1)
-    nmap_tool, nikto_tool, whatweb_tool, sslscan_tool,
+    # blue_agent – Active Scanning (naabu/ffuf/testssl/enum4linux entfernt Phase 9.1; wafw00f ergänzt)
+    nmap_tool, nikto_tool, whatweb_tool, wafw00f_tool, sslscan_tool,
     curl_tool, ping_tool, nuclei_tool,
     httpx_tool,
     # research_agent – Passive Recon (9 tools; amass/assetfinder/sublist3r/waybackurls/gau/theHarvester entfernt Phase 9.1)
@@ -218,7 +218,7 @@ blue_agent = Agent(
         "Report only tool-confirmed findings."
     ),
     tools=[
-        ping_tool, nmap_tool, httpx_tool, whatweb_tool,
+        ping_tool, nmap_tool, httpx_tool, whatweb_tool, wafw00f_tool,
         curl_tool, nikto_tool, sslscan_tool,
         nuclei_tool,
     ],

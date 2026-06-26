@@ -69,6 +69,22 @@ Output wird von `blue_agent` genutzt um `nuclei`-Tags zu befüllen.
 
 ---
 
+### 3b. `wafw00f_detect` – Wafw00fTool
+
+**Binary:** `wafw00f` (System-PATH)  
+**Installation:** `pip install wafw00f` ODER `apt install wafw00f`  
+**Graceful-Disable:** Wenn nicht installiert, gibt das Tool `[wafw00f] nicht installiert — Tool nicht verfügbar.` zurück (kein Crash, `shutil.which`-Check wie bei theHarvester).
+
+Erkennt eine vorgeschaltete **WAF / CDN / Reverse-Proxy** (Cloudflare, Akamai, AWS WAF, ModSecurity u.a.) via `wafw00f -a <target>` (`-a` = alle Treffer melden).
+
+**Warum wichtig (Pentest-Scope):** Hinter einer WAF/CDN gehören Server-Banner und CVE-Treffer potenziell der WAF, **nicht** dem Origin-Server. Ein leeres CVE-Ergebnis hinter einer WAF heißt NICHT „Ziel sicher" — die eigentliche Angriffsfläche ist verdeckt. Das `blue_agent` ruft wafw00f bei `web`/`full`-Scope **zuerst** auf.
+
+**Report-Hinweis (deterministisch):** Das `_waf_detection_guardrail` (in `tasks.py`, am blue-Task) liest den wafw00f-Output aus dem Session-Trace und hängt bei Treffer einen Block `=== WAF/CDN DETECTED ===` an den blue-Output — fließt via `context` in findings und in den Final Report. Kein LLM, kein „immer grün" (Positiv/Negativ-Kontrolle verifiziert: erkennt Cloudflare, ignoriert „No WAF detected").
+
+**Status:** Tool + Verdrahtung integriert; Binary im aktuellen Container noch nicht installiert (graceful disabled bis `pip install wafw00f`).
+
+---
+
 ### 4. `sslscan_tls` – SslscanTool
 
 **Binary:** `sslscan` (System-PATH)  
@@ -132,6 +148,10 @@ Adaptive Parameter (P1):
 - `severity`: Filtert nach Kritikalität (`critical,high` für CVE-Fokus)
 - `tags`: Technologie-spezifisches Scanning (z.B. `apache`, `wordpress`, `django`) — befüllt aus whatweb/httpx-Findings
 
+**Objective-getriggerte Spezial-Tags** (analog httpx `api_probe`, nur wenn das Objective es nennt):
+- **API-Service-Erkennung:** `tags='exposures,graphql,swagger'` — exponierte Swagger-/OpenAPI-Doku, GraphQL-Introspection, Spring-Actuator.
+- **Fehlkonfigurations-Checks:** `tags='misconfiguration,cors,redirect'` — CORS-Fehlkonfiguration, Open Redirects, sonstige Misconfigurations. Verifiziert: nuclei lädt für diese Tags real Templates (misconfiguration 9, cors 6, redirect 186); Tool-Pfad E2E sauber (kein Fuzzing, kein neuer Tool). Der blue-Task weist diese Tags nur an, wenn das Objective Fehlkonfiguration/CORS/Misconfiguration/Open-Redirect erwähnt.
+
 **Status:** ✓ Installiert, aktuell.
 
 ---
@@ -173,6 +193,10 @@ Wird nur bei bestätigtem offenem Port 445 eingesetzt (STOPP-Regel in blue_task)
 **Letzte stabile Version:** v1.x (ProjectDiscovery)
 
 HTTP-Probing für viele Hosts gleichzeitig: prüft Erreichbarkeit, ermittelt HTTP-Statuscodes, Seitentitel und erkannte Technologien (`-tech-detect`). Liest Targets von stdin (kommagetrennte Liste). Ideal für schnelles Screening von Subdomain-Listen.
+
+**API-Service-Erkennung (`api_probe=true`):** Probt eine feste, kuratierte Liste kanonischer API-/Doku-Pfade (`/api`, `/api/v1`, `/graphql`, `/swagger.json`, `/v2/swagger.json`, `/v3/api-docs`, `/openapi.json`, `/actuator` u.a.) gegen den Host und meldet **Status-Code + Content-Type** je Pfad (`-mc 200,201,401,403 -content-type -no-color`). Auch auth-geschützte APIs zählen (401/403 = „existiert"); `application/json` verrät den API-Typ. **Zweck: ERKENNUNG eines API-Service** (existiert eine API, welcher Typ, Doku exponiert?) — KEINE Endpunkt-Enumeration / kein Fuzzing (außerhalb des Scopes, kuratierte Pfadliste statt Wordlist).
+
+Getriggert über das **Objective**: nur wenn das Objective API/REST/GraphQL/Swagger/OpenAPI erwähnt, weist der blue-Task `httpx api_probe=true` + `nuclei tags='exposures,graphql,swagger'` an. Verifiziert (Positiv/Negativ): petstore.swagger.io → `/v2/swagger.json [200] [application/json]` erkannt; scanme.nmap.org → leer (kein False-Positive).
 
 **Status:** ✓ Installiert (Snap). Expliziter Pfad notwendig da Snap-Binaries nicht immer im System-PATH landen.
 

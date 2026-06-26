@@ -103,7 +103,9 @@ ENUM4LINUX_DIR   = os.path.join(PROJECT_DIR, "enum4linux-ng")
 
 # ─── Tool-Binaries ────────────────────────────────────────────────────────────
 
-VENV_PYTHON        = os.path.join(PROJECT_DIR, "venv", "bin", "python3")
+# Einziges venv liegt auf Suite-Ebene (recon-suite/venv) — gemeinsam für alle Teams,
+# nicht team-lokal in agentscanit/. (Konsolidiert 2026-06-26: doppeltes venv entfernt.)
+VENV_PYTHON        = os.path.join(_SUITE_DIR, "venv", "bin", "python3")
 
 # Go-Binary-Verzeichnis: GOPATH/bin ermitteln, Fallback auf ~/go/bin
 def _go_bin() -> str:
@@ -123,6 +125,7 @@ GO_BIN             = _go_bin()
 NMAP_BIN           = "nmap"
 NIKTO_BIN          = "nikto"
 WHATWEB_BIN        = "whatweb"
+WAFW00F_BIN        = "wafw00f"
 SSLSCAN_BIN        = "sslscan"
 FFUF_BIN           = "ffuf"
 SUBLIST3R_BIN      = "sublist3r"

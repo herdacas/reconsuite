@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from config import (
     CURL_BIN, ENUM4LINUX_BIN, ENUM4LINUX_DIR, FFUF_BIN, HTTPX_BIN,
     NAABU_BIN, NIKTO_BIN, NMAP_BIN, NUCLEI_BIN, PING_BIN, SSLSCAN_BIN,
-    TESTSSL_BIN, TESTSSL_DIR, VENV_PYTHON, WHATWEB_BIN, WORDLIST_DEFAULT,
+    TESTSSL_BIN, TESTSSL_DIR, VENV_PYTHON, WAFW00F_BIN, WHATWEB_BIN, WORDLIST_DEFAULT,
     TIMEOUT_DEFAULT, TIMEOUT_MEDIUM, TIMEOUT_NIKTO, TIMEOUT_NMAP_DISC,
     TIMEOUT_NMAP_SCAN, TIMEOUT_NUCLEI, TIMEOUT_SHORT, TIMEOUT_TESTSSL,
 )
@@ -140,6 +140,35 @@ class WhatwebTool(BaseTool):
 
 
 # ---------------------------------------------------------------------------
+# wafw00f — WAF/CDN-Erkennung
+# ---------------------------------------------------------------------------
+
+class Wafw00fInput(BaseModel):
+    target: str = Field(description="URL oder Hostname des Web-Ziels, z.B. 'example.com' oder 'https://example.com'")
+
+
+class Wafw00fTool(BaseTool):
+    name: str = "wafw00f_detect"
+    description: str = (
+        "Erkennt eine vorgeschaltete Web Application Firewall (WAF) oder einen CDN/Reverse-Proxy "
+        "(Cloudflare, Akamai, AWS WAF, ModSecurity u.a.) vor dem Ziel. "
+        "WICHTIG für die Bewertung: Wird eine WAF erkannt, sind Server-Banner und CVE-Treffer "
+        "potenziell die der WAF/des CDN — NICHT des dahinterliegenden Origin-Servers. Ein leeres "
+        "CVE-Ergebnis hinter einer WAF bedeutet NICHT zwingend, dass das Ziel sicher ist."
+    )
+    args_schema: Type[BaseModel] = Wafw00fInput
+
+    def _run(self, target: str) -> str:
+        import shutil
+        bin_path = shutil.which(WAFW00F_BIN)
+        if not bin_path:
+            return "[wafw00f] nicht installiert — Tool nicht verfügbar."
+        # -a: alle Treffer melden (nicht beim ersten stoppen); -o -: maschinenlesbar auf stdout
+        cmd = [bin_path, "-a", target]
+        return _limit(_run(cmd, timeout=TIMEOUT_SHORT), "wafw00f")
+
+
+# ---------------------------------------------------------------------------
 # sslscan
 # ---------------------------------------------------------------------------
 
@@ -248,7 +277,12 @@ class NucleiInput(BaseModel):
     ))
     tags: Optional[str] = Field(default=None, description=(
         "Template-Tags filtern, kommagetrennt. Beispiele: 'apache', 'wordpress', 'ssl', "
-        "'rce', 'sqli'. Nutze erkannte Technologien aus whatweb/httpx als Tags."
+        "'rce', 'sqli'. Nutze erkannte Technologien aus whatweb/httpx als Tags. "
+        "Für API-Service-Erkennung (nur bei API-Objective): 'exposures,graphql,swagger' "
+        "— findet exponierte Swagger-/OpenAPI-Doku, GraphQL-Introspection, Spring-Actuator. "
+        "Für Fehlkonfigurations-Checks (nur bei Misconfig/CORS-Objective): "
+        "'misconfiguration,cors,redirect' — findet CORS-Fehlkonfiguration, Open Redirects "
+        "und sonstige Misconfigurations."
     ))
 
 
@@ -347,6 +381,23 @@ class HttpxInput(BaseModel):
     options: str = Field(default="-title -status-code -tech-detect", description=(
         "Zusätzliche httpx-Flags als String"
     ))
+    api_probe: bool = Field(default=False, description=(
+        "Wenn True: probt bekannte API-Pfade (/api, /graphql, /swagger.json, /openapi.json u.a.) "
+        "und meldet Status-Code + Content-Type je Pfad. Dient der ERKENNUNG eines API-Service "
+        "(existiert eine API, welcher Typ, Doku exponiert?), NICHT der Endpunkt-Enumeration. "
+        "Nur nutzen wenn das Objective API/REST/GraphQL/Swagger erwähnt."
+    ))
+
+
+# Bekannte API-/Doku-Pfade für api_probe — feste, kuratierte Liste (kein Fuzzing,
+# kein Wordlist-Bruteforce): nur die kanonischen Pfade die einen API-Service verraten.
+_API_PROBE_PATHS = [
+    "/api", "/api/v1", "/api/v2", "/graphql", "/graphiql",
+    "/swagger.json", "/swagger-ui.html", "/openapi.json",
+    "/v2/swagger.json", "/v2/api-docs", "/v3/api-docs",
+    "/swagger/v1/swagger.json", "/api-docs",
+    "/actuator", "/actuator/health", "/.well-known/openapi.json",
+]
 
 
 class HttpxTool(BaseTool):
@@ -355,12 +406,24 @@ class HttpxTool(BaseTool):
         "Probt HTTP/HTTPS-Endpunkte: prüft Erreichbarkeit, ermittelt Titel, "
         "Status-Codes und Technologien. Ideal für schnelles Screening vieler Hosts. "
         "PFLICHT: 'targets' muss immer angegeben werden (z.B. 'example.com' oder "
-        "'example.com,sub.example.com'). Ohne 'targets' liefert das Tool leeren Output."
+        "'example.com,sub.example.com'). Ohne 'targets' liefert das Tool leeren Output. "
+        "Setze 'api_probe=true' um bekannte API-Pfade auf einen API-Service zu prüfen "
+        "(nur bei API-bezogenem Objective)."
     )
     args_schema: Type[BaseModel] = HttpxInput
 
-    def _run(self, targets: str, options: str = "-title -status-code -tech-detect") -> str:
-        target_list = "\n".join(t.strip() for t in targets.split(","))
+    def _run(self, targets: str, options: str = "-title -status-code -tech-detect",
+             api_probe: bool = False) -> str:
+        hosts = [t.strip() for t in targets.split(",") if t.strip()]
+        if api_probe:
+            # Kreuzprodukt host × API-Pfad; httpx meldet Status + Content-Type je URL.
+            urls = [h.rstrip("/") + p for h in hosts for p in _API_PROBE_PATHS]
+            target_list = "\n".join(urls)
+            # -mc 200,401,403: nur "existiert" (auch auth-geschützt) zählt; -ct: Content-Type.
+            base_cmd = [HTTPX_BIN, "-silent", "-no-color", "-status-code", "-content-type",
+                        "-mc", "200,201,401,403"]
+            return _limit(_run(base_cmd, timeout=TIMEOUT_MEDIUM, stdin=target_list), "httpx")
+        target_list = "\n".join(hosts)
         base_cmd = [HTTPX_BIN, "-silent"] + options.split()
         return _limit(_run(base_cmd, timeout=TIMEOUT_MEDIUM, stdin=target_list), "httpx")
 
@@ -400,6 +463,7 @@ class NaabuTool(BaseTool):
 nmap_tool       = NmapTool()
 nikto_tool      = NiktoTool()
 whatweb_tool    = WhatwebTool()
+wafw00f_tool    = Wafw00fTool()
 sslscan_tool    = SslscanTool()
 testssl_tool    = TestsslTool()
 curl_tool       = CurlTool()

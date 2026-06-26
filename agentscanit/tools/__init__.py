@@ -9,7 +9,7 @@ Shared helpers                   → tools/_base.py
 """
 
 from tools.active_scanning import (
-    nmap_tool, nikto_tool, whatweb_tool, sslscan_tool, testssl_tool,
+    nmap_tool, nikto_tool, whatweb_tool, wafw00f_tool, sslscan_tool, testssl_tool,
     curl_tool, ping_tool, nuclei_tool, ffuf_tool, enum4linux_tool,
     httpx_tool, naabu_tool,
 )
@@ -24,7 +24,7 @@ from tools.nvd import nvd_tool, nvd_cpe_tool
 
 __all__ = [
     # active scanning (all exported for reversibility; agents.py controls what's active)
-    "nmap_tool", "nikto_tool", "whatweb_tool", "sslscan_tool", "testssl_tool",
+    "nmap_tool", "nikto_tool", "whatweb_tool", "wafw00f_tool", "sslscan_tool", "testssl_tool",
     "curl_tool", "ping_tool", "nuclei_tool", "ffuf_tool", "enum4linux_tool",
     "httpx_tool", "naabu_tool",
     # passive recon (all exported for reversibility; agents.py controls what's active)

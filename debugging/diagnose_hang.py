@@ -24,8 +24,8 @@ BLUE_TIMEOUT= int(sys.argv[3]) if len(sys.argv) > 3 else 90
 MAX_TOTAL   = 420
 
 REPO    = Path(__file__).parent.parent
-VENV_PY = str(REPO / "agentscanit" / "venv" / "bin" / "python3")
-PYSPY   = str(REPO / "agentscanit" / "venv" / "bin" / "py-spy")
+VENV_PY = str(REPO / "venv" / "bin" / "python3")
+PYSPY   = str(REPO / "venv" / "bin" / "py-spy")
 
 TOOL_BINS = {"nmap","nikto","nuclei","sslscan","testssl","testssl.sh","ffuf",
              "whatweb","httpx","naabu","subfinder","amass","dnsrecon","dig",
