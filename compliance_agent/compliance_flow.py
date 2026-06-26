@@ -1,7 +1,7 @@
 """
 compliance_agent/compliance_flow.py — Team 5: Compliance Mapper
 
-Mapped Scan-Findings auf OWASP Top 10 (2021) via Knowledge Source.
+Mapped Scan-Findings auf OWASP Top 10 (2025) via Knowledge Source.
 Nutzt einen CrewAI Agent mit owasp_knowledge — kein Internet-Lookup nötig,
 alles aus der lokal eingebetteten Knowledge Source.
 
@@ -177,13 +177,13 @@ class ComplianceFlow(Flow[ComplianceState]):
         compliance_agent = Agent(
             role="Security Compliance Analyst",
             goal=(
-                "Analysiere Scan-Findings und mappe sie auf OWASP Top 10 (2021). "
+                "Analysiere Scan-Findings und mappe sie auf OWASP Top 10 (2025). "
                 "Nutze deine Knowledge Source für das exakte Mapping. "
                 "Sei präzise — nur Findings die klar einem OWASP-Kategorie zugeordnet werden können."
             ),
             backstory=(
                 "Du bist spezialisiert auf Compliance-Mapping von Security-Assessment-Findings. "
-                "Du kennst OWASP Top 10 (2021) auswendig und weißt welche technischen Findings "
+                "Du kennst OWASP Top 10 (2025) auswendig und weißt welche technischen Findings "
                 "welchen Kategorien entsprechen. Du arbeitest faktenbasiert — "
                 "kein Spekulieren, nur direkte Mapping auf Basis der vorliegenden Findings."
             ),
@@ -237,12 +237,12 @@ class ComplianceFlow(Flow[ComplianceState]):
         mapping_task = Task(
             description=(
                 f"Du bist Teil eines PENETRATIONSTESTS (nicht eines defensiven Audits). "
-                f"Mappe die folgenden Findings von {self.state.scan_target} auf OWASP Top 10 (2021) "
+                f"Mappe die folgenden Findings von {self.state.scan_target} auf OWASP Top 10 (2025) "
                 f"aus ANGREIFER-Perspektive.\n\n"
                 f"FINDINGS:\n{self.state.findings_text[:6000]}\n\n"
                 f"{_poc_block}"
                 "Erstelle für jede relevante OWASP-Kategorie die betroffen ist:\n"
-                "1. OWASP-ID und Name (z.B. A06:2021 – Vulnerable and Outdated Components)\n"
+                "1. OWASP-ID und Name (z.B. A03:2025 – Software Supply Chain Failures)\n"
                 "2. Konkrete Findings die dieser Kategorie zugeordnet werden\n"
                 "3. Severity: Critical / High / Medium / Low\n"
                 "(Punkt 4/5 siehe oben — abhängig vom PoC-Status)\n\n"
@@ -252,7 +252,7 @@ class ComplianceFlow(Flow[ComplianceState]):
             expected_output=(
                 "Strukturierter Pentest-OWASP-Report im Markdown-Format:\n"
                 "## OWASP Top 10 Mapping (Angreifer-Perspektive)\n"
-                "### A0X:2021 – Name\n"
+                "### A0X:2025 – Name\n"
                 "- **Findings:** ...\n"
                 "- **Severity:** ...\n"
                 "- **Angriffsvektor:** ... (wie ausnutzbar)\n"
@@ -291,7 +291,7 @@ class ComplianceFlow(Flow[ComplianceState]):
         content = "\n".join([
             f"**Target:** {target}  ",
             f"**Date:** {ts_human}  ",
-            "**Framework:** OWASP Top 10 — 2021\n",
+            "**Framework:** OWASP Top 10 — 2025\n",
             "---\n",
             f"# Compliance Mapping Report: {target}\n",
             self.state.mapping_result,
