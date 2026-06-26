@@ -59,6 +59,10 @@ def evaluate_groundtruth(target_id: str, report_path: str, trace_path: str | Non
     verified = _version_verified_cves(report)
     must = {c.upper() for c in spec.get("must_find_cves", [])}
     forbid = {c.upper() for c in spec.get("forbid_cves", [])}
+    # allow_cves: bei TN-Targets bekannte, reale CVEs die toleriert werden (z.B. nginx:alpine
+    # hat ein echtes, tool-bestätigtes CVE — kein Framework-Fehler). Dokumentiert die Realität,
+    # statt das Target als "unsauber" zu werten. NUR explizit gelistete IDs sind erlaubt.
+    allow = {c.upper() for c in spec.get("allow_cves", [])}
 
     recall_hits = must & found
     recall = len(recall_hits) / len(must) if must else None
@@ -84,9 +88,13 @@ def evaluate_groundtruth(target_id: str, report_path: str, trace_path: str | Non
     }
 
     if spec["kind"] == "tn":
-        # True-Negative: keine versions-verifizierte CVE erlaubt
+        # True-Negative: keine versions-verifizierte CVE erlaubt — AUSSER explizit in
+        # allow_cves gelistete, bekannte reale CVEs (z.B. nginx:alpine HTTP/3-UAF).
+        unexpected = verified - allow
         result["tn_verified_cves"] = sorted(verified)
-        result["tn_clean"] = (len(verified) == 0)
+        result["tn_allowed_cves"] = sorted(verified & allow)
+        result["tn_unexpected_cves"] = sorted(unexpected)
+        result["tn_clean"] = (len(unexpected) == 0)
         result["passed"] = result["tn_clean"] and not forbid_hits
     else:
         result["passed"] = (recall == 1.0 if must else True) and not forbid_hits
@@ -97,8 +105,11 @@ def evaluate_groundtruth(target_id: str, report_path: str, trace_path: str | Non
 def print_result(r: dict) -> None:
     print(f"=== Dim 3: Ground-Truth — {r['target']} (kind={r['kind']}) ===")
     if r["kind"] == "tn":
-        print(f"  TN-Check: {len(r['tn_verified_cves'])} versions-verifizierte CVE(s) "
-              f"(erlaubt: 0) → {'CLEAN' if r['tn_clean'] else 'VERLETZT: ' + str(r['tn_verified_cves'])}")
+        allowed = r.get("tn_allowed_cves", [])
+        unexpected = r.get("tn_unexpected_cves", r["tn_verified_cves"])
+        allow_note = f", davon {len(allowed)} bekannt-erlaubt {allowed}" if allowed else ""
+        print(f"  TN-Check: {len(r['tn_verified_cves'])} versions-verifizierte CVE(s){allow_note} "
+              f"→ {'CLEAN' if r['tn_clean'] else 'VERLETZT (unerwartet): ' + str(unexpected)}")
     else:
         print(f"  Recall: {r['recall']}  gefunden={r['found_required']}  fehlt={r['missing_required']}")
     if r["forbid_violations"]:

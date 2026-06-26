@@ -1,0 +1,65 @@
+{
+  "timestamp": "20260626_062809",
+  "n_runs": 2,
+  "targets": {
+    "scanme-nmap-org": {
+      "kind": "tp",
+      "runs": [
+        {
+          "artifacts": {
+            "trace": "/opt/projects/agentic-ai/recon-suite/logs/trace_scanme.nmap.org_20260626_063729.json",
+            "report": "/opt/projects/agentic-ai/recon-suite/logs/final_report_scanme.nmap.org_20260626_064309.md",
+            "crew": "/opt/projects/agentic-ai/recon-suite/logs/crew_scanme.nmap.org_20260626_063729.json",
+            "debug": "/opt/projects/agentic-ai/recon-suite/logs/llm_debug_2499342.jsonl",
+            "exit": 0,
+            "dur_s": 901.2
+          },
+          "eval": {
+            "dim1_input": {
+              "passed": true,
+              "output": "=== Dim 1: Tool-Input \u2014 trace_scanme.nmap.org_20260626_063729.json ===\n  target=scanme.nmap.org scope=network\n  input_valid_rate = 1.000 (21/21)  PASS (Schwelle 0.95)"
+            },
+            "dim2_output": {
+              "passed": true,
+              "output": "=== Dim 2: Tool-Output \u2014 trace_scanme.nmap.org_20260626_063729.json ===\n  CVEs: 14 tool-best\u00e4tigt, 0 HALLUZINIERT  PASS"
+            },
+            "dim3_groundtruth": {
+              "passed": true,
+              "output": "=== Dim 3: Ground-Truth \u2014 scanme-nmap-org (kind=tp) ===\n  Recall: 1.0  gefunden=['CVE-2018-15473']  fehlt=[]\n  Ports: 22=\u2713, 80=\u2713\n  \u2192 PASS"
+            }
+          },
+          "failed": false
+        },
+        {
+          "artifacts": {
+            "trace": "/opt/projects/agentic-ai/recon-suite/logs/trace_scanme.nmap.org_20260626_065122.json",
+            "report": "/opt/projects/agentic-ai/recon-suite/logs/final_report_scanme.nmap.org_20260626_065632.md",
+            "crew": "/opt/projects/agentic-ai/recon-suite/logs/crew_scanme.nmap.org_20260626_065122.json",
+            "debug": "/opt/projects/agentic-ai/recon-suite/logs/llm_debug_2511612.jsonl",
+            "exit": 0,
+            "dur_s": 803.5
+          },
+          "eval": {
+            "dim1_input": {
+              "passed": true,
+              "output": "=== Dim 1: Tool-Input \u2014 trace_scanme.nmap.org_20260626_065122.json ===\n  target=scanme.nmap.org scope=network\n  input_valid_rate = 1.000 (25/25)  PASS (Schwelle 0.95)"
+            },
+            "dim2_output": {
+              "passed": true,
+              "output": "=== Dim 2: Tool-Output \u2014 trace_scanme.nmap.org_20260626_065122.json ===\n  CVEs: 14 tool-best\u00e4tigt, 0 HALLUZINIERT  PASS"
+            },
+            "dim3_groundtruth": {
+              "passed": true,
+              "output": "=== Dim 3: Ground-Truth \u2014 scanme-nmap-org (kind=tp) ===\n  Recall: 1.0  gefunden=['CVE-2018-15473']  fehlt=[]\n  Ports: 22=\u2713, 80=\u2713\n  \u2192 PASS"
+            }
+          },
+          "failed": false
+        }
+      ],
+      "consistency": {
+        "passed": true,
+        "output": "=== Dim 4: Konsistenz \u00fcber 2 L\u00e4ufe ===\n  Ziel-CVE-Konsistenz: 1.0  (Ziel 1.0, must_find=['CVE-2018-15473'])  \u2713   [PRIM\u00c4R]\n  CVE-Jaccard (gesamt): 1.0  [nur INFO, nicht Pass-Kriterium]\n  Port-Consistency: True  (Ziel identisch)  \u2713\n  Grade-StdDev:     0.0  (Ziel \u2264 5.0)  \u2713\n  CVE-Mengen: [['CVE-2015-5600', 'CVE-2015-8325', 'CVE-2016-10009', 'CVE-2016-10012', 'CVE-2016-1908', 'CVE-2017-3167', 'CVE-2017-7679', 'CVE-2017-9798', 'CVE-2018-1312', 'CVE-2018-15473', 'CVE-2021-26691', 'CVE-2021-39275', 'CVE-2021-41773', 'CVE-2021-42013', 'CVE-2023-38408'], ['CVE-2015-5600', 'CVE-2015-8325', 'CVE-2016-10009', 'CVE-2016-10012', 'CVE-2016-1908', 'CVE-2017-3167', 'CVE-2017-7679', 'CVE-2017-9798', 'CVE-2018-1312', 'CVE-2018-15473', 'CVE-2021-26691', 'CVE-2021-39275', 'CVE-2021-41773', 'CVE-2021-42013', 'CVE-2023-38408']]\n  Port-Mengen: [[22, 80, 9929, 31337], [22, 80, 9929, 31337]]\n  \u2192 PASS"
+      }
+    }
+  }
+}

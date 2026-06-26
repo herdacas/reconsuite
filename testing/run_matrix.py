@@ -134,11 +134,14 @@ def _newest(pattern_target: str, prefix: str, ext: str, after_ts: float) -> str 
     return max(cands, key=os.path.getmtime) if cands else None
 
 
-def run_scan(target: str, scope: str) -> dict:
-    """Einen Scan ausführen, Pfade der erzeugten Artefakte zurückgeben."""
+def run_scan(target: str, scope: str, objective: str = "matrix-scan") -> dict:
+    """Einen Scan ausführen, Pfade der erzeugten Artefakte zurückgeben.
+
+    objective steuert objective-getriggerte Tools (API-Erkennung, Misconfig-Checks) —
+    feature-Targets setzen es passend (z.B. 'API-Services erkennen')."""
     t0 = time.time()
     env = dict(os.environ, RECON_LLM_DEBUG="1")
-    cmd = [_VENV_PY, os.path.join(_ROOT, "main.py"), target, "matrix-scan", scope]
+    cmd = [_VENV_PY, os.path.join(_ROOT, "main.py"), target, objective, scope]
     p = subprocess.run(cmd, cwd=_ROOT, env=env, capture_output=True, text=True, timeout=2400)
     return {
         "trace": _newest(target, "trace", ".json", t0),
@@ -166,10 +169,31 @@ def evaluate_run(target_id: str, spec: dict, artifacts: dict) -> dict:
         out["dim1_input"] = _eval("eval_tool_input.py", [tr])
     if tr and crew:
         out["dim2_output"] = _eval("eval_tool_output.py", [tr, crew])
-    if rep:
+    # feature-Targets (WAF/API/Misconfig) haben keine CVE-Ground-Truth → kein Dim3-Recall,
+    # stattdessen: erscheint die erwartete Feature-Signatur im Report ODER Trace?
+    if spec.get("kind") == "feature":
+        out["feature"] = _eval_feature(spec, tr, rep)
+    elif rep:
         gargs = ["--target", target_id, "--report", rep] + (["--trace", tr] if tr else [])
         out["dim3_groundtruth"] = _eval("eval_groundtruth.py", gargs)
     return out
+
+
+def _eval_feature(spec: dict, trace: str | None, report: str | None) -> dict:
+    """Deterministisch: jede in expect_signatures gelistete Zeichenkette muss im
+    Report ODER im Trace-Roh-Output vorkommen. Kein LLM. Read-only."""
+    sigs = spec.get("expect_signatures", [])
+    haystack = ""
+    for path in (report, trace):
+        if path and os.path.exists(path):
+            haystack += open(path, encoding="utf-8", errors="ignore").read()
+    found = {s: (s in haystack) for s in sigs}
+    passed = bool(sigs) and all(found.values())
+    out = "=== Feature-Check: " + spec["id"] + " ===\n"
+    for s, ok in found.items():
+        out += f"  {'✓' if ok else '✗'} '{s}'\n"
+    out += f"  → {'PASS' if passed else 'FAIL'}"
+    return {"passed": passed, "output": out}
 
 
 def main():
@@ -217,21 +241,37 @@ def main():
         try:
             for i in range(n_runs):
                 print(f"  Lauf {i+1}/{n_runs} (target={scan_target}) ...")
-                art = run_scan(scan_target, spec["scope"])
-                ev = evaluate_run(tid, spec, art)
-                runs.append({"artifacts": art, "eval": ev})
+                art = run_scan(scan_target, spec["scope"],
+                               objective=spec.get("objective", "matrix-scan"))
+                # exit≠0-Filter: bei fehlgeschlagenem Scan NICHT evaluieren — sonst greift
+                # _newest auf einen alten Report aus einem früheren Lauf und verfälscht Dim3.
+                if art["exit"] == 0:
+                    ev = evaluate_run(tid, spec, art)
+                    failed = False
+                else:
+                    ev = {}
+                    failed = True
+                runs.append({"artifacts": art, "eval": ev, "failed": failed})
                 print(f"    exit={art['exit']} dur={art['dur_s']}s "
-                      f"trace={'✓' if art['trace'] else '✗'} report={'✓' if art['report'] else '✗'}")
+                      f"trace={'✓' if art['trace'] else '✗'} report={'✓' if art['report'] else '✗'}"
+                      f"{'  [FAILED → nicht ausgewertet]' if failed else ''}")
         finally:
             if is_docker:
                 container_down(spec)
 
-        # Dim 4 Konsistenz über die N Läufe
+        # Dim 4 Konsistenz über die N Läufe — NUR erfolgreiche Läufe (exit==0),
+        # sonst würde ein alter Report aus einem Fehllauf die Jaccard-Konsistenz verfälschen.
         pairs = [f"{r['artifacts']['trace']}:{r['artifacts']['report']}"
-                 for r in runs if r["artifacts"]["trace"] and r["artifacts"]["report"]]
+                 for r in runs
+                 if not r.get("failed")
+                 and r["artifacts"]["trace"] and r["artifacts"]["report"]]
         consistency = None
         if len(pairs) >= 2:
-            consistency = _eval("eval_consistency.py", ["--pairs"] + pairs)
+            cons_args = ["--pairs"] + pairs
+            must = spec.get("must_find_cves") or []
+            if must:
+                cons_args += ["--must-find"] + must
+            consistency = _eval("eval_consistency.py", cons_args)
 
         matrix["targets"][tid] = {"kind": spec["kind"], "runs": runs,
                                   "consistency": consistency}
@@ -252,15 +292,21 @@ def _print_summary(matrix: dict) -> None:
             continue
         runs = data["runs"]
         oks = sum(1 for r in runs if r["artifacts"]["exit"] == 0)
-        # Dimensions-Pass-Rate über alle Läufe
+        # Dimensions-Pass-Rate NUR über erfolgreiche Läufe (failed-Läufe wurden nicht evaluiert).
+        ok_runs = [r for r in runs if not r.get("failed")]
         def drate(dim):
-            vals = [r["eval"].get(dim, {}).get("passed") for r in runs if dim in r["eval"]]
+            vals = [r["eval"].get(dim, {}).get("passed") for r in ok_runs if dim in r["eval"]]
             return f"{sum(bool(v) for v in vals)}/{len(vals)}" if vals else "-"
         cons = data.get("consistency")
         cons_s = ("PASS" if cons and cons["passed"] else "FAIL") if cons else "-"
-        print(f"  {tid} ({data['kind']}): scans {oks}/{len(runs)} | "
-              f"Dim1 {drate('dim1_input')} Dim2 {drate('dim2_output')} "
-              f"Dim3 {drate('dim3_groundtruth')} | Konsistenz {cons_s}")
+        if data["kind"] == "feature":
+            print(f"  {tid} ({data['kind']}): scans {oks}/{len(runs)} | "
+                  f"Dim1 {drate('dim1_input')} Dim2 {drate('dim2_output')} "
+                  f"Feature {drate('feature')} | Konsistenz {cons_s}")
+        else:
+            print(f"  {tid} ({data['kind']}): scans {oks}/{len(runs)} | "
+                  f"Dim1 {drate('dim1_input')} Dim2 {drate('dim2_output')} "
+                  f"Dim3 {drate('dim3_groundtruth')} | Konsistenz {cons_s}")
 
 
 if __name__ == "__main__":

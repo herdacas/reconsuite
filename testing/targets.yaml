@@ -89,7 +89,11 @@ targets:
     expected_services:
       - "nginx"
     must_find_cves: []
-    forbid_cves: []                   # TN: KEINE confirmed CVE erwartet; Prüfung = 0 versions-verifizierte CVEs
+    forbid_cves: []                   # TN: KEINE confirmed CVE erwartet
+    # allow_cves: nginx:alpine hat ein ECHTES, tool-bestätigtes CVE (kein Framework-Fehler).
+    # Quelle: Matrix 2026-06-23 (nuclei) + CLAUDE.md — CVE-2026-42530 = HTTP/3-UAF in nginx 1.31.2.
+    # Toleriert beim TN-Check, statt das Target als unsauber zu werten (Option A aus Harness-Plan).
+    allow_cves: ["CVE-2026-42530"]
     version_known: true               # nginx:alpine sendet "Server: nginx/<version>"
     lifecycle: docker_run
     docker_image: "nginx:alpine"
@@ -98,6 +102,51 @@ targets:
     ready_probe: null                 # Container-IP erst nach Start bekannt → Probe in run_matrix
     ready_timeout_s: 30
     source: "Aktuelles offizielles nginx:alpine, isoliert über Container-IP (172.17.x.x). TN-Erwartung: kein kritisches CVE — nur nginx sichtbar, keine Host-Dienste."
+
+  # ─── Feature-Targets (kind=feature) ──────────────────────────────────────────
+  # Prüfen die in dieser Session ergänzten objective-getriggerten Tools (Commit 0f23f73).
+  # KEINE CVE-Ground-Truth → kein Dim3-Recall, stattdessen Feature-Check: die exakte
+  # Signatur (deterministisch aus dem Tool-/Guardrail-Code) MUSS in Report ODER Trace stehen.
+  # expect_signatures = exakte Strings, die der Code erzeugt.
+
+  - id: waf-cloudflare
+    kind: feature
+    scan_target: www.cloudflare.com
+    scope: web
+    objective: "WAF/CDN-Erkennung"
+    expect_signatures:
+      - "WAF/CDN DETECTED"     # _waf_detection_guardrail-Block (tasks.py)
+      - "Cloudflare"
+    lifecycle: live
+    source: "Cloudflare-Host (eigene Verifikation 2026-06-26: wafw00f erkennt 'is behind Cloudflare')."
+
+  - id: api-petstore-swagger
+    kind: feature
+    scan_target: petstore.swagger.io
+    scope: web
+    objective: "API-Services und Swagger/OpenAPI erkennen"
+    expect_signatures:
+      - "swagger.json"         # httpx api_probe-Treffer (active_scanning.py)
+    lifecycle: live
+    source: "petstore.swagger.io (eigene Verifikation 2026-06-26: api_probe meldet /v2/swagger.json [200] [application/json])."
+
+  - id: subdomain-rich-proofpoint
+    kind: feature
+    scan_target: proofpoint.com
+    scope: web
+    objective: "Subdomains und Endpunkte enumerieren"
+    expect_signatures:
+      - "dnsx"      # erscheint im Trace-command, wenn der Agent dnsx auslöst
+      - "katana"    # erscheint im Trace-command, wenn der Agent katana auslöst
+    # HINWEIS: dnsx/katana sind aktuell rein agenten-ermessensabhängig (KEINE Prompt-Anweisung
+    # im research-Task). Dieses Target liefert mit ~20 echten Subdomains (api/admin/portal/
+    # dashboard/auth/login…) den Subdomain-reichen Kontext, der sie am ehesten provoziert.
+    # Schlagen die Signaturen fehl = valider BEFUND (Tools werden ohne Prompt-Bedingung nicht
+    # zuverlässig ausgelöst), KEIN Harness-Fehler. Ground-Truth-Subdomains aus externem
+    # Framework-Scan (scan_id 0064, 2026-05-09): 20 aktive Subdomains bestätigt.
+    expect_subdomains_min: 8   # erwartete Mind.-Zahl entdeckter Subdomains (informativ)
+    lifecycle: live
+    source: "proofpoint.com — externer Framework-Scan (2026-05-09) bestätigt 20 aktive Subdomains (www/ns1-3/admin/imap/manage/stage/demo/dashboard/access/api/portal/blog/wiki/auth/support/help/login/kb)."
 
 # ─── Konsistenz-Parameter ──────────────────────────────────────────────────────
 consistency:
