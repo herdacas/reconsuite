@@ -203,3 +203,43 @@ WebLogic 12.2.1.3 REMOTE   1.00    0       1.00        0.90         1.5
 
 Damit lässt sich faktenbasiert sagen: *Liefert das Framework wahre, konsistente Ergebnisse —
 und tut es das mit beiden Modell-Setups gleichermaßen?*
+
+---
+
+## 8. ERGEBNIS — Matrix-Lauf 2026-06-27 (Remote qwen3-coder:480b)
+
+Stand: 5 von 7 Targets belegt. Lauf über mehrere Session-Limit-Resets verteilt
+(qwen3-coder:480b free-tier: Session-Limit ~alle 3h, Weekly knapp). Bei jedem Limit
+**sauber abgebrochen** (kein Verfälschen durch exit≠0-Läufe — Schritt-1-Filter greift).
+
+| Target | Kind | Ergebnis |
+|---|---|---|
+| Tomcat 8.5.19 | TP | ✅ **CVE-2017-12615 in 4/4 Läufen** (Recall 1.0) |
+| WebLogic 12.2.1.3 | TP | ✅ **CVE-2023-21839 in 4/4 Läufen** (Recall 1.0) |
+| scanme.nmap.org | TP | ✅ **CVE-2018-15473** gefunden (1 valider Lauf; Rest nmap.org 12/Tag-Limit) |
+| petstore.swagger.io | feature | ✅ **PASS** — `swagger.json [200]` via httpx api_probe erkannt |
+| proofpoint.com | feature | ✅ **PASS** — **dnsx + katana ERSTMALS vom Agenten ausgelöst** (tool-bestätigt: dnsx `-silent -resp`, katana auf 8 Subdomains) |
+| nginx:alpine | TN | ⏳ OFFEN — beim Session-Limit-Abbruch nicht abgeschlossen |
+| waf-cloudflare | feature | ⏳ OFFEN — beim Session-Limit-Abbruch nicht abgeschlossen |
+
+**Kern-Erkenntnisse:**
+1. **CVE-Recall 1.0** über alle TP-Container-Läufe, **0 Halluzinationen** (Dim 1+2 durchg.) —
+   bestätigt den Wahrheitsgehalt für versions-präzise Targets.
+2. **Durchbruch dnsx/katana:** der seit Projektbeginn offene Punkt („mit qwen3-coder nie
+   provoziert") ist gelöst — der subdomain-reiche Kontext (proofpoint, ~20 Subdomains)
+   triggert die agenten-ermessensabhängigen Tools. katana crawlte real 8 Subdomains.
+3. **Methodischer Befund (kein Framework-Fehler):** Tomcat + WebLogic liefen im Lauf
+   **parallel auf 127.0.0.1** (Container-Lifecycle überlappte — beide Ports 8080+7001 in allen
+   4 Traces). Beide Ziel-CVEs wurden gefunden, aber nicht sauber getrennt. Für eine isolierte
+   Matrix müsste `container_up`/`container_down` strikt sequenziell sein (Backlog).
+4. **exit≠0-Filter bewährt:** bei den Session-Limit-Abbrüchen wurden keine kaputten Läufe
+   ausgewertet.
+
+## 9. NACHHOLEN (nächste Session, nach User-Freigabe)
+
+- **nginx-TN + waf-cloudflare** nachfahren (je N=1 reicht: TN-Check bzw. WAF/CDN-Signatur):
+  `venv/bin/python testing/run_matrix.py --targets nginx-clean-baseline waf-cloudflare --runs 1`
+  (Weekly-Budget beachten; ~2 Scans).
+- **Optional Backlog:** Container-Lifecycle strikt sequenziell machen, damit Tomcat/WebLogic
+  isoliert laufen (für eine saubere getrennte CVE-Konsistenz-Auswertung).
+- Danach: Matrix 7/7 vollständig, TESTKONZEPT final.

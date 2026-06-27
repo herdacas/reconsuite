@@ -1,0 +1,68 @@
+{
+  "timestamp": "20260627_133435",
+  "n_runs": 1,
+  "targets": {
+    "api-petstore-swagger": {
+      "kind": "feature",
+      "runs": [
+        {
+          "artifacts": {
+            "trace": "/opt/projects/agentic-ai/recon-suite/logs/trace_petstore.swagger.io_20260627_134257.json",
+            "report": "/opt/projects/agentic-ai/recon-suite/logs/final_report_petstore.swagger.io_20260627_134328.md",
+            "crew": "/opt/projects/agentic-ai/recon-suite/logs/crew_petstore.swagger.io_20260627_134257.json",
+            "debug": "/opt/projects/agentic-ai/recon-suite/logs/llm_debug_3082750.jsonl",
+            "exit": 0,
+            "dur_s": 534.0
+          },
+          "eval": {
+            "dim1_input": {
+              "passed": true,
+              "output": "=== Dim 1: Tool-Input \u2014 trace_petstore.swagger.io_20260627_134257.json ===\n  target=petstore.swagger.io scope=web\n  input_valid_rate = 1.000 (38/38)  PASS (Schwelle 0.95)"
+            },
+            "dim2_output": {
+              "passed": true,
+              "output": "=== Dim 2: Tool-Output \u2014 trace_petstore.swagger.io_20260627_134257.json ===\n  CVEs: 2 tool-best\u00e4tigt, 0 HALLUZINIERT  PASS"
+            },
+            "feature": {
+              "passed": true,
+              "output": "=== Feature-Check: api-petstore-swagger ===\n  \u2713 'swagger.json'\n  \u2192 PASS"
+            }
+          },
+          "failed": false
+        }
+      ],
+      "consistency": null
+    },
+    "subdomain-rich-proofpoint": {
+      "kind": "feature",
+      "runs": [
+        {
+          "artifacts": {
+            "trace": "/opt/projects/agentic-ai/recon-suite/logs/trace_proofpoint.com_20260627_135440.json",
+            "report": "/opt/projects/agentic-ai/recon-suite/logs/final_report_proofpoint.com_20260627_135555.md",
+            "crew": "/opt/projects/agentic-ai/recon-suite/logs/crew_proofpoint.com_20260627_135440.json",
+            "debug": "/opt/projects/agentic-ai/recon-suite/logs/llm_debug_3087330.jsonl",
+            "exit": 0,
+            "dur_s": 746.6
+          },
+          "eval": {
+            "dim1_input": {
+              "passed": true,
+              "output": "=== Dim 1: Tool-Input \u2014 trace_proofpoint.com_20260627_135440.json ===\n  target=proofpoint.com scope=web\n  input_valid_rate = 1.000 (55/55)  PASS (Schwelle 0.95)"
+            },
+            "dim2_output": {
+              "passed": true,
+              "output": "=== Dim 2: Tool-Output \u2014 trace_proofpoint.com_20260627_135440.json ===\n  CVEs: 3 tool-best\u00e4tigt, 0 HALLUZINIERT  PASS"
+            },
+            "feature": {
+              "passed": true,
+              "output": "=== Feature-Check: subdomain-rich-proofpoint ===\n  \u2713 'dnsx'\n  \u2713 'katana'\n  \u2192 PASS"
+            }
+          },
+          "failed": false
+        }
+      ],
+      "consistency": null
+    }
+  }
+}
