@@ -9,6 +9,17 @@ Wir arbeiten die Roadmap (`roadmap.md`) phasenweise ab. Im Ablauf wird entschied
 
 **WICHTIG — Keine pauschalen Antworten. Faktenbasierte Responses auf jede Frage.**
 
+### Aktueller Stand (2026-06-27 — Finale Matrix 5/7 belegt, 2 offen)
+- **FINALE VOLL-MATRIX zu 5/7 Targets durchgeführt (Remote qwen3-coder:480b).** Über mehrere Session-Limit-Resets verteilt (free-tier: Session-Limit ~alle 3h, Weekly bei 91% am Sessionende). Bei jedem Limit **sauber abgebrochen** (exit≠0-Filter verhindert Verfälschung). Volldetails: `testing/TESTKONZEPT.md` §8/§9.
+  - ✅ **Tomcat 8.5.19** (TP): CVE-2017-12615 in **4/4** Läufen (Recall 1.0)
+  - ✅ **WebLogic 12.2.1.3** (TP): CVE-2023-21839 in **4/4** Läufen (Recall 1.0)
+  - ✅ **scanme.nmap.org** (TP): CVE-2018-15473 gefunden (1 valider Lauf; Rest nmap.org 12/Tag-Limit)
+  - ✅ **petstore.swagger.io** (feature): PASS — swagger.json [200] via httpx `api_probe`
+  - ✅ **proofpoint.com** (feature): PASS — **dnsx + katana ERSTMALS vom Agenten ausgelöst** (tool-bestätigt, katana crawlte 8 Subdomains). LÖST den seit Projektbeginn offenen Punkt „dnsx/katana mit qwen3-coder nie provoziert".
+  - ⏳ **OFFEN (Abbruch durch Session-Limit): nginx-TN + waf-cloudflare** — nachzuholen NÄCHSTE SESSION nach User-Freigabe: `venv/bin/python testing/run_matrix.py --targets nginx-clean-baseline waf-cloudflare --runs 1` (~2 Scans, Weekly-Budget beachten).
+  - **Kern-Erkenntnis:** CVE-Recall 1.0 + 0 Halluzinationen über alle TP-Läufe → Wahrheitsgehalt für versions-präzise Targets bestätigt. **Methodischer Befund (kein Framework-Fehler):** Tomcat+WebLogic liefen parallel auf 127.0.0.1 (Container-Lifecycle überlappte, beide Ports in allen Traces) → beide CVEs gefunden, aber nicht isoliert getrennt. Backlog: `container_up`/`container_down` strikt sequenziell.
+  - **NUR LOKAL:** Matrix-Artefakte + TESTKONZEPT §8/§9 (testing/, nicht gepusht). CLAUDE.md (dieser Block) ist push-bar.
+
 ### Aktueller Stand (2026-06-26, Nachmittag — Harness-Fertigstellung)
 - **TESTKONZEPT-HARNESS WEITGEHEND FERTIGGESTELLT (2026-06-26, NUR LOKAL in `testing/`, nicht gepusht).** Plan + Details: `docs/harness-fertigstellung-plan.md`. Schritte 1–7 umgesetzt + verifiziert (Pos/Neg-Kontrollen):
   - **Schritt 1 — exit≠0-Filter** (`run_matrix.py`): fehlgeschlagene Läufe (`exit!=0`) werden NICHT mehr ausgewertet (sonst griff `_newest` einen alten Report → verfälschte Dim3). `failed`-Flag, aus Konsistenz-Paaren + Dim-Raten entfernt. Verifiziert synthetisch.
