@@ -1,23 +1,24 @@
 """AlienVault OTX Threat Intelligence Tool.
 
 Kostenlose API — Account unter https://otx.alienvault.com erforderlich.
-API-Key via OTX_API_KEY env-var oder config. Ohne Key: graceful skip.
+API-Key via OTX_API_KEY env-var oder ../api_keys.md. Ohne Key: graceful skip.
 
 Endpunkte genutzt:
   CVE:  GET /api/v1/indicators/CVE/<cve>/general
   IPv4: GET /api/v1/indicators/IPv4/<ip>/general
 """
 
-import os
 import time
 import requests
+
+from ._keys import get_key
 
 _BASE = "https://otx.alienvault.com/api/v1/indicators"
 _TIMEOUT = 10
 
 
 def _api_key() -> str:
-    return os.environ.get("OTX_API_KEY", "")
+    return get_key("OTX_API_KEY")
 
 
 def _get(url: str, key: str) -> dict:

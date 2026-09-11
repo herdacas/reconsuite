@@ -1,18 +1,19 @@
 """Shodan Host Intelligence Tool.
 
-Paid API — Key via SHODAN_API_KEY env-var. Ohne Key: graceful skip.
+Paid API — Key via SHODAN_API_KEY env-var oder ../api_keys.md. Ohne Key: graceful skip.
 Endpunkt: GET https://api.shodan.io/shodan/host/<ip>?key=<API_KEY>
 """
 
-import os
 import requests
+
+from ._keys import get_key
 
 _BASE    = "https://api.shodan.io/shodan/host"
 _TIMEOUT = 10
 
 
 def _api_key() -> str:
-    return os.environ.get("SHODAN_API_KEY", "")
+    return get_key("SHODAN_API_KEY")
 
 
 def lookup_ip(ip: str) -> dict:

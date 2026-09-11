@@ -1,6 +1,6 @@
 """VirusTotal Reputation Tool.
 
-Paid API (free tier: 500 req/day) — Key via VT_API_KEY env-var.
+Paid API (free tier: 500 req/day) — Key via VT_API_KEY env-var oder ../api_keys.md.
 Ohne Key: graceful skip.
 
 Endpunkte genutzt:
@@ -8,15 +8,16 @@ Endpunkte genutzt:
   CVE: GET https://www.virustotal.com/api/v3/vulnerabilities/<cve>
 """
 
-import os
 import requests
+
+from ._keys import get_key
 
 _BASE    = "https://www.virustotal.com/api/v3"
 _TIMEOUT = 10
 
 
 def _api_key() -> str:
-    return os.environ.get("VT_API_KEY", "")
+    return get_key("VT_API_KEY")
 
 
 def _get(path: str, key: str) -> dict:

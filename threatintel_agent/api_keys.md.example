@@ -1,0 +1,22 @@
+# Threat-Intel API-Keys
+
+Kopiere diese Datei zu `api_keys.md` und trage deine Keys ein.
+`api_keys.md` ist gitignored und wird nie committed.
+
+Alle drei sind optional — ohne Key degradiert der jeweilige Scan graceful
+(kein Crash, Status `"no_key"` im Output). Eine gesetzte Umgebungsvariable
+(z.B. `OTX_API_KEY` im Shell-Environment) hat immer Vorrang vor dieser Datei.
+
+Format: `VARIABLENNAME: wert`, eine Zeile pro Key. Zeilen ohne gültigen
+Key-Namen (z.B. diese Überschriften/Kommentare) werden ignoriert.
+
+OTX_API_KEY: dein-key-hier
+SHODAN_API_KEY: dein-key-hier
+VT_API_KEY: dein-key-hier
+
+## Woher bekomme ich die Keys?
+
+- **OTX** (kostenlos): Account unter https://otx.alienvault.com, dann
+  Settings → API Integration.
+- **Shodan** (paid-tier): https://account.shodan.io
+- **VirusTotal** (free-tier, 500 req/Tag): https://www.virustotal.com/gui/my-apikey

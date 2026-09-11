@@ -215,6 +215,8 @@ Teams 4–6 degradieren **graceful** ohne API-Keys — kein Crash, kein Timeout,
 
 Modell-Auswahl über `models.json` (von `models.json.example` ableiten).
 
+**Threat-Intel-Keys (Team 4)** lassen sich alternativ an einer Stelle eintragen statt als Env-Vars: [threatintel_agent/api_keys.md](threatintel_agent/api_keys.md.example) (von `api_keys.md.example` ableiten, gitignored — gleiches Prinzip wie `models.json`). Eine gesetzte Umgebungsvariable hat immer Vorrang.
+
 ---
 
 ## Einschränkungen

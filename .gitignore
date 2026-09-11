@@ -12,6 +12,7 @@ agentscanit/temp/
 agentscanit/logs/
 agentscanit/scans/
 agentscanit/models.json
+threatintel_agent/api_keys.md
 agentscanit/theHarvester/
 agentscanit/testssl.sh/
 agentscanit/enum4linux-ng/
