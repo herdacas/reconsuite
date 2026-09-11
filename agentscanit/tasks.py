@@ -291,6 +291,71 @@ def _cve_trace_guardrail(output: Any) -> tuple[bool, Any]:
     return True, raw
 
 
+_VERSION_TOKEN_RE = _re.compile(r'\d+\.\d+')
+
+
+def _searchsploit_version_guardrail(output: Any) -> tuple[bool, Any]:
+    """Guardrail (red): lehnt versionslose searchsploit-Treffer als Findings ab.
+
+    BUG-23 (2026-09-11): searchsploit ohne Versionsangabe (z.B. 'searchsploit Apache'
+    statt 'searchsploit Apache 2.4.49') liefert einen ungefilterten Keyword-Dump der
+    gesamten lokalen ExploitDB — teils >100 KB, älteste Treffer von 1996, KEIN Bezug
+    zur tatsächlich laufenden Version des Ziels. Beobachteter Realfall (rastede.de):
+    'searchsploit --json Apache' lieferte 7 Treffer (u.a. ActiveMQ, Apache 0.8.x/1.0.x/
+    1.1/1.2/1.3), die der Agent 1:1 als confirmed_attack_surface/exploitable_findings
+    übernahm — obwohl ActiveMQ auf dem Ziel gar nicht läuft und nie eine Apache-Version
+    erkannt wurde. Der Prompt verlangt 'searchsploit <service> <version>', das ist aber
+    reine Vorgabe, kein Code-Zwang (gleiches Muster wie BUG-20, dort für die NVD-CVE-
+    Liste gelöst — hier für den red-Task nachgezogen).
+
+    Teilt sich den Reject-Counter mit den anderen Guardrails dieser Session (gleiches
+    Muster wie beim findings-Task, wo _cve_tool_used_guardrail + _cve_trace_guardrail
+    ebenfalls einen gemeinsamen Counter nutzen) — ein Retry-Budget pro Task-Versuch,
+    nicht pro Guardrail-Typ.
+    """
+    pydantic_out = getattr(output, "pydantic", None)
+    raw = getattr(output, "raw", output) if not isinstance(output, str) else output
+    if not pydantic_out:
+        return True, raw
+
+    surface     = list(getattr(pydantic_out, "confirmed_attack_surface", None) or [])
+    exploitable = list(getattr(pydantic_out, "exploitable_findings", None) or [])
+    if not surface and not exploitable:
+        return True, raw
+
+    try:
+        from tools.trace import run_trace
+        if not run_trace.is_active:
+            return True, raw
+
+        versionless_calls = []
+        for call in run_trace._pending:
+            if call.get("tool_name", "") != "searchsploit":
+                continue
+            cmd = call.get("command") or call.get("agent_params") or []
+            query = " ".join(str(c) for c in cmd) if isinstance(cmd, (list, tuple)) else str(cmd)
+            if not _VERSION_TOKEN_RE.search(query):
+                versionless_calls.append(query)
+
+        if versionless_calls and run_trace._guardrail_reject_count < 1:
+            run_trace._guardrail_reject_count += 1
+            return False, (
+                f"FEHLER: searchsploit wurde ohne Versionsangabe aufgerufen "
+                f"({versionless_calls}) — das liefert einen ungefilterten Keyword-Dump "
+                f"der gesamten lokalen ExploitDB (ggf. hunderte Treffer seit 1996), "
+                f"KEINE tool-bestätigte Aussage über das aktuelle Ziel. "
+                f"'confirmed_attack_surface'/'exploitable_findings' sind aber nicht leer. "
+                f"Entweder: rufe searchsploit erneut mit '<service> <version>' auf "
+                f"(Version aus blue-/findings-Context entnehmen), oder — falls keine "
+                f"konkrete Version bekannt ist — leere 'confirmed_attack_surface' und "
+                f"'exploitable_findings' (keine Version = kein bestätigter Treffer)."
+            )
+    except Exception:
+        pass
+
+    return True, raw
+
+
 # ─── Subdomain-Fanout (deterministisch) ───────────────────────────────────────
 # Problem: research entdeckt Subdomains (subfinder), aber blue scannte bisher nur
 # die Apex-Domain → die eigentliche Angriffsfläche (auth/api/backoffice/…) wurde nie
@@ -546,6 +611,97 @@ def _cve_tool_used_guardrail(output: Any) -> tuple[bool, Any]:
     except Exception:
         pass
     return True, getattr(output, "raw", output)
+
+
+_CONFIRMED_FINDINGS_SECTION_RE = _re.compile(
+    r'## Confirmed Findings(.*?)(?=\n## |\Z)', _re.DOTALL,
+)
+
+
+def _confirmed_findings_tool_guardrail(output: Any) -> tuple[bool, Any]:
+    """Guardrail (report): 'Tool'-Spalte der Confirmed-Findings-Tabelle gegen die
+    real in dieser Session gelaufenen Tools validieren.
+
+    BUG-23 (2026-09-11): ReportOutput hat kein Pydantic-Feld für die Tabelle (nur
+    'path' + 'executive_summary') — sie ist ungeschütztes Markdown-Freitext im
+    raw-Output, den der reporter_agent OHNE eigenen Tool-Zugriff aus dem Kontext
+    vorheriger Tasks synthetisiert. Beobachteter Realfall (rastede.de): der Reporter
+    schrieb 'nuclei_vulnerability_scanner' als Quelle für 7 Findings, deren echte
+    Quelle ein versionsloser searchsploit-Dump war — der einzige echte nuclei-Call
+    dieser Session lieferte 0 Treffer. Diese Guardrail parst die Tabelle und lehnt
+    ab, wenn ein genanntes Tool nie aufgerufen wurde.
+
+    Folgefund (oldenburg.de, 2026-09-11): der erste Verifikationslauf zeigte, dass
+    diese Guardrail wirkungslos blieb — 'nikto_scanner'/'sslscan_tls' wurden für
+    Findings genannt, obwohl nikto/sslscan in der Session NIE liefen, und kein
+    Reject erfolgte. Ursache: 'output.raw' ist die ROHE JSON-Antwort
+    ('{"path":...,"executive_summary":"# Recon Report:...\\n\\n##..."}') — die
+    Zeilenumbrüche darin sind JSON-escaped (zwei Zeichen '\\'+'n'), kein echtes
+    '\\n'. '.splitlines()'/die Regex fanden dadurch keine einzige Tabellenzeile,
+    liefen leer durch und akzeptierten stillschweigend. Fix: bevorzugt aus dem
+    bereits geparsten 'output.pydantic.executive_summary' lesen (dort echte
+    Python-Newlines); Fallback: 'raw' selbst als JSON parsen und entpacken.
+    """
+    raw = getattr(output, "raw", output) if not isinstance(output, str) else output
+    pydantic_out = getattr(output, "pydantic", None)
+
+    text = getattr(pydantic_out, "executive_summary", None) if pydantic_out is not None else None
+    if not text:
+        try:
+            import json as _json3
+            parsed = _json3.loads(raw)
+            if isinstance(parsed, dict):
+                text = parsed.get("executive_summary")
+        except Exception:
+            pass
+    if not text and isinstance(raw, str):
+        text = raw
+    if not text or "## Confirmed Findings" not in text:
+        return True, raw
+
+    try:
+        from tools.trace import run_trace
+        if not run_trace.is_active:
+            return True, raw
+
+        real_tools = run_trace.get_all_tool_names()
+        if not real_tools:
+            return True, raw
+
+        section_match = _CONFIRMED_FINDINGS_SECTION_RE.search(text)
+        if not section_match:
+            return True, raw
+
+        fabricated: set = set()
+        for row in section_match.group(1).splitlines():
+            row = row.strip()
+            if not row.startswith("|"):
+                continue
+            cols = [c.strip() for c in row.strip("|").split("|")]
+            if len(cols) < 4:
+                continue
+            tool_col = cols[3]  # Service | Port | Beobachtung | Tool | Trace-Seq#
+            if not tool_col or tool_col == "Tool" or _re.fullmatch(r'-+', tool_col):
+                continue  # Kopfzeile / Trennzeile
+            for name in _re.split(r'[,/]', tool_col):
+                name = name.strip().strip('`')
+                if name and name not in real_tools:
+                    fabricated.add(name)
+
+        if fabricated and run_trace._guardrail_reject_count < 1:
+            run_trace._guardrail_reject_count += 1
+            return False, (
+                f"FEHLER: Die 'Confirmed Findings'-Tabelle nennt Tool(s) "
+                f"{sorted(fabricated)} als Quelle, die in dieser Session NIE "
+                f"aufgerufen wurden. Real gelaufene Tools: {sorted(real_tools)}. "
+                f"Korrigiere die 'Tool'-Spalte auf das Tool, das die jeweilige "
+                f"Beobachtung laut Kontext tatsächlich lieferte (z.B. searchsploit "
+                f"statt eines Scanners der nichts fand)."
+            )
+    except Exception:
+        pass
+
+    return True, raw
 
 
 # ─── Task Factory ─────────────────────────────────────────────────────────────
@@ -839,7 +995,7 @@ def make_tasks() -> dict:
             "welche PoCs DDG zurückgegeben hat — nichts darüber hinaus."
         ),
         output_pydantic=RedOutput,
-        guardrails=[_cve_trace_guardrail],
+        guardrails=[_cve_trace_guardrail, _searchsploit_version_guardrail],
         guardrail_max_retries=2,
         agent=red_agent,
         context=[blue, findings],
@@ -869,6 +1025,8 @@ def make_tasks() -> dict:
     )
 
     report = Task(
+        guardrails=[_confirmed_findings_tool_guardrail],
+        guardrail_max_retries=2,
         description=(
             "Ziel: {target} | Objective: {objective} | Scope: {scope}\n\n"
             "Erstelle einen Recon-Report als Markdown. Der Report ist Rohdaten-Aufbereitung "

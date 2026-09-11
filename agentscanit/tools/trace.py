@@ -180,6 +180,25 @@ class RunTrace:
             parts.append(call.get("raw_output", ""))
         return "\n".join(parts)
 
+    def get_all_tool_names(self) -> set:
+        """Return the set of tool_name values from every call this session (closed + pending).
+
+        BUG-23: used by guardrails that must verify a claimed tool source actually ran
+        (e.g. _confirmed_findings_tool_guardrail on the report task — catches a report
+        attributing a finding to a tool, like a scanner, that was never invoked).
+        """
+        names = set()
+        for phase_data in self._phases.values():
+            for call in phase_data["tool_calls"]:
+                name = call.get("tool_name", "")
+                if name:
+                    names.add(name)
+        for call in self._pending:
+            name = call.get("tool_name", "")
+            if name:
+                names.add(name)
+        return names
+
     def cve_in_raw_outputs(self, cve_id: str) -> bool:
         """Check if a CVE ID appears in any tool's raw output.
 
