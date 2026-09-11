@@ -1,0 +1,13 @@
+{
+  "_comment": "Phase 9 Scope-Whitelist — signierte Freigaben pro Ziel. Kopieren nach authorized_scopes.json (gitignored) und mit dem echten Engagement-Scope befüllen. Ohne passenden Eintrag: Tier 1 nur per interaktiver Bestätigung möglich, Tier 2/3 sind komplett blockiert (siehe scope_gate.py).",
+  "scopes": [
+    {
+      "target": "juice-shop.herokuapp.com",
+      "client": "OWASP Juice Shop (public training target)",
+      "authorized_by": "self",
+      "valid_until": "2026-12-31",
+      "tiers": ["tier1", "tier2"],
+      "notes": "Absichtlich verwundbare Trainingsanwendung — kein reales Engagement, aber Tier 3 (Exploitation/Credentials) bleibt trotzdem aus, weil dafür immer zusätzlich eine live Pro-Run-Bestätigung nötig ist."
+    }
+  ]
+}
