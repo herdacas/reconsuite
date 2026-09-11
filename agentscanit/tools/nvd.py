@@ -110,6 +110,20 @@ def _parse_cve(cve_obj: dict) -> dict:
                 if match.get("vulnerable"):
                     affected.append(match.get("criteria", ""))
 
+    # BUG-22: Anwendungs-CPEs (cpe:2.3:a:...) VOR Betriebssystem-/Firmware-CPEs
+    # (o:/h:) einsortieren, bevor auf 10 gekappt wird. NVD listet bei vielen CVEs
+    # zuerst dutzende OS-/Firmware-Bundling-CPEs (z.B. SonicWall/Ubuntu/AlmaLinux) —
+    # die eigentliche Anwendungs-CPE (z.B. openbsd:openssh), auf die der
+    # nachgelagerte Produkt/Versions-Match (reporting_flow._cve_product_keywords)
+    # angewiesen ist, kann dadurch aus den ersten 10 rausfallen und die CVE wird
+    # danach fälschlich als "kein Versions-Match" verworfen. sort() ist stabil,
+    # die Reihenfolge innerhalb einer Gruppe bleibt erhalten.
+    def _cpe_part(criteria: str) -> str:
+        fields = criteria.split(":")
+        return fields[2] if len(fields) > 2 else ""
+
+    affected.sort(key=lambda c: 0 if _cpe_part(c) == "a" else 1)
+
     refs = [r["url"] for r in cve_obj.get("references", [])[:5]]
 
     return {
