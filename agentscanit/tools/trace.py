@@ -199,6 +199,26 @@ class RunTrace:
                 names.add(name)
         return names
 
+    def get_raw_outputs_for_tool(self, tool_name: str) -> list:
+        """Return every raw_output string recorded under this exact tool_name.
+
+        BUG-25: used by guardrails that must verify not just THAT a cited tool ran
+        (get_all_tool_names), but that a specific claimed VALUE (product/version/
+        hostname) actually appears in what that tool returned — catching a report
+        that cites a real, correctly-run tool but attributes a fabricated finding
+        to it (e.g. "WordPress 5.9" attributed to whatweb, when whatweb's real
+        output never mentioned WordPress at all).
+        """
+        outputs = []
+        for phase_data in self._phases.values():
+            for call in phase_data["tool_calls"]:
+                if call.get("tool_name", "") == tool_name:
+                    outputs.append(call.get("raw_output", ""))
+        for call in self._pending:
+            if call.get("tool_name", "") == tool_name:
+                outputs.append(call.get("raw_output", ""))
+        return outputs
+
     def cve_in_raw_outputs(self, cve_id: str) -> bool:
         """Check if a CVE ID appears in any tool's raw output.
 

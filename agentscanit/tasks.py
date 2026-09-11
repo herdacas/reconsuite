@@ -618,6 +618,34 @@ _CONFIRMED_FINDINGS_SECTION_RE = _re.compile(
 )
 
 
+def _extract_report_text(output: Any) -> tuple[str, Any]:
+    """Extract the reporter's markdown text (executive_summary) + the raw fallback value.
+
+    Shared by every report-task guardrail (BUG-23 tool-name check, BUG-25 value-
+    grounding check). 'output.raw' is the ROHE JSON-Antwort
+    ('{"path":...,"executive_summary":"# Recon Report:...\\n\\n##..."}') — die
+    Zeilenumbrüche darin sind JSON-escaped (zwei Zeichen '\\'+'n'), kein echtes
+    '\\n'. Liest deshalb bevorzugt aus dem bereits geparsten
+    'output.pydantic.executive_summary' (echte Python-Newlines); Fallback: 'raw'
+    selbst als JSON parsen und entpacken; letzter Fallback: 'raw' direkt als Text.
+    """
+    raw = getattr(output, "raw", output) if not isinstance(output, str) else output
+    pydantic_out = getattr(output, "pydantic", None)
+
+    text = getattr(pydantic_out, "executive_summary", None) if pydantic_out is not None else None
+    if not text:
+        try:
+            import json as _json3
+            parsed = _json3.loads(raw)
+            if isinstance(parsed, dict):
+                text = parsed.get("executive_summary")
+        except Exception:
+            pass
+    if not text and isinstance(raw, str):
+        text = raw
+    return text, raw
+
+
 def _confirmed_findings_tool_guardrail(output: Any) -> tuple[bool, Any]:
     """Guardrail (report): 'Tool'-Spalte der Confirmed-Findings-Tabelle gegen die
     real in dieser Session gelaufenen Tools validieren.
@@ -642,20 +670,7 @@ def _confirmed_findings_tool_guardrail(output: Any) -> tuple[bool, Any]:
     bereits geparsten 'output.pydantic.executive_summary' lesen (dort echte
     Python-Newlines); Fallback: 'raw' selbst als JSON parsen und entpacken.
     """
-    raw = getattr(output, "raw", output) if not isinstance(output, str) else output
-    pydantic_out = getattr(output, "pydantic", None)
-
-    text = getattr(pydantic_out, "executive_summary", None) if pydantic_out is not None else None
-    if not text:
-        try:
-            import json as _json3
-            parsed = _json3.loads(raw)
-            if isinstance(parsed, dict):
-                text = parsed.get("executive_summary")
-        except Exception:
-            pass
-    if not text and isinstance(raw, str):
-        text = raw
+    text, raw = _extract_report_text(output)
     if not text or "## Confirmed Findings" not in text:
         return True, raw
 
@@ -697,6 +712,171 @@ def _confirmed_findings_tool_guardrail(output: Any) -> tuple[bool, Any]:
                 f"Korrigiere die 'Tool'-Spalte auf das Tool, das die jeweilige "
                 f"Beobachtung laut Kontext tatsächlich lieferte (z.B. searchsploit "
                 f"statt eines Scanners der nichts fand)."
+            )
+    except Exception:
+        pass
+
+    return True, raw
+
+
+# BUG-25: faktische Anker (Version/Hostname/wörtliches Zitat) — bewusst NICHT der
+# ganze Satz, Paraphrasierung der Beobachtung ist erlaubt. Nur diese drei Muster
+# deckten die real beobachteten Fabrikationsfälle ab (example.com, 2026-09-12):
+# "Apache 2.4.54" (Versionsanker fehlte komplett im Trace), "WordPress 5.9" +
+# "<title>...WordPress 5.9</title>" (Versionsanker + Zitat fehlten), "admin.
+# example.com" (Hostnamen-Anker fehlte — reale Subdomains waren admin11/17/20/24).
+_VERSION_ANCHOR_RE  = _re.compile(r'\d+(?:\.\d+){1,3}[a-zA-Z0-9]*')
+_HOSTNAME_ANCHOR_RE = _re.compile(
+    r'\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.){1,}[a-zA-Z]{2,}\b'
+)
+_QUOTED_TAG_ANCHOR_RE = _re.compile(r'<[^<>]{3,200}>')
+_DETECTED_TECH_SECTION_RE = _re.compile(
+    r'## Detected Technologies(.*?)(?=\n## |\Z)', _re.DOTALL,
+)
+_TECH_LINE_RE = _re.compile(r'^([\w./`\'"\[\] -]+?)\s*(?:→|->)\s*(.+)$')
+
+
+def _extract_value_anchors(text: str) -> list:
+    """Faktische Anker aus einer Beobachtungs-Zeichenkette extrahieren (BUG-25).
+
+    Nicht jede Beobachtung hat einen Anker (z.B. 'Missing X-Frame-Options header'
+    ist eine reine Boolean-Aussage ohne Produkt/Version/Hostname) — solche Zeilen
+    werden von _value_grounding_guardrail übersprungen (kein Anker = nichts zu
+    prüfen, kein Fehlalarm-Risiko).
+    """
+    anchors = []
+    anchors += _QUOTED_TAG_ANCHOR_RE.findall(text)
+    anchors += _HOSTNAME_ANCHOR_RE.findall(text)
+    anchors += _VERSION_ANCHOR_RE.findall(text)
+    return anchors
+
+
+def _value_grounding_guardrail(output: Any) -> tuple[bool, Any]:
+    """Guardrail (report): faktische Anker der 'Beobachtung'-Spalte gegen den
+    Raw-Output des in derselben Zeile zitierten Tools cross-checken.
+
+    BUG-25 (2026-09-12): Anders als BUG-23 (falscher Tool-*Name*) stimmt hier der
+    zitierte Tool-Name — aber der behauptete WERT (Produktname+Version, Hostname,
+    wörtliches Zitat) hat keine Deckung im tatsächlichen Tool-Output. Beobachtet
+    bei example.com full: "WordPress version 5.9 identified" + Fake-Zitat
+    '<title>Example Site - WordPress 5.9</title>' zugeschrieben an whatweb
+    (echter Output: nur 'Title[Example Domain]'); "nmap_service_version → Apache
+    2.4.54" (echter nmap-Output nennt nirgends 'Apache'); "Subdomain
+    admin.example.com discovered" zugeschrieben an subfinder (echte Funde waren
+    admin11/17/20/24.example.com, nie exakt 'admin.example.com'). Der bestehende
+    _confirmed_findings_tool_guardrail (BUG-23) prüft nur ob das zitierte Tool
+    IRGENDWANN lief — nicht ob der konkrete Wert aus dessen Output stammt.
+
+    Bewusst KEIN Exact-Match des ganzen Satzes (Paraphrasierung erlaubt) — nur
+    strukturierte Anker (Versionsnummern, Hostnamen, HTML-Tag-Zitate) müssen
+    wörtlich im Raw-Output des zitierten Tools vorkommen. Zeilen ohne extrahierbare
+    Anker werden übersprungen (nicht generisch faktengeprüft — siehe CLAUDE.md
+    BUG-25-Arbeitsplan, Abgrenzung).
+
+    Deckt ZWEI Sektionen ab: 'Confirmed Findings' (Tabelle, Tool-Spalte explizit)
+    UND 'Detected Technologies' (Zeilen '<label> → <wert>', z.B. 'nmap_service_
+    version → Apache 2.4.54' — Tool wird über Präfix-Match des Labels gegen die
+    real gelaufenen Tools aufgelöst, da das Label meist '<tool>_<zweck>' ist).
+    Der reale "Apache 2.4.54"-Fabrikationsfall stand NUR in Detected Technologies,
+    nicht in der Confirmed-Findings-Tabelle — beide Sektionen müssen geprüft
+    werden, sonst bleibt genau dieser Fall unentdeckt.
+
+    Sonderfall sslscan-Eigenbanner (NICHT von dieser Guardrail behandelt): die
+    ersten Zeilen von sslscan-Output sind das Tool selbst (Versions-Banner), nicht
+    das Scan-Ergebnis — der Versionsanker steht dort zwar wörtlich, ist aber
+    trotzdem eine Fehlinterpretation. Das fängt diese Guardrail strukturell NICHT
+    (der Wert IST ja im Trace vorhanden) — behoben stattdessen im blue-Prompt
+    (separater Fix, siehe make_tasks()).
+    """
+    text, raw = _extract_report_text(output)
+    if not text or ("## Confirmed Findings" not in text and "## Detected Technologies" not in text):
+        return True, raw
+
+    try:
+        from tools.trace import run_trace
+        if not run_trace.is_active:
+            return True, raw
+
+        real_tools = run_trace.get_all_tool_names()
+
+        def _grounded_haystack(tool_names: list) -> list:
+            parts = []
+            for name in tool_names:
+                parts += run_trace.get_raw_outputs_for_tool(name)
+            return parts
+
+        ungrounded: list = []
+
+        # --- Sektion 1: Confirmed Findings (Tabelle, Tool-Spalte explizit) ---
+        section_match = _CONFIRMED_FINDINGS_SECTION_RE.search(text)
+        if section_match:
+            for row in section_match.group(1).splitlines():
+                row = row.strip()
+                if not row.startswith("|"):
+                    continue
+                cols = [c.strip() for c in row.strip("|").split("|")]
+                if len(cols) < 4:
+                    continue
+                observation, tool_col = cols[2], cols[3]
+                if not tool_col or tool_col == "Tool" or _re.fullmatch(r'-+', tool_col):
+                    continue  # Kopfzeile / Trennzeile
+
+                anchors = _extract_value_anchors(observation)
+                if not anchors:
+                    continue  # keine strukturierte Behauptung — nichts zu prüfen
+
+                tool_names = [n.strip().strip('`') for n in _re.split(r'[,/]', tool_col) if n.strip()]
+                haystack_parts = _grounded_haystack(tool_names)
+                if not haystack_parts:
+                    continue  # kein Raw-Output für dieses Tool auffindbar — von
+                              # _confirmed_findings_tool_guardrail (BUG-23) abgedeckt,
+                              # hier kein Doppel-Reject auf denselben Root Cause
+
+                haystack = "\n".join(haystack_parts)
+                if not any(anchor in haystack for anchor in anchors):
+                    ungrounded.append((observation, tool_col, anchors))
+
+        # --- Sektion 2: Detected Technologies (Zeilen 'label → wert') ---
+        tech_match = _DETECTED_TECH_SECTION_RE.search(text)
+        if tech_match:
+            for row in tech_match.group(1).splitlines():
+                row = row.strip()
+                m = _TECH_LINE_RE.match(row)
+                if not m:
+                    continue
+                label, value = m.group(1).strip(), m.group(2).strip()
+
+                anchors = _extract_value_anchors(value)
+                if not anchors:
+                    continue
+
+                # Label ist meist '<tool>_<zweck>' (z.B. 'nmap_service_version') —
+                # Tool über Präfix-Match gegen die real gelaufenen Tools auflösen.
+                matched_tools = [t for t in real_tools if label.lower().startswith(t.lower())]
+                if not matched_tools:
+                    continue  # unbekanntes Label — von BUG-23-Logik nicht abgedeckt,
+                              # aber auch hier kein sicherer Tool-Bezug herstellbar
+                haystack_parts = _grounded_haystack(matched_tools)
+                if not haystack_parts:
+                    continue
+
+                haystack = "\n".join(haystack_parts)
+                if not any(anchor in haystack for anchor in anchors):
+                    ungrounded.append((value, label, anchors))
+
+        if ungrounded and run_trace._guardrail_reject_count < 1:
+            run_trace._guardrail_reject_count += 1
+            details = "; ".join(
+                f"'{obs}' (Tool: {tool}, Anker {anc} nicht im Raw-Output gefunden)"
+                for obs, tool, anc in ungrounded[:5]
+            )
+            return False, (
+                f"FEHLER: Die 'Confirmed Findings'-Tabelle enthält Beobachtungen, "
+                f"deren zitiertes Tool NIE diesen Wert geliefert hat: {details}. "
+                f"Jede Beobachtung muss WÖRTLICH aus dem Tool-Kontext dieser "
+                f"Session stammen — keine Produktnamen/Versionen/Subdomains "
+                f"erfinden oder aus Trainingsdaten ergänzen. Entferne oder "
+                f"korrigiere diese Zeilen anhand des tatsächlichen Tool-Outputs."
             )
     except Exception:
         pass
@@ -788,7 +968,14 @@ def make_tasks() -> dict:
             "SERVICE-ERKENNUNG: nmap-Default-Portnamen (z.B. 'EtherNetIP-1' auf 2222, "
             "'snet-sensor-mgmt' auf 10000) sind RATE-NAMEN aus /etc/services, KEINE erkannten "
             "Dienste. Verifiziere immer mit -sV/httpx: Port 10000 ist meist Webmin, 2222 meist "
-            "SSH. Trage nur tatsächlich erkannte Dienste als Service ein.\n\n"
+            "SSH. Trage nur tatsächlich erkannte Dienste als Service ein.\n"
+            "SSLSCAN-BANNER (BUG-25): die ERSTEN 1-2 Zeilen von sslscan-Output (z.B. "
+            "'Version: 2.1.2' / 'OpenSSL 3.0.13 30 Jan 2024') sind sslscan's EIGENE Tool-/Build-"
+            "Version — NICHT die TLS-Version des gescannten Ziels. Die Ziel-Info (Protokolle, "
+            "Cipher-Suites, Zertifikat) steht immer in den Zeilen DANACH. Wenn sslscan KEINE "
+            "solchen Zeilen liefert (nur der Banner, sonst nichts — z.B. weil ein Reverse-Proxy/"
+            "CDN die Verbindung terminiert), gilt die TLS-Version des Ziels als NICHT ermittelt — "
+            "niemals den Banner als Ziel-Version eintragen oder danach eine CVE suchen.\n\n"
             "WICHTIG – Tool-Auswahl-Prinzip:\n"
             "Wähle NUR die Tools die direkt zum Objective '{objective}' beitragen.\n"
             "Führe NICHT alle verfügbaren Tools aus. Plane zuerst, dann execute.\n\n"
@@ -1025,7 +1212,7 @@ def make_tasks() -> dict:
     )
 
     report = Task(
-        guardrails=[_confirmed_findings_tool_guardrail],
+        guardrails=[_confirmed_findings_tool_guardrail, _value_grounding_guardrail],
         guardrail_max_retries=2,
         description=(
             "Ziel: {target} | Objective: {objective} | Scope: {scope}\n\n"
