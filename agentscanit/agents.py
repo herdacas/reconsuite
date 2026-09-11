@@ -120,6 +120,13 @@ def _llm(model: str, temperature: float) -> LLM:
         base_url=ACTIVE_BASE_URL,
         temperature=temperature,
         timeout=300,
+        # Output-Längen-Limit (BUG-24, 2026-09-11): ohne explizites max_tokens fällt
+        # der Remote-Endpoint (ollama.com) auf einen knappen Default zurück, der bei
+        # langen Reports (v.a. full-Scope mit vielen Findings) das JSON mitten im
+        # Objekt abschneidet ("EOF while parsing an object" in ReportOutput —
+        # beobachtet bei oldenburg.de full). 8000 remote (num_ctx=16384, lässt genug
+        # Raum für Input-Context) / 4000 lokal (num_ctx=8192).
+        max_tokens=8000 if OLLAMA_API_KEY else 4000,
     )
     if OLLAMA_API_KEY:
         kwargs["api_key"] = OLLAMA_API_KEY
