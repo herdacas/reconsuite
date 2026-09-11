@@ -9,6 +9,7 @@ Kein LLM — reine Datenzusammenführung.
 
 import os
 import re
+import sys
 from datetime import datetime
 
 from pydantic import BaseModel, Field
@@ -21,40 +22,13 @@ _TEAM_DIR  = os.path.dirname(os.path.abspath(__file__))
 _SUITE_DIR = os.path.dirname(_TEAM_DIR)
 LOG_DIR    = os.path.join(_SUITE_DIR, "logs")
 
+if _SUITE_DIR not in sys.path:
+    sys.path.insert(0, _SUITE_DIR)
+import cve_filters  # Shared Versions-Gate-Filterung (auch von risk_scorer genutzt)
+
 console = Console()
 
 _SEVERITY_ICON = {"CRITICAL": "🔴", "HIGH": "🟠", "MEDIUM": "🟡", "LOW": "🟢"}
-
-
-def _cve_product_keywords(cve: dict) -> set[str]:
-    """Produkt-Keywords einer CVE aus den affected_cpe-Einträgen extrahieren.
-
-    cpe:2.3:a:openbsd:openssh:* → {'openssh'}, apache:tomcat → {'tomcat'}.
-    Genutzt um zu prüfen ob der Scan für dieses Produkt eine Version erkannt hat.
-    """
-    # Produkt-Aliasse: NVD-CPE-Produktname → Banner-Schreibweise(n) des Scanners.
-    # NVD nennt es "http_server", nmap-Banner sagt "httpd"/"apache httpd".
-    _ALIAS = {
-        "http server": ["httpd"],
-        "weblogic server": ["weblogic"],
-    }
-    # Generische Tokens die als alleiniges Keyword zu breit matchen würden
-    _too_generic = {"server", "http", "https", "service", "manager", "core", "web",
-                    "linux", "enterprise", "framework"}
-    kws: set[str] = set()
-    for cpe in cve.get("affected_cpe", []) or []:
-        parts = cpe.split(":")
-        # cpe:2.3:<part>:<vendor>:<product>:<version>:...
-        if len(parts) >= 5:
-            product = parts[4].replace("_", " ").strip().lower()
-            if not product or product == "*":
-                continue
-            kws.add(product)                           # volles Produkt, z.B. "weblogic server"
-            kws.update(_ALIAS.get(product, []))        # Banner-Aliasse, z.B. "httpd"
-            last = product.split()[-1]
-            if last not in _too_generic:               # last-token nur wenn spezifisch
-                kws.add(last)                          # z.B. "tomcat", "openssh"
-    return kws
 
 
 def _format_cve_entries(cves: list[dict]) -> list[str]:
@@ -82,27 +56,6 @@ def _format_cve_entries(cves: list[dict]) -> list[str]:
             lines += [f"- {ref}" for ref in cve["references"]]
             lines.append("")
     return lines
-
-
-def _version_confirmed_in_scan(cve: dict, scan_body: str) -> bool:
-    """True wenn der Scan für das CVE-Produkt eine konkrete Version erkannt hat.
-
-    Banner-Versions-Gate (BUG-17): Eine CVE ist nur dann versions-verifizierbar wenn
-    im Scan-Body das Produkt-Keyword von einer Versionsnummer (\\d+\\.\\d+) gefolgt
-    wird (z.B. "OpenSSH 6.6.1p1"). Bei versionslosem Banner ("Apache Tomcat version
-    unknown") bleibt der Versions-Match unbestätigt → potenzielles False-Positive.
-    """
-    if not scan_body:
-        return False
-    body = scan_body.lower()
-    for kw in _cve_product_keywords(cve):
-        if len(kw) < 3:
-            continue
-        # Produkt-Keyword gefolgt (innerhalb ~20 Zeichen) von einer Versionsnummer
-        pattern = re.escape(kw) + r"[^\n]{0,20}?\d+\.\d+"
-        if re.search(pattern, body):
-            return True
-    return False
 
 
 # ─── State ────────────────────────────────────────────────────────────────────
@@ -150,16 +103,18 @@ class ReportingFlow(Flow[ReportingState]):
         # ohne erkannte Service-Version. Eine CVE mit echtem CVSS ist NICHT automatisch
         # ein bestätigtes Finding — fehlt die Version (Banner wie "Apache-Coyote/1.1"),
         # ist der Versions-Match spekulativ (potenzielles False-Positive).
-        version_ok  = [r for r in valid if _version_confirmed_in_scan(r, scan_body)]
-        version_unk = [r for r in valid if r not in version_ok]
+        # Geteilt mit risk_scorer über cve_filters.py (Backlog-Fix 2026-09-11:
+        # Critical-Count-Inkonsistenz zwischen Team 3/Team 6 — siehe CLAUDE.md).
+        version_ok, version_unk_kev, version_unk_dropped = cve_filters.split_by_version_gate(
+            valid, scan_body,
+        )
+        version_unk = version_unk_kev + version_unk_dropped
         split_sections = bool(version_ok and version_unk)
 
         # Kopfzeilen-Zählung: nur die TATSÄCHLICH gelisteten CVEs zählen (versions-
         # verifizierte + KEV-Ausnahmen) — versionslose generische CVEs werden weder
         # gelistet noch gezählt, sonst täuscht "Critical: 14" eine Bedrohung vor die
         # nur aus versionsloser Spekulation besteht (User-Entscheidung 2026-06-25).
-        def _sev(r, s): return (r.get("cvss_severity") or "").upper() == s
-        _counted = version_ok  # KEV-Ausnahmen werden unten ergänzt (siehe version_unk_kev)
 
         nvd_lines = [
             "\n## CVE Validation (NVD API v2)\n",
@@ -181,19 +136,12 @@ class ReportingFlow(Flow[ReportingState]):
         # erkannte Version hat keinen praktischen Wert (reine Spekulation/Rauschen).
         # AUSNAHME: aktiv ausgenutzte CVEs (CISA-KEV-Heuristik: "exploited" in der
         # NVD-Beschreibung) werden als expliziter Hinweis behalten — die sind auch
-        # ohne Versions-Match relevant.
-        def _is_kev(r: dict) -> bool:
-            desc = (r.get("description") or "").lower()
-            return ("exploited in the wild" in desc or "known to be exploited" in desc
-                    or "actively exploited" in desc)
-
-        version_unk_kev = [r for r in version_unk if _is_kev(r)]
-        version_unk_dropped = [r for r in version_unk if not _is_kev(r)]
+        # ohne Versions-Match relevant. (version_unk_kev/version_unk_dropped kommen
+        # bereits aus cve_filters.split_by_version_gate() oben.)
 
         # Header-Zählung final: nur gelistete CVEs (verifiziert + KEV-Ausnahmen)
         _counted = version_ok + version_unk_kev
-        _crit = sum(1 for r in _counted if _sev(r, "CRITICAL"))
-        _high = sum(1 for r in _counted if _sev(r, "HIGH"))
+        _crit, _high = cve_filters.severity_counts(_counted)
         _hdr = (f"- Gelistet: **{len(_counted)}**  Critical: **{_crit}**  High: **{_high}**"
                 + (f"  ·  {len(version_unk_dropped)} versionslose generische CVE(s) ausgeblendet"
                    if version_unk_dropped else "") + "\n")
@@ -212,8 +160,8 @@ class ReportingFlow(Flow[ReportingState]):
 
         if version_unk_dropped and not version_ok and not version_unk_kev:
             # Nichts Verwertbares: klarer Hinweis statt einer Fantasie-CVE-Liste
-            prods = sorted({_cve_product_keywords(r) and sorted(_cve_product_keywords(r))[0]
-                            for r in version_unk_dropped if _cve_product_keywords(r)})
+            prods = sorted({cve_filters.cve_product_keywords(r) and sorted(cve_filters.cve_product_keywords(r))[0]
+                            for r in version_unk_dropped if cve_filters.cve_product_keywords(r)})
             prod_str = ", ".join(p for p in prods if p) or "die erkannten Dienste"
             nvd_lines += [
                 "### ℹ️ Keine versionsspezifische CVE-Analyse möglich\n",

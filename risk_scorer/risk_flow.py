@@ -35,6 +35,10 @@ _TEAM_DIR  = os.path.dirname(os.path.abspath(__file__))
 _SUITE_DIR = os.path.dirname(_TEAM_DIR)
 LOG_DIR    = os.path.join(_SUITE_DIR, "logs")
 
+if _SUITE_DIR not in sys.path:
+    sys.path.insert(0, _SUITE_DIR)
+import cve_filters  # Shared Versions-Gate-Filterung (auch von reporting_flow genutzt)
+
 console = Console()
 
 
@@ -43,6 +47,7 @@ console = Console()
 class RiskState(BaseModel):
     scan_json_path:      str        = ""
     scan_target:         str        = ""
+    scan_body:           str        = ""   # recon_report_*.md-Body, für Versions-Gate (cve_filters)
     nvd_results:         list[dict] = Field(default_factory=list)
     threat_intel_output: str        = ""   # aus ScanState
     compliance_output:   str        = ""   # aus ScanState
@@ -73,6 +78,9 @@ class RiskFlow(Flow[RiskState]):
             return
 
         self.state.scan_target = summary.get("target", "unknown")
+        # Scan-Body für die Versions-Gate-Filterung (BUG-Backlog 2026-09-11:
+        # Critical-Count-Inkonsistenz — muss dieselbe Basis wie reporting_flow nutzen).
+        self.state.scan_body = cve_filters.load_scan_body(summary.get("report", ""))
 
         # CVEs + CVSS aus Tasks extrahieren
         cves: list[dict] = []
@@ -107,19 +115,23 @@ class RiskFlow(Flow[RiskState]):
         cves     = self.state.top_findings
         nvd_data = self.state.nvd_results
 
-        # Basis: höchster CVSS-Score
-        cvss_scores = [
-            c["cvss"] for c in cves if c.get("cvss") is not None
-        ]
-        base_score = max(cvss_scores) if cvss_scores else (5.0 if cves else 0.0)
+        # Zähler + Score-Basis — dieselbe Versions-Gate-Filterung wie reporting_flow
+        # (cve_filters.py), damit "Critical: N" in Risk Score und Final Report garantiert
+        # übereinstimmen (Backlog-Fix 2026-09-11: vorher zählte risk_flow direkt aus dem
+        # ungefilterten nvd_results, reporting_flow nur version-bestätigte + KEV-CVEs —
+        # zwei Zahlen für denselben Scan).
+        counted = cve_filters.counted_cves(nvd_data, self.state.scan_body)
+        counted_ids = {c["id"] for c in counted}
+        self.state.critical_count, self.state.high_count = cve_filters.severity_counts(counted)
 
-        # Zähler
-        self.state.critical_count = sum(
-            1 for c in cves if (c.get("severity") or "").upper() == "CRITICAL"
-        )
-        self.state.high_count = sum(
-            1 for c in cves if (c.get("severity") or "").upper() == "HIGH"
-        )
+        # Basis: höchster CVSS-Score — NUR unter den Versions-Gate-bestätigten CVEs.
+        # Sonst widerspräche sich der Report selbst: "Critical: 0 / High: 0" bei
+        # gleichzeitig CRITICAL-Score, getrieben von einer CVE die laut derselben
+        # Versions-Gate-Filterung gar nicht als bestätigt zählt (live beobachtet am
+        # example.com-Scan 2026-09-12: CVE-2019-0190 versionslos/unbestätigt, trotzdem
+        # Score 9.8 CRITICAL vor diesem Fix).
+        counted_scores = [c["cvss_score"] for c in counted if c.get("cvss_score") is not None]
+        base_score = max(counted_scores) if counted_scores else (5.0 if counted else 0.0)
 
         # Multiplikatoren
         exploit_mul = 1.3 if self.state.has_exploitable else 1.0
@@ -167,6 +179,13 @@ class RiskFlow(Flow[RiskState]):
         ]
 
         if self.state.top_findings:
+            # Welche CVE-IDs zählen laut Versions-Gate als bestätigt (dieselbe Basis wie
+            # critical_count/high_count/base_score oben) — Top Findings zeigt weiterhin
+            # ALLE referenzierten CVEs (nichts wird versteckt), aber unbestätigte werden
+            # explizit markiert statt unkommentiert neben bestätigten zu stehen.
+            counted_ids = {
+                c["id"] for c in cve_filters.counted_cves(self.state.nvd_results, self.state.scan_body)
+            }
             md_lines += ["## Top Findings\n"]
             sorted_cves = sorted(
                 self.state.top_findings,
@@ -177,7 +196,8 @@ class RiskFlow(Flow[RiskState]):
                 sev   = (cve.get("severity") or "UNKNOWN").upper()
                 cvss  = cve.get("cvss")
                 score_str = f"CVSS {cvss}" if cvss is not None else "CVSS N/A"
-                md_lines.append(f"- **{cve['id']}** — {score_str} ({sev})")
+                tag = "" if cve["id"] in counted_ids else "  ⚠️ *unbestätigt — keine Versions-Bestätigung*"
+                md_lines.append(f"- **{cve['id']}** — {score_str} ({sev}){tag}")
             md_lines.append("")
 
         md_lines += [
@@ -191,6 +211,13 @@ class RiskFlow(Flow[RiskState]):
         self.state.report_md_path = md_path
 
         # JSON-Output für maschinelle Weiterverarbeitung
+        counted_ids = {
+            c["id"] for c in cve_filters.counted_cves(self.state.nvd_results, self.state.scan_body)
+        }
+        top_findings_json = [
+            {**c, "version_confirmed": c["id"] in counted_ids}
+            for c in self.state.top_findings[:10]
+        ]
         json_data = {
             "target":          target,
             "timestamp":       ts_human,
@@ -200,7 +227,7 @@ class RiskFlow(Flow[RiskState]):
             "high_count":      self.state.high_count,
             "exploitable":     self.state.has_exploitable,
             "in_the_wild":     _has_in_the_wild(self.state.threat_intel_output),
-            "top_findings":    self.state.top_findings[:10],
+            "top_findings":    top_findings_json,
         }
         json_path = os.path.join(LOG_DIR, f"risk_score_{safe}_{ts}.json")
         with open(json_path, "w", encoding="utf-8") as f:
