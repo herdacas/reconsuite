@@ -2,7 +2,7 @@
 # Erstellt via: pip freeze (2026-05-18)
 # Installieren: pip install -r requirements.txt
 
-crewai==1.14.4
+crewai==1.15.21
 ollama==0.6.2
 pydantic==2.12.5
 pydantic-settings==2.10.1
