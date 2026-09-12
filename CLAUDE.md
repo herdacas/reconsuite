@@ -257,9 +257,7 @@ Lokal-Achse (llama3-groq) steht aus (User entfernt Key bei Bedarf). `dnsx`/`kata
 - roadmap.md + models.json bleiben gitignored.
 
 **NÄCHSTE SESSION — offene Punkte (Priorität):**
-1. **Gesamt-E2E-Beweis Pentest-Scope:** ein voller Scan (z.B. rastede.de full, Remote) der zeigt dass ALLE
-   4 Reports im Zusammenspiel sauber Pentest-Sprache liefern (compliance+reporter+risk+final). Einzeln verifiziert,
-   Zusammenspiel noch nicht.
+1. ~~**Gesamt-E2E-Beweis Pentest-Scope**~~ — **erledigt (2026-09-12)**, durch den BUG-18/BUG-25-Verifikationslauf (`example.com full`) nebenbei mitbestätigt: alle 6 Teams liefen (recon/interpret/threatintel/compliance/risk/final), `compliance_example.com_20260912_040914.md` + `risk_score_example.com_20260912_040914.md` durchgängig Angreifer-Perspektive ("Angriffsvektor", "Exploit entwickeln", "keine Remediation ohne nachgewiesenen Exploit"), 0 Defender-Sprache. (Dabei den neuen Backlog-Fund oben entdeckt — sslscan-Banner-Kontamination erreicht auch Team 5/6.)
 2. **Lokal-Achse abschließen:** llama3-groq E2E-Scan (network lief durch; findings-CVE-Phase für 8B zu schwach,
    BUG-21-Guardrail greift → ehrlicher Abbruch). Stärkeres lokales Modell testen (qwen3-coder:30b Kandidat).
 3. **Testkonzept-Harness-Schwachpunkte** (testing/, lokal): run_matrix exit≠0-Filter + Jaccard-Metrik auf
