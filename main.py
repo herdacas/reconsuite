@@ -22,6 +22,7 @@ Phase 9 (Exploitation & Validation) — Safety-Gate-Flags, Default OFF:
 import sys
 import os
 import json
+import signal
 import sqlite3
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -32,6 +33,26 @@ from agentscanit.crew import VALID_SCOPES
 from rich.prompt import Prompt
 from rich.panel import Panel
 from rich.table import Table
+
+
+# ─── Ctrl+C-Fix (2026-09-12) ───────────────────────────────────────────────────
+# Bisher dokumentiert als offener Punkt ("Strg+C wirkt nicht während langer
+# Tool-Scans" — Phase-7-Notiz, nie gefixt). Root Cause: CrewAI's native
+# Tool-Calling ruft Agent-Tools (und damit tools/_base.py::_run()'s blockierenden
+# subprocess-Call) nicht im Main-Thread auf. Ein SIGINT feuert in CPython aber
+# NUR im Main-Thread — der Worker-Thread bleibt im blockierenden Subprozess-Wait
+# stecken, unabhängig vom Signal, bis der Tool-Timeout greift oder der Subprozess
+# selbst fertig ist (bei nmap -p 1-65535 etc. potenziell viele Minuten).
+# Fix: SIGINT-Handler im Main-Thread killt alle aktuell laufenden Tool-Subprozesse
+# direkt per OS-Signal (agentscanit.tools._base.kill_all_active_procs() — Registry
+# wird von _run() gepflegt) und beendet den Python-Prozess danach hart. Das Killen
+# des Kind-Subprozesses lässt den blockierenden Call im Worker-Thread sofort
+# zurückkehren; os._exit() umgeht jede weitere Thread-/Flow-Wartelogik.
+def _sigint_handler(signum, frame):
+    from agentscanit.tools._base import kill_all_active_procs
+    n = kill_all_active_procs()
+    console.print(f"\n[yellow]⚠ Strg+C — beende {n} aktive(n) Tool-Prozess(e) und den Scan...[/]")
+    os._exit(130)  # 128 + SIGINT — Standard-Konvention für signalbeendete Prozesse
 
 
 def _cmd_list() -> None:
@@ -112,6 +133,8 @@ def _cmd_score(trace_arg: str = "") -> None:
 
 
 if __name__ == "__main__":
+    signal.signal(signal.SIGINT, _sigint_handler)
+
     _log_llm          = "--log-llm" in sys.argv
     _enable_injection = "--enable-injection" in sys.argv   # Phase 9, Tier 2 (Opt-in)
     _enable_exploit   = "--enable-exploit" in sys.argv     # Phase 9, Tier 3 (Opt-in)
