@@ -1,0 +1,38 @@
+{
+  "timestamp": "20260912_050735",
+  "n_runs": 1,
+  "targets": {
+    "waf-cloudflare": {
+      "kind": "feature",
+      "runs": [
+        {
+          "artifacts": {
+            "trace": "/opt/projects/agentic-ai/recon-suite/logs/trace_www.cloudflare.com_20260912_051855.json",
+            "report": "/opt/projects/agentic-ai/recon-suite/logs/final_report_www.cloudflare.com_20260912_051937.md",
+            "crew": "/opt/projects/agentic-ai/recon-suite/logs/crew_www.cloudflare.com_20260912_051855.json",
+            "debug": "/opt/projects/agentic-ai/recon-suite/logs/llm_debug_1233703.jsonl",
+            "exit": 0,
+            "dur_s": 722.5,
+            "tail": ""
+          },
+          "eval": {
+            "dim1_input": {
+              "passed": true,
+              "output": "=== Dim 1: Tool-Input \u2014 trace_www.cloudflare.com_20260912_051855.json ===\n  target=www.cloudflare.com scope=web\n  input_valid_rate = 1.000 (17/17)  PASS (Schwelle 0.95)"
+            },
+            "dim2_output": {
+              "passed": true,
+              "output": "=== Dim 2: Tool-Output \u2014 trace_www.cloudflare.com_20260912_051855.json ===\n  CVEs: 5 tool-best\u00e4tigt, 0 HALLUZINIERT  PASS"
+            },
+            "feature": {
+              "passed": false,
+              "output": "=== Feature-Check: waf-cloudflare ===\n  \u2717 'WAF/CDN DETECTED'\n  \u2713 'Cloudflare'\n  \u2192 FAIL"
+            }
+          },
+          "failed": false
+        }
+      ],
+      "consistency": null
+    }
+  }
+}
