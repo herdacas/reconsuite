@@ -484,6 +484,58 @@ def _waf_detection_guardrail(output: Any) -> tuple[bool, Any]:
     return True, output
 
 
+def _tools_executed_guardrail(output: Any) -> tuple[bool, Any]:
+    """Guardrail (blue/red_scan): 'tools_executed'-Feld gegen echte Tool-Calls
+    DIESER Task validieren.
+
+    Live gefunden (2026-09-12, www.cloudflare.com web, Test-Matrix-Nachtrag):
+    BlueOutput.tools_executed nannte ['wafw00f', 'httpx_prober'], obwohl diese
+    Task nur EINEN echten Tool-Call machte (httpx). 'httpx_prober' ist legitim
+    (CrewAI-Tool-Klassenname für den echten 'httpx'-Call — Präfix-Match nötig,
+    gleiches Muster wie bei der 'Detected Technologies'-Zuordnung in
+    _value_grounding_guardrail) — 'wafw00f' dagegen ist komplett erfunden, kein
+    einziger Call dazu im Trace. Bisher rein Prompt-Vorgabe ('tools_executed
+    muss aus echten Tool-Aufrufen stammen', s.u.), kein Guardrail — mit dem
+    erwarteten Ergebnis (vgl. BUG-20/23/25: Werte-Kontrolle braucht einen
+    Guardrail, keine Prompt-Bitte).
+
+    Prüft run_trace._pending (Calls DIESER Task — close_phase() läuft erst im
+    task_callback NACH bestandenem Guardrail, wie bei _tool_call_guardrail).
+    """
+    pydantic_out = getattr(output, "pydantic", None)
+    raw = getattr(output, "raw", output) if not isinstance(output, str) else output
+    if not pydantic_out:
+        return True, raw
+    claimed = [t for t in (getattr(pydantic_out, "tools_executed", None) or []) if t]
+    if not claimed:
+        return True, raw
+
+    try:
+        from tools.trace import run_trace
+        if not run_trace.is_active:
+            return True, raw
+        real_used = {c.get("tool_name", "") for c in run_trace._pending if c.get("tool_name")}
+        if not real_used:
+            return True, raw
+
+        def _grounded(name: str) -> bool:
+            low = name.lower()
+            return any(low == r.lower() or low.startswith(r.lower()) for r in real_used)
+
+        fabricated = [t for t in claimed if not _grounded(t)]
+        if fabricated and run_trace._guardrail_reject_count < 1:
+            run_trace._guardrail_reject_count += 1
+            return False, (
+                f"FEHLER: 'tools_executed' nennt {fabricated}, für die es in "
+                f"dieser Task KEINEN echten Tool-Call gibt (echte Calls: "
+                f"{sorted(real_used)}). Entferne nicht wirklich aufgerufene "
+                f"Tools aus 'tools_executed'."
+            )
+    except Exception:
+        pass
+    return True, raw
+
+
 # ─── Output-Modelle ───────────────────────────────────────────────────────────
 
 class ResearchOutput(BaseModel):
@@ -1113,7 +1165,8 @@ def make_tasks() -> dict:
             "offene Ports, erkannte Services und Versionen, bestätigte Findings aus Tool-Output."
         ),
         output_pydantic=BlueOutput,
-        guardrails=[_tool_call_guardrail, _scope_coverage_guardrail, _waf_detection_guardrail],
+        guardrails=[_tool_call_guardrail, _scope_coverage_guardrail, _waf_detection_guardrail,
+                    _tools_executed_guardrail],
         guardrail_max_retries=2,
         agent=blue_agent,
         context=[research],
@@ -1226,6 +1279,7 @@ def make_tasks() -> dict:
             "erkannte Technologien aus HTTP-Headern, welche CVEs bestätigt wurden, welche ausgeschlossen."
         ),
         output_pydantic=RedScanOutput,
+        guardrails=[_tools_executed_guardrail],
         agent=blue_agent,
         context=[blue, findings],
     )
