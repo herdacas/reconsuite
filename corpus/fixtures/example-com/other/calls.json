@@ -1,0 +1,185 @@
+[
+  {
+    "seq": 3,
+    "tool_bin": "nmap",
+    "command": [
+      "nmap",
+      "-T4",
+      "-Pn",
+      "-p",
+      "1-65535",
+      "--open",
+      "example.com"
+    ],
+    "raw_output": "Starting Nmap 7.94SVN ( https://nmap.org ) at 2026-09-12 03:56 CEST\nNmap scan report for example.com (104.20.23.154)\nHost is up (0.00075s latency).\nOther addresses for example.com (not scanned): 172.66.147.243 2606:4700:10::6814:179a 2606:4700:10::ac42:93f3\nNot shown: 65521 filtered tcp ports (no-response), 1 closed tcp port (reset)\nSome closed ports may be reported as filtered due to --defeat-rst-ratelimit\nPORT     STATE SERVICE\n80/tcp   open  http\n443/tcp  open  https\n2052/tcp open  clearvisn\n2053/tcp open  knetd\n2082/tcp open  infowave\n2083/tcp open  radsec\n2086/tcp open  gnunet\n2087/tcp open  eli\n2095/tcp open  nbx-ser\n2096/tcp open  nbx-dir\n8080/tcp open  http-proxy\n8443/tcp open  https-alt\n8880/tcp open  cddbp-alt\n\nNmap done: 1 IP address (1 host up) scanned in 88.03 seconds",
+    "raw_output_chars": 791,
+    "duration_s": 88.05,
+    "is_error": false,
+    "tool_name": "nmap",
+    "agent_params": null,
+    "phase": "blue"
+  },
+  {
+    "seq": 5,
+    "tool_bin": "nmap",
+    "command": [
+      "nmap",
+      "-T4",
+      "-Pn",
+      "-p",
+      "80,443,8080,8443",
+      "--open",
+      "-sV",
+      "--host-timeout",
+      "540s",
+      "example.com"
+    ],
+    "raw_output": "Starting Nmap 7.94SVN ( https://nmap.org ) at 2026-09-12 03:58 CEST\nNmap scan report for example.com (104.20.23.154)\nHost is up (0.00065s latency).\nOther addresses for example.com (not scanned): 172.66.147.243 2606:4700:10::ac42:93f3 2606:4700:10::6814:179a\n\nPORT     STATE SERVICE  VERSION\n80/tcp   open  http     Cloudflare http proxy\n443/tcp  open  ssl/http Cloudflare http proxy\n8080/tcp open  http     Cloudflare http proxy\n8443/tcp open  ssl/http Cloudflare http proxy\n\nService detection performed. Please report any incorrect results at https://nmap.org/submit/ .\nNmap done: 1 IP address (1 host up) scanned in 40.73 seconds",
+    "raw_output_chars": 631,
+    "duration_s": 40.77,
+    "is_error": false,
+    "tool_name": "nmap",
+    "agent_params": null,
+    "phase": "blue"
+  },
+  {
+    "seq": 9,
+    "tool_bin": "nvd_cpe_lookup",
+    "command": [
+      "nvd_cpe_lookup",
+      "OpenSSL 3.0.13"
+    ],
+    "raw_output": "[NVD-CPE] CVEs für cpe:2.3:a:openssl:openssl:3.0.13 (10 Top-Treffer nach CVSS):\n\nCVE-2026-31789 — CVSS 9.8 (CRITICAL)\n  Published: 2026-04-07\n  Issue summary: Converting an excessively large OCTET STRING value to\na hexadecimal string leads to a heap buffer overflow on 32 bit platforms.\n\nImpact summary: A heap buffer overflow may lead to a cra\n\nCVE-2026-34182 — CVSS 9.1 (CRITICAL)\n  Published: 2026-06-09\n  Issue Summary: Cryptographic Message Services (CMS) processing fails to perform\nsufficient input validation on the cipher and tag length fields of\nAuthEnvelopedData containers, leading to various pote\n\nCVE-2026-75803 — CVSS 9.1 (CRITICAL)\n  Published: 2026-08-25\n  Issue summary: ChaCha20-Poly1305 and AES-OCB decryption with an empty\nciphertext can report success without verifying the supplied authentication\ntag when the operation is finalized by calling the EVP\n\nCVE-2025-15467 — CVSS 8.8 (HIGH)\n  Published: 2026-01-27\n  Issue summary: Parsing CMS AuthEnvelopedData or EnvelopedData message with\nmaliciously crafted AEAD parameters can trigger a stack buffer overflow.\n\nImpact summary: A stack buffer overflow may lead to\n\nCVE-2026-45447 — CVSS 8.8 (HIGH)\n  Published: 2026-06-09\n  Issue summary: A specially crafted PKCS#7 or S/MIME signed message could\ntrigger a use-after-free during PKCS#7 signature verification.\n\nImpact summary: A use-after-free may result in process crashes,\n\nCVE-2026-28387 — CVSS 8.1 (HIGH)\n  Published: 2026-04-07\n  Issue summary: An uncommon configuration of clients performing DANE TLSA-based\nserver authentication, when paired with uncommon server DANE TLSA records, may\nresult in a use-after-free and/or double-f\n\nCVE-2026-7383 — CVSS 8.1 (HIGH)\n  Published: 2026-06-09\n  Issue summary: A signed integer overflow when sizing the destination\nbuffer for Unicode output in ASN1_mbstring_ncopy() can lead to a heap\nbuffer overflow.\n\nImpact summary: A heap buffer overflow may \n\nCVE-2019-0190 — CVSS 7.5 (HIGH)\n  Published: 2019-01-30\n  A bug exists in the way mod_ssl handled client renegotiations. A remote attacker could send a carefully crafted request that would cause mod_ssl to enter a loop leading to a denial of service. This bu\n\nCVE-2024-6119 — CVSS 7.5 (HIGH)\n  Published: 2024-09-03\n  Issue summary: Applications performing certificate name checks (e.g., TLS\nclients checking server certificates) may attempt to read an invalid memory\naddress resulting in abnormal termination of the a\n\nCVE-2025-69420 — CVSS 7.5 (HIGH)\n  Published: 2026-01-27\n  Issue summary: A type confusion vulnerability exists in the TimeStamp Response\nverification code where an ASN1_TYPE union member is accessed without first\nvalidating the type, causing an invalid or NU",
+    "raw_output_chars": 2698,
+    "duration_s": 7.74,
+    "is_error": false,
+    "tool_name": "nvd_cpe_lookup",
+    "agent_params": null,
+    "phase": "findings"
+  },
+  {
+    "seq": 10,
+    "tool_bin": "searchsploit",
+    "command": [
+      "/usr/local/bin/searchsploit",
+      "--json",
+      "OpenSSL",
+      "3.0.13"
+    ],
+    "raw_output": "{\n\t\"SEARCH\": \"OpenSSL 3.0.13\",\n\t\"DB_PATH_EXPLOIT\": \"/opt/exploitdb\",\n\t\"RESULTS_EXPLOIT\": [\n\t\t{\"Title\":\"PHP < 5.3.6 'OpenSSL' Extension - 'openssl_decrypt' Ciphertext Data Memory Leak Denial of Service\",\"EDB-ID\":\"35487\",\"Date_Published\":\"2011-03-08\",\"Date_Added\":\"2011-03-08\",\"Date_Updated\":\"2014-12-08\",\"Author\":\"dovbysh\",\"Type\":\"dos\",\"Platform\":\"php\",\"Port\":\"\",\"Verified\":\"1\",\"Codes\":\"CVE-2011-1468;OSVDB-73755\",\"Tags\":\"\",\"Aliases\":\"\",\"Screenshot\":\"\",\"Application\":\"\",\"Source\":\"https://www.securityfocus.com/bid/46977/info\",\"Path\":\"/opt/exploitdb/exploits/php/dos/35487.php\"},\n\t\t{\"Title\":\"PHP < 5.3.6 'OpenSSL' Extension - 'openssl_encrypt' Plaintext Data Memory Leak Denial of Service\",\"EDB-ID\":\"35486\",\"Date_Published\":\"2011-03-08\",\"Date_Added\":\"2011-03-08\",\"Date_Updated\":\"2014-12-08\",\"Author\":\"dovbysh\",\"Type\":\"dos\",\"Platform\":\"php\",\"Port\":\"\",\"Verified\":\"1\",\"Codes\":\"CVE-2011-1468;OSVDB-73754\",\"Tags\":\"\",\"Aliases\":\"\",\"Screenshot\":\"\",\"Application\":\"\",\"Source\":\"https://www.securityfocus.com/bid/46977/info\",\"Path\":\"/opt/exploitdb/exploits/php/dos/35486.php\"}\n\t],\n\t\"DB_PATH_SHELLCODE\": \"/opt/exploitdb\",\n\t\"RESULTS_SHELLCODE\": [\t]\n}",
+    "raw_output_chars": 1134,
+    "duration_s": 1.0,
+    "is_error": false,
+    "tool_name": "searchsploit",
+    "agent_params": null,
+    "phase": "findings"
+  },
+  {
+    "seq": 11,
+    "tool_bin": "ddg_search",
+    "command": [
+      "ddg_search",
+      "CVE-2026-31789 PoC"
+    ],
+    "raw_output": "**CVE-2026-31789 - Heap Buffer Overflow in Hexadecimal Conversion**\nhttps://cvefeed.io/vuln/detail/CVE-2026-31789\nCVE-2026-31789 has a 14 public PoC/Exploit available at Github. Go to the Public Exploits tab to see the list.While CVE identifies specific instances of vulnerabilities, CWE categorizes the common flaws or weaknesses that can lead to vulnerabilities.\n\n**CVE-2026-31789 - Heap Buffer Overflow in OpenSSL... | WatchStack.io**\nhttps://watchstack.io/intel/cve/CVE-2026-31789\nCVE-2026-31789: Issue summary: Converting an excessively large OCTET STRING value to a hexadecimal string leads to a heap buffer overflow on 32 bit platforms.CVE-2026-31789 Exploits & PoCs (Proof Of Concept). No public PoCs found in our database for this CVE.\n\n**CVE-2026-31789, OpenSSL Heap Overflow on 32-Bit Systems**\nhttps://www.penligent.ai/hackinglabs/cve-2026-31789/\nCVE-2026-31789 is an OpenSSL heap overflow affecting 32-bit certificate-printing paths. Learn the real attack conditions, affected versions, safe validation, and fixes.\n\n**CVE-2026-31789 - Vulnerability Details - OpenCVE**\nhttps://app.opencve.io/cve/CVE-2026-31789\nCVE-2026-31789 - Heap Buffer Overflow in Hexadecimal Conversion.The vulnerability affects 32-bit systems and requires an application or service to process an unusually large X.509 certificate (over 1 Gigabyte) by printing or logging its contents.\n\n**CVE-2026-31789 | Vulnerability Database | Aqua Security**\nhttps://avd.aquasec.com/nvd/2026/cve-2026-31789/\nCVE-2026-31789 Vulnerability, Severity 9.8 CRITICAL, Out-of-bounds Write.",
+    "raw_output_chars": 1554,
+    "duration_s": 1.16,
+    "is_error": false,
+    "tool_name": "ddg_search",
+    "agent_params": null,
+    "phase": "red"
+  },
+  {
+    "seq": 12,
+    "tool_bin": "searchsploit",
+    "command": [
+      "/usr/local/bin/searchsploit",
+      "--json",
+      "CVE-2026-31789"
+    ],
+    "raw_output": "{\n\t\"SEARCH\": \"CVE-2026-31789\",\n\t\"DB_PATH_EXPLOIT\": \"/opt/exploitdb\",\n\t\"RESULTS_EXPLOIT\": [\t],\n\t\"DB_PATH_SHELLCODE\": \"/opt/exploitdb\",\n\t\"RESULTS_SHELLCODE\": [\t]\n}",
+    "raw_output_chars": 161,
+    "duration_s": 0.51,
+    "is_error": false,
+    "tool_name": "searchsploit",
+    "agent_params": null,
+    "phase": "red"
+  },
+  {
+    "seq": 13,
+    "tool_bin": "searchsploit",
+    "command": [
+      "/usr/local/bin/searchsploit",
+      "--json",
+      "CVE-2026-34182"
+    ],
+    "raw_output": "{\n\t\"SEARCH\": \"CVE-2026-34182\",\n\t\"DB_PATH_EXPLOIT\": \"/opt/exploitdb\",\n\t\"RESULTS_EXPLOIT\": [\t],\n\t\"DB_PATH_SHELLCODE\": \"/opt/exploitdb\",\n\t\"RESULTS_SHELLCODE\": [\t]\n}",
+    "raw_output_chars": 161,
+    "duration_s": 0.51,
+    "is_error": false,
+    "tool_name": "searchsploit",
+    "agent_params": null,
+    "phase": "red"
+  },
+  {
+    "seq": 14,
+    "tool_bin": "ddg_search",
+    "command": [
+      "ddg_search",
+      "CVE-2026-34182 PoC"
+    ],
+    "raw_output": "**Cve**\nhttps://www.cve.org/CVERecord?id=CVE-2026-34182\nCommon vulnerabilities and Exposures (CVE) · We're sorry but the CVE Website doesn't work properly without JavaScript enabled. Please enable it to continue\n\n**CVE-2026-34182 - Red Hat Customer Portal**\nhttps://access.redhat.com/security/cve/cve-2026-34182\nJune 11, 2026 - A flaw was found in OpenSSL's Cryptographic Message Services (CMS) AuthEnvelopedData processing. An on-path attacker can exploit insufficient input validation on cipher and tag length fields by sending specially crafted CMS messages. This can lead to the forging of messages or bypass\n\n**CVE-2026-34182 Common Vulnerabilities and Exposures | SUSE**\nhttps://www.suse.com/security/cve/CVE-2026-34182.html\nSecure your Linux systems from CVE-2026-34182. Stay ahead of potential threats with the latest security updates from SUSE.\n\n**CVE-2026-34182 | Ubuntu**\nhttps://ubuntu.com/security/CVE-2026-34182\nJune 9, 2026 - https://www.cve.org/CVERecord?id=CVE-2026-34182 ·\n\n**CVE-2026-34182 Detail - NVD**\nhttps://nvd.nist.gov/vuln/detail/CVE-2026-34182\nJune 9, 2026 - This is a potential security issue, you are being redirected to https://nvd.nist.gov · Official websites use .gov A .gov website belongs to an official government organization in the United States",
+    "raw_output_chars": 1283,
+    "duration_s": 0.81,
+    "is_error": false,
+    "tool_name": "ddg_search",
+    "agent_params": null,
+    "phase": "red"
+  },
+  {
+    "seq": 15,
+    "tool_bin": "ddg_search",
+    "command": [
+      "ddg_search",
+      "CVE-2026-75803 PoC"
+    ],
+    "raw_output": "**CVE-2026-75803 — CVSS N/A NONE | CTIWatch**\nhttps://ctiwatch.com/vulnerabilities/CVE-2026-75803\nNVD Source Technical Analysis CVE-2026-75803 requires local access, meaning attackers must already have a foothold on the target system. Exploitation requires some privileges, which limits the exposure to scenarios where an attacker has already gained initial access. Exploit & PoC Resources NO KNOWN\n\n**GitHub - SecureWithUmer/CVE-2026-PoCs: A community-curated, verified ...**\nhttps://github.com/SecureWithUmer/CVE-2026-PoCs\nMost CVE PoC collections are scattered across Twitter threads, gists, and dead blog links. This repo aims to be the single, well-organized, actively maintained index of 2026 CVE PoCs — with consistent metadata, verified references, and clear contribution standards.\n\n**CVE-2026-75803 - GitHub Advisory Database**\nhttps://github.com/advisories/GHSA-vr27-9w4v-hjw2\nCritical severity Unreviewed Published Aug 25, 2026 to the GitHub Advisory Database • Updated Sep 1, 2026\n\n**CVE-2026-75803: Improper Validation of Integrity Check Value**\nhttps://www.rapid7.com/db/vulnerabilities/cve-2026-75803/\nCVE-2026-75803: Improper Validation of Integrity Check Value. View severity, references, and remediation details from Rapid7.\n\n**CVE-2026-75803 - Critical Vulnerability - TheHackerWire**\nhttps://www.thehackerwire.com/vulnerability/CVE-2026-75803/\nCVE-2026-75803 is a Critical severity vulnerability (CVSS 9.1). Issue summary: ChaCha20-Poly1305 and AES-OCB decryption with an empty ciphertext can report success without verifying the supplied authentication tag when...",
+    "raw_output_chars": 1586,
+    "duration_s": 1.0,
+    "is_error": false,
+    "tool_name": "ddg_search",
+    "agent_params": null,
+    "phase": "red"
+  },
+  {
+    "seq": 16,
+    "tool_bin": "searchsploit",
+    "command": [
+      "/usr/local/bin/searchsploit",
+      "--json",
+      "CVE-2026-45447"
+    ],
+    "raw_output": "{\n\t\"SEARCH\": \"CVE-2026-45447\",\n\t\"DB_PATH_EXPLOIT\": \"/opt/exploitdb\",\n\t\"RESULTS_EXPLOIT\": [\t],\n\t\"DB_PATH_SHELLCODE\": \"/opt/exploitdb\",\n\t\"RESULTS_SHELLCODE\": [\t]\n}",
+    "raw_output_chars": 161,
+    "duration_s": 0.5,
+    "is_error": false,
+    "tool_name": "searchsploit",
+    "agent_params": null,
+    "phase": "red"
+  },
+  {
+    "seq": 17,
+    "tool_bin": "ddg_search",
+    "command": [
+      "ddg_search",
+      "CVE-2026-28387 PoC"
+    ],
+    "raw_output": "**NVD - CVE-2026-28387**\nhttps://nvd.nist.gov/vuln/detail/CVE-2026-28387\nCVE-2026-28387 Detail. Modified After Enrichment.CVE Dictionary Entry: CVE-2026-28387 NVD Published Date: 04/07/2026 NVD Last Modified: 07/24/2026 Source: OpenSSL Software Foundation.\n\n**CVE-2026-28387 - Use-after-free/double-free in DANE... | WatchStack.io**\nhttps://watchstack.io/intel/cve/CVE-2026-28387\nCVE-2026-28387: Issue summary: An uncommon configuration of clients performing DANE TLSA-based server authentication, when paired with uncommon server DANE TLSA records, may result in a use-after-free and/or double-free on the client side.\n\n**CVE-2026-28387 Common Vulnerabilities and Exposures | SUSE**\nhttps://www.suse.com/security/cve/CVE-2026-28387.html\nSecure your Linux systems from CVE-2026-28387. Stay ahead of potential threats with the latest security updates from SUSE.\n\n**CVE-2026-28387 — Alpine Security Tracker**\nhttps://security.alpinelinux.org/vuln/CVE-2026-28387\nCVE, NVD, CERT, CVE Details, CIRCL, Arch Linux, Debian, Red Hat, Ubuntu, Gentoo, SUSE (Bugzilla), SUSE (CVE), Mageia.\n\n**CVE-2026-28387 | Tenable**\nhttps://www.tenable.com/cve/CVE-2026-28387\nBy far the most common deployment of DANE is in SMTP MTAs for which RFC7672 recommends that clients treat as 'unusable' any TLSA records that have the PKIX certificate usages.CVE-2026-28387. high. Information.",
+    "raw_output_chars": 1360,
+    "duration_s": 0.9,
+    "is_error": false,
+    "tool_name": "ddg_search",
+    "agent_params": null,
+    "phase": "red"
+  }
+]

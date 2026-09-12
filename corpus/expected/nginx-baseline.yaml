@@ -1,0 +1,11 @@
+# SCHREIBGESCHÜTZT — Quelle: testing/targets.yaml#nginx-clean-baseline (bereits
+# etablierte TN-Baseline dieses Projekts, siehe CLAUDE.md "Testkonzept-Harness").
+target: "172.17.0.2 (nginx:alpine Docker-Container, isoliert)"
+category: lab_networks
+expected_open_ports: [80]
+notes: >
+  TN-Baseline. WICHTIG (CLAUDE.md, Testkonzept-Schritt 3): nginx:alpine hatte
+  historisch schon EIN reales nuclei-CVE (CVE-2026-42530, HTTP/3-UAF) — ein
+  gefundenes CVE ist hier NICHT automatisch ein Bug, nur ein unbestätigter
+  Fund zählt als FALSE_POSITIVE. Kein must_find_cves — Container-Image kann
+  sich zwischen Läufen aktualisieren (kein garantiert stabiler Soll-Zustand).

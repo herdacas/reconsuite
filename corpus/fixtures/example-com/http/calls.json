@@ -1,0 +1,55 @@
+[
+  {
+    "seq": 4,
+    "tool_bin": "httpx",
+    "command": [
+      "/snap/bin/httpx",
+      "-silent",
+      "-silent"
+    ],
+    "raw_output": "https://example.com",
+    "raw_output_chars": 19,
+    "duration_s": 0.16,
+    "is_error": false,
+    "tool_name": "httpx",
+    "agent_params": null,
+    "phase": "blue"
+  },
+  {
+    "seq": 6,
+    "tool_bin": "whatweb",
+    "command": [
+      "whatweb",
+      "https://example.com",
+      "--no-errors"
+    ],
+    "raw_output": "\u001b[1m\u001b[34mhttps://example.com\u001b[0m [200 OK] \u001b[1mAllow\u001b[0m[\u001b[1m\u001b[31mGET, HEAD\u001b[0m], \u001b[1mCountry\u001b[0m[\u001b[0m\u001b[22mRESERVED\u001b[0m][\u001b[1m\u001b[31mZZ\u001b[0m], \u001b[1mHTML5\u001b[0m, \u001b[1mHTTPServer\u001b[0m[\u001b[1m\u001b[36mcloudflare\u001b[0m], \u001b[1mIP\u001b[0m[\u001b[0m\u001b[22m172.66.147.243\u001b[0m], \u001b[1mTitle\u001b[0m[\u001b[1m\u001b[33mExample Domain\u001b[0m], \u001b[1mUncommonHeaders\u001b[0m[\u001b[0m\u001b[22mcf-cache-status,cf-ray\u001b[0m]",
+    "raw_output_chars": 343,
+    "duration_s": 4.78,
+    "is_error": false,
+    "tool_name": "whatweb",
+    "agent_params": null,
+    "phase": "blue"
+  },
+  {
+    "seq": 8,
+    "tool_bin": "nikto",
+    "command": [
+      "nikto",
+      "-h",
+      "https://example.com",
+      "-nointeractive",
+      "-maxtime",
+      "90s",
+      "-timeout",
+      "5"
+    ],
+    "raw_output": "- Nikto v2.1.5\n---------------------------------------------------------------------------\n+ Target IP:          104.20.23.154\n+ Target Hostname:    example.com\n+ Target Port:        443\n+ Start Time:         2026-09-12 04:00:19 (GMT2)\n---------------------------------------------------------------------------\n+ Server: cloudflare\n+ The anti-clickjacking X-Frame-Options header is not present.\n+ Uncommon header 'cf-ray' found, with contents: -\n+ No CGI Directories found (use '-C all' to force check all possible dirs)\n+ 6544 items checked: 0 error(s) and 2 item(s) reported on remote host\n+ End Time:           2026-09-12 04:00:40 (GMT2) (21 seconds)\n---------------------------------------------------------------------------\n+ 1 host(s) tested",
+    "raw_output_chars": 749,
+    "duration_s": 21.92,
+    "is_error": false,
+    "tool_name": "nikto",
+    "agent_params": null,
+    "phase": "blue"
+  }
+]

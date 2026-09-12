@@ -1,0 +1,142 @@
+{
+  "target": "scanme.nmap.org",
+  "objective": "Full vulnerability assessment of scanme.nmap.org",
+  "scope": "full",
+  "pipeline": [
+    "research",
+    "blue",
+    "findings",
+    "red_scan",
+    "red",
+    "coding",
+    "report"
+  ],
+  "timestamp": "20260910_223412",
+  "report": "/opt/projects/agentic-ai/recon-suite/logs/recon_report_scanme.nmap.org_20260910_223412.md",
+  "memory_hit": true,
+  "tasks": {
+    "research": {
+      "status": "completed",
+      "preview": [
+        "{   \"target_type\": \"domain\",   \"summary\": \"scanme.nmap.org is a domain that resolves to IP 45.33.32.156. No subdomains",
+        "were discovered. WHOIS indicates registrar is Public Interest Registry. No reverse DNS record found.\",   \"subdomains\":",
+        "[],   \"technologies\": [],   \"osint_notes\": [     \"Target is a domain\",     \"Resolved to IP 45.33.32.156\",     \"No",
+        "subdomains found\",     \"WHOIS registrar: Public Interest Registry\",     \"No reverse DNS record found\"   ],",
+        "\"reverse_dns\": null,   \"asn_info\": null,   \"memory_hit\": false }  === VERIFIED LIVE HOSTS (deterministic httpx) ===",
+        "Diese Hosts sind erreic"
+      ],
+      "memory_hit": false
+    },
+    "blue": {
+      "status": "completed",
+      "preview": [
+        "{   \"tools_executed\": [     \"nmap -p 1-65535 -T4 scanme.nmap.org\",     \"nmap -p 22,80,9929,31337 -sV -T4",
+        "scanme.nmap.org\",     \"whatweb http://scanme.nmap.org\",     \"httpx -targets scanme.nmap.org -options -api_probe=false\",",
+        "\"wafw00f https://scanme.nmap.org\",     \"nikto -target http://scanme.nmap.org -port 80 -tuning 4\",     \"curl_http_headers",
+        "-url https://scanme.nmap.org -follow_redirects true\"   ],   \"open_ports\": [     22,     80,     9929,     31337   ],",
+        "\"services\": {},   \"vulnerabilities\": [     \"Apache 2.4.7 version disclosed in Server header\",     \"Missing X-Frame-",
+        "Options header\","
+      ],
+      "open_ports": [
+        22,
+        80,
+        9929,
+        31337
+      ],
+      "vulnerabilities": [
+        "Apache 2.4.7 version disclosed in Server header",
+        "Missing X-Frame-Options header",
+        "OpenSSH 6.6.1p1 version disclosed",
+        "Informational Nping echo service on port 9929",
+        "Informational tcpwrapped service on port 31337"
+      ]
+    },
+    "findings": {
+      "status": "completed",
+      "preview": [
+        "{\"service_versions\": [\"Apache 2.4.7\", \"OpenSSH 6.6.1p1\"], \"cve_references\": [\"CVE-2017-3167\", \"CVE-2017-7679\",",
+        "\"CVE-2018-1312\", \"CVE-2021-26691\", \"CVE-2021-39275\", \"CVE-2021-41773\", \"CVE-2021-42013\", \"CVE-2017-9798\",",
+        "\"CVE-2014-0226\", \"CVE-2013-2160\", \"CVE-2002-0082\", \"CVE-2023-38408\"], \"risk_summary\": \"Apache HTTP Server 2.4.7 version",
+        "disclosed in Server header; OpenSSH 6.6.1p1 version disclosed; Missing X-Frame-Options header; Informational Nping echo",
+        "service on port 9929; Informational tcpwrapped service on port 31337\"}"
+      ],
+      "cve_references": [
+        "CVE-2017-3167",
+        "CVE-2017-7679",
+        "CVE-2018-1312",
+        "CVE-2021-26691",
+        "CVE-2021-39275",
+        "CVE-2021-41773",
+        "CVE-2021-42013",
+        "CVE-2017-9798",
+        "CVE-2014-0226",
+        "CVE-2013-2160",
+        "CVE-2002-0082",
+        "CVE-2023-38408"
+      ]
+    },
+    "red_scan": {
+      "status": "completed",
+      "preview": [
+        "{   \"targeted_findings\": [     \"Apache 2.4.7\",     \"OpenSSH 6.6.1p1\",     \"CVE-2017-3167\",     \"CVE-2017-7679\",",
+        "\"CVE-2018-1312\",     \"CVE-2021-26691\",     \"CVE-2021-39275\",     \"CVE-2021-41773\",     \"CVE-2021-42013\",",
+        "\"CVE-2017-9798\",     \"CVE-2014-0226\",     \"CVE-2013-2160\",     \"CVE-2002-0082\",     \"CVE-2023-38408\"   ],",
+        "\"tools_executed\": [     \"nmap -p 1-65535 -T4 scanme.nmap.org\",     \"nmap -p 22,80,9929,31337 -sV -T4 scanme.nmap.org\",",
+        "\"whatweb http://scanme.nmap.org\",     \"httpx -targets scanme.nmap.org -options -api_probe=false\",     \"wafw00f",
+        "https://scanme.nmap.org\",     \"ni"
+      ],
+      "open_ports": [
+        22,
+        80,
+        9929,
+        31337
+      ],
+      "vulnerabilities": [
+        "Apache 2.4.7 version disclosed in Server header",
+        "Missing X-Frame-Options header",
+        "OpenSSH 6.6.1p1 version disclosed",
+        "Informational Nping echo service on port 9929",
+        "Informational tcpwrapped service on port 31337"
+      ]
+    },
+    "red": {
+      "status": "completed",
+      "preview": [
+        "{   \"confirmed_attack_surface\": [     \"http:80 — Apache 2.4.7 version disclosed in Server header\",     \"ssh:22 — OpenSSH",
+        "6.6.1p1 version disclosed\",     \"http:80 — Missing X-Frame-Options header\",     \"npings:9929 — Informational Nping echo",
+        "service on port 9929\",     \"tcpwrapped:31337 — Informational tcpwrapped service on port 31337\"   ],",
+        "\"exploitable_findings\": [     \"http:80 — Apache 2.4.7 version disclosed in Server header\",     \"ssh:22 — OpenSSH 6.6.1p1",
+        "version disclosed\"   ],   \"exploitable_findings_count\": 2,   \"cve_references\": [     \"CVE-2002-0082\",",
+        "\"CVE-2017-9798\"   ] }"
+      ],
+      "cve_references": [
+        "CVE-2002-0082",
+        "CVE-2017-9798"
+      ],
+      "attack_surface_count": 5,
+      "exploitable_findings_count": 2
+    },
+    "coding": {
+      "status": "completed",
+      "preview": [
+        "{   \"filename\": \"scan_heise.py\",   \"code\": \"import subprocess, logging, sys,",
+        "json\\nlogging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')\\ndef",
+        "run_command(cmd):\\n    logging.info(f'Running: {cmd}')\\n    try:\\n        result = subprocess.run(cmd, shell=True,",
+        "capture_output=True, text=True)\\n        if result.returncode != 0:\\n            logging.error(f'Command failed with",
+        "return code {result.returncode}')\\n            logging.error(result.stderr)\\n        else:\\n",
+        "logging.info(result.stdout)\\n        return result.stdout, result.stderr\\n    except"
+      ]
+    },
+    "report": {
+      "status": "completed",
+      "preview": [
+        "{\"path\":\"pending\",\"executive_summary\":\"# Recon Report: scanme.nmap.org\\n## Reconnaissance Summary\\n  Target IP:",
+        "45.33.32.156\\n  Open ports: 22, 80, 9929, 31337\\n  Services detected:\\n    - Port 80: Apache httpd 2.4.7\\n    - Port 22:",
+        "OpenSSH 6.6.1p1\\n    - Port 9929: Informational Nping echo service\\n    - Port 31337: Informational tcpwrapped",
+        "service\\n\\n## Scope & Methodik\\n| Tool | Purpose | Covered Assets |\\n|------|---------|----------------|\\n| nmap -p",
+        "1-65535 -T4 scanme.nmap.org | Full port scan | All 1-65535 ports |\\n| nmap -p 22,80,9929,31337 -sV -T4 scanme.nmap.org |",
+        "Service/version det"
+      ]
+    }
+  }
+}

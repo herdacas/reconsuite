@@ -1,0 +1,17 @@
+# SCHREIBGESCHÜTZT — Quelle: CLAUDE.md, BUG-22 (2026-09-11), gegen NVD verifiziert.
+target: rastede.de
+category: external_readonly
+known_services:
+  - product: OpenSSH
+    version: "9.6p1"
+    confidence: CONTROLLED
+must_find_cves:
+  - CVE-2024-6387    # regreSSHion, CVSS 8.1, OpenSSH 8.5p1-9.7p1 — 9.6p1 liegt im Bereich
+forbid_cves:
+  - CVE-2023-38408   # betrifft nur "OpenSSH before 9.3p2" — 9.6p1 ist bereits gepatcht,
+                      # historisch als Falsch-Positiv-Risiko dokumentiert (CLAUDE.md BUG-22-Nebenbefund)
+notes: >
+  forbid_cves ist eine bewusste Erweiterung ggü. der VALIDATION_SPEC-Klassen —
+  eine hier gelistete CVE, die der Scanner trotzdem als versions-bestätigt
+  meldet, ist WRONG_VALUE (semantischer Range-Fehler, bekannte strukturelle
+  Grenze des BUG-17-Gates, siehe CLAUDE.md).

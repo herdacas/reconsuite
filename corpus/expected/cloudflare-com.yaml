@@ -1,0 +1,14 @@
+# SCHREIBGESCHÜTZT — kein historisch etabliertes must_find_cve für dieses Ziel.
+target: www.cloudflare.com
+category: external_readonly
+known_services: []
+must_find_cves: []
+expect_signature_present:
+  - "cloudflare"    # muss irgendwo in Report/Trace als Server/WAF/CDN-Hinweis vorkommen (case-insensitive)
+notes: >
+  Diese Fixture (Trace 20260912_051855, NACH dem sslscan-Banner- und dem
+  unattributed-finding-Fix) ist die Negativkontrolle für beide Fixes: der
+  Report enthält KEINE fabrizierte 'WAF/CDN detected'-Zeile mehr, sondern
+  korrekt 'Server header: cloudflare' zugeordnet an httpx. Feature-Check
+  'wafw00f'-Aufruf selbst bleibt FAIL (agent-ermessensabhängig, kein Bug —
+  siehe CLAUDE.md).

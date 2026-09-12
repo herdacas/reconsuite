@@ -1,0 +1,34 @@
+[
+  {
+    "seq": 11,
+    "tool_bin": "httpx",
+    "command": [
+      "/snap/bin/httpx",
+      "-silent",
+      "-follow-redirects"
+    ],
+    "raw_output": "https://mail5.westerstede.de\nhttps://mail3.westerstede.de\nhttps://mail2.westerstede.de",
+    "raw_output_chars": 86,
+    "duration_s": 0.27,
+    "is_error": false,
+    "tool_name": "httpx",
+    "agent_params": null,
+    "phase": "blue"
+  },
+  {
+    "seq": 12,
+    "tool_bin": "whatweb",
+    "command": [
+      "whatweb",
+      "http://mail2.westerstede.de",
+      "--no-errors"
+    ],
+    "raw_output": "\u001b[1m\u001b[34mhttp://mail2.westerstede.de\u001b[0m [301 Moved Permanently] \u001b[1mApache\u001b[0m, \u001b[1mCountry\u001b[0m[\u001b[0m\u001b[22mGERMANY\u001b[0m][\u001b[1m\u001b[31mDE\u001b[0m], \u001b[1mHTTPServer\u001b[0m[\u001b[1m\u001b[36mApache\u001b[0m], \u001b[1mIP\u001b[0m[\u001b[0m\u001b[22m80.228.77.170\u001b[0m], \u001b[1mRedirectLocation\u001b[0m[\u001b[0m\u001b[22mhttps://mail2.westerstede.de:443/\u001b[0m], \u001b[1mTitle\u001b[0m[\u001b[1m\u001b[33m301 Moved Permanently\u001b[0m]\n\u001b[1m\u001b[34mhttps://mail2.westerstede.de/\u001b[0m [403 Forbidden] \u001b[1mApache\u001b[0m, \u001b[1mCountry\u001b[0m[\u001b[0m\u001b[22mGERMANY\u001b[0m][\u001b[1m\u001b[31mDE\u001b[0m], \u001b[1mHTTPServer\u001b[0m[\u001b[1m\u001b[36mApache\u001b[0m], \u001b[1mIP\u001b[0m[\u001b[0m\u001b[22m80.228.77.170\u001b[0m], \u001b[1mTitle\u001b[0m[\u001b[1m\u001b[33m403 Forbidden\u001b[0m]",
+    "raw_output_chars": 595,
+    "duration_s": 7.28,
+    "is_error": false,
+    "tool_name": "whatweb",
+    "agent_params": null,
+    "phase": "blue"
+  }
+]

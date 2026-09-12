@@ -1,0 +1,17 @@
+[
+  {
+    "seq": 4,
+    "tool_bin": "whois",
+    "command": [
+      "whois",
+      "westerstede.de"
+    ],
+    "raw_output": "% Restricted rights.\n% \n% Terms and Conditions of Use\n% \n% The above data may only be used within the scope of technical or\n% administrative necessities of Internet operation or to remedy legal\n% problems.\n% The use for other purposes, in particular for advertising, is not permitted.\n% \n% The DENIC whois service on port 43 doesn't disclose any information concerning\n% the domain holder, general request and abuse contact.\n% This information can be obtained through use of our web-based whois service\n% available at the DENIC website:\n% https://webwhois.denic.de/?lang=en\n% \n% \n\nDomain: westerstede.de\nNserver: ns2.inwx.de\nNserver: ns3.inwx.eu\nNserver: ns.inwx.de\nStatus: connect\nChanged: 2020-10-30T01:13:45+01:00",
+    "raw_output_chars": 716,
+    "duration_s": 0.05,
+    "is_error": false,
+    "tool_name": "whois",
+    "agent_params": null,
+    "phase": "research"
+  }
+]

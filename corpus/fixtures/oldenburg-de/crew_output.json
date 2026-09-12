@@ -1,0 +1,127 @@
+{
+  "target": "oldenburg.de",
+  "objective": "Full vulnerability assessment of oldenburg.de",
+  "scope": "full",
+  "pipeline": [
+    "research",
+    "blue",
+    "findings",
+    "red_scan",
+    "red",
+    "coding",
+    "report"
+  ],
+  "timestamp": "20260912_014331",
+  "report": "/opt/projects/agentic-ai/recon-suite/logs/recon_report_oldenburg.de_20260912_014331.md",
+  "memory_hit": true,
+  "tasks": {
+    "research": {
+      "status": "completed",
+      "preview": [
+        "{   \"target_type\": \"domain\",   \"summary\": \"Domain oldenburg.de; passive reconnaissance identified multiple subdomains;",
+        "no active scanning or vulnerability assessment performed; no technologies detected.\",   \"subdomains\": [",
+        "\"test.oldenburg.de\",     \"mail.test.oldenburg.de\"   ],   \"technologies\": [],   \"osint_notes\": [     \"Passive subdomain",
+        "enumeration performed using subfinder_passive.\",     \"No active scanning or vulnerability assessment performed.\",",
+        "\"No technology detection observed.\",     \"No WHOIS or ASN information retrieved.\"   ],   \"reverse_dns\": null,",
+        "\"asn_info\": null,   \"mem"
+      ],
+      "memory_hit": false
+    },
+    "blue": {
+      "status": "completed",
+      "preview": [
+        "{   \"tools_executed\": [     \"nmap_scanner\",     \"httpx_prober\",     \"whatweb_fingerprint\",     \"wafw00f_detect\",",
+        "\"curl_http_headers\",     \"sslscan_tls\"   ],   \"open_ports\": [     22,     80,     443   ],   \"services\": {},",
+        "\"vulnerabilities\": [     \"Missing Strict-Transport-Security (HSTS) header\",     \"OpenSSL 3.0.13 supports legacy TLS",
+        "versions\",     \"nginx server version not disclosed\",     \"No Web Application Firewall detected\"   ],   \"analysis\": \"The",
+        "target oldenburg.de runs nginx on ports 80 and 443, and OpenSSH 10.5 on port 22. No WAF is detected, but several",
+        "security headers are mi"
+      ],
+      "open_ports": [
+        22,
+        80,
+        443
+      ],
+      "vulnerabilities": [
+        "Missing Strict-Transport-Security (HSTS) header",
+        "OpenSSL 3.0.13 supports legacy TLS versions",
+        "nginx server version not disclosed",
+        "No Web Application Firewall detected"
+      ]
+    },
+    "findings": {
+      "status": "completed",
+      "preview": [
+        "{\"service_versions\": [\"OpenSSH 10.5\", \"OpenSSL 3.0.13\", \"nginx\"], \"cve_references\": [\"CVE-2026-31789\", \"CVE-2026-34182\",",
+        "\"CVE-2026-75803\", \"CVE-2026-45447\", \"CVE-2026-28387\", \"CVE-2026-7383\", \"CVE-2019-0190\", \"CVE-2024-6119\",",
+        "\"CVE-2025-69420\", \"CVE-2023-38408\"], \"risk_summary\": \"Subdomains test.oldenburg.de and mail.test.oldenburg.de are",
+        "reachable. OpenSSH 10.5 runs on port 22. nginx serves on ports 80 and 443, version not disclosed. OpenSSL 3.0.13 is",
+        "used, supporting legacy TLS versions. HSTS header is missing. No web application firewall detected.\"}"
+      ],
+      "cve_references": [
+        "CVE-2026-31789",
+        "CVE-2026-34182",
+        "CVE-2026-75803",
+        "CVE-2026-45447",
+        "CVE-2026-28387",
+        "CVE-2026-7383",
+        "CVE-2019-0190",
+        "CVE-2024-6119",
+        "CVE-2025-69420",
+        "CVE-2023-38408"
+      ]
+    },
+    "red_scan": {
+      "status": "completed",
+      "preview": [
+        "{   \"targeted_findings\": [     \"OpenSSH 10.5\",     \"OpenSSL 3.0.13\",     \"nginx\",     \"CVE-2026-31789\",",
+        "\"CVE-2026-34182\",     \"CVE-2026-75803\",     \"CVE-2026-45447\",     \"CVE-2026-28387\",     \"CVE-2026-7383\",",
+        "\"CVE-2019-0190\",     \"CVE-2024-6119\",     \"CVE-2025-69420\",     \"CVE-2023-38408\"   ],   \"tools_executed\": [",
+        "\"nmap_scanner\",     \"httpx_prober\",     \"whatweb_fingerprint\",     \"wafw00f_detect\",     \"curl_http_headers\",",
+        "\"sslscan_tls\"   ],   \"open_ports\": [     22,     80,     443   ],   \"vulnerabilities\": [     \"Missing Strict-Transport-",
+        "Security (HSTS) header\",     \"OpenSSL"
+      ],
+      "open_ports": [
+        22,
+        80,
+        443
+      ],
+      "vulnerabilities": [
+        "Missing Strict-Transport-Security (HSTS) header",
+        "OpenSSL 3.0.13 supports legacy TLS versions",
+        "nginx server version not disclosed",
+        "No Web Application Firewall detected"
+      ]
+    },
+    "red": {
+      "status": "completed",
+      "preview": [
+        "{   \"confirmed_attack_surface\": [],   \"exploitable_findings\": [     \"CVE-2026-31789\",     \"CVE-2026-34182\"   ],",
+        "\"exploitable_findings_count\": 2,   \"cve_references\": [     \"CVE-2026-31789\",     \"CVE-2026-34182\"   ] }"
+      ],
+      "cve_references": [
+        "CVE-2026-31789",
+        "CVE-2026-34182"
+      ],
+      "attack_surface_count": 0,
+      "exploitable_findings_count": 2
+    },
+    "coding": {
+      "status": "completed",
+      "preview": [
+        "{   \"filename\": \"scan_oldenburg_de.py\",   \"code\": \"import logging\\nimport subprocess\\nimport sys\\nimport re\\n\\ndef",
+        "run_cmd(cmd):\\n    '''Execute a command and return stdout. Raises on error.'''\\n    try:\\n        result"
+      ]
+    },
+    "report": {
+      "status": "completed",
+      "preview": [
+        "{\"path\":\"recon_report_oldenburg_de.md\",\"executive_summary\":\"# Recon Report: oldenburg.de\\n\\n## Reconnaissance Summary\\n-",
+        "Live hosts: test.oldenburg.de, mail.test.oldenburg.de\\n- Open ports: 22, 80, 443\\n\\n## Scope & Methodik\\n| Tool | Zweck",
+        "| Abgedeckte Assets |\\n|------|-------|-------------------|\\n| nmap | Netzwerk-Scanning | Ports 22, 80, 443 |\\n| httpx |",
+        "HTTP/HTTPS-Probing | Subdomains, Server-Versionen |\\n| whatweb | Technologie-Fingerprinting | OpenSSH 10.5, nginx |\\n|",
+        "sslscan | TLS-Konfiguration | OpenSSL 3.0.13, Legacy-TLS-Versionen |\\n| curl | HTTP-Header-Analyse | Fehlender HSTS-Hea"
+      ]
+    }
+  }
+}

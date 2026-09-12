@@ -1,0 +1,53 @@
+[
+  {
+    "seq": 1,
+    "tool_bin": "subfinder",
+    "command": [
+      "/root/go/bin/subfinder",
+      "-d",
+      "www.cloudflare.com",
+      "-silent"
+    ],
+    "raw_output": "timeline.www.cloudflare.com\nzh-cn.www.cloudflare.com\nai-search.www.cloudflare.com\nfr-fr.www.cloudflare.com\nsv-se.www.cloudflare.com\nnb-no.www.cloudflare.com\ncatalog.www.cloudflare.com\nen-gb.www.cloudflare.com\nko-kr.www.cloudflare.com\npages.www.cloudflare.com\nru-ru.www.cloudflare.com\ntr.www.cloudflare.com\nzh-tw.www.cloudflare.com\nassets.www.cloudflare.com\nen-us.www.cloudflare.com\not.www.cloudflare.com\nth-th.www.cloudflare.com\ntr-tr.www.cloudflare.com\nzh-hans-cn.www.cloudflare.com\nblog.api.www.cloudflare.com\nar-ar.www.cloudflare.com\nen-au.www.cloudflare.com\nen-ca.www.cloudflare.com\nips.www.cloudflare.com\nit-it.www.cloudflare.com\nde-de.www.cloudflare.com\nel-gr.www.cloudflare.com\nid-id.www.cloudflare.com\nvi-vn.www.cloudflare.com\napi.www.cloudflare.com\ncf-assets.www.cloudflare.com\nes-la.www.cloudflare.com\nevents.www.cloudflare.com\nhe-il.www.cloudflare.com\ncf-obs.www.cloudflare.com\nrainfocusadmin.www.cloudflare.com\nfieldmarketing.www.cloudflare.com\nja-jp.www.cloudflare.com\npt-br.www.cloudflare.com\nwillow.www.cloudflare.com\nen-in.www.cloudflare.com\nes-es.www.cloudflare.com\nlp.www.cloudflare.com\nnl-nl.www.cloudflare.com\npl-pl.www.cloudflare.com\no59.ptr4959.send.www.cloudflare.com",
+    "raw_output_chars": 1190,
+    "duration_s": 5.21,
+    "is_error": false,
+    "tool_name": "subfinder",
+    "agent_params": null,
+    "phase": "research"
+  },
+  {
+    "seq": 2,
+    "tool_bin": "dig",
+    "command": [
+      "dig",
+      "www.cloudflare.com",
+      "A",
+      "+short"
+    ],
+    "raw_output": "104.16.124.96\n104.16.123.96",
+    "raw_output_chars": 27,
+    "duration_s": 0.03,
+    "is_error": false,
+    "tool_name": "dig",
+    "agent_params": null,
+    "phase": "research"
+  },
+  {
+    "seq": 3,
+    "tool_bin": "dig",
+    "command": [
+      "dig",
+      "104.16.124.96.in-addr.arpa",
+      "PTR",
+      "+short"
+    ],
+    "raw_output": "",
+    "raw_output_chars": 0,
+    "duration_s": 0.15,
+    "is_error": false,
+    "tool_name": "dig",
+    "agent_params": null,
+    "phase": "research"
+  }
+]

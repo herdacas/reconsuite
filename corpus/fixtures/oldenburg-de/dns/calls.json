@@ -1,0 +1,19 @@
+[
+  {
+    "seq": 1,
+    "tool_bin": "subfinder",
+    "command": [
+      "/root/go/bin/subfinder",
+      "-d",
+      "oldenburg.de",
+      "-silent"
+    ],
+    "raw_output": "www.china.oldenburg.de\nmetrics.klimaportal.oldenburg.de\ncloud.oldenburg.de\nabhol.oldenburg.de\nredaktion.oldenburg.de\nwww.china-begegnungen.oldenburg.de\nmaenner.oldenburg.de\nwww.opendata.oldenburg.de\nwww.kindertagesbetreuung.oldenburg.de\nstadtbibliothek.oldenburg.de\ntraukalender.oldenburg.de\nchina-begegnungen.oldenburg.de\nimmobilienkreis.oldenburg.de\nwww.klimaportal.oldenburg.de\npiwik.oldenburg.de\nwww.wissenschaft.oldenburg.de\nwww.gemeinsam.oldenburg.de\ntraukalender-test.oldenburg.de\nwww.maenner.oldenburg.de\nmuseum.oldenburg.de\nupload.oldenburg.de\nbbb.oldenburg.de\nredaktion-serviceportal.oldenburg.de\ntest.oldenburg.de\nwww.awb.oldenburg.de\nwww.cadillac.oldenburg.de\nwww.frauen.oldenburg.de\nedit.klimaportal.oldenburg.de\nncloud.oldenburg.de\nwww.stadtbibliothek.oldenburg.de\nmail.test.oldenburg.de\nmeet.oldenburg.de\ncadillac.oldenburg.de\nchina.oldenburg.de\nwww.efa.oldenburg.de\ngemeinsam.oldenburg.de\nratsinfo.oldenburg.de\nawb.oldenburg.de\nbau-werk.oldenburg.de\nwww.kinder.oldenburg.de\nmeet-test.oldenburg.de\ndata-3069017f33.oldenburg.de\nefa.oldenburg.de\ngis4ol.oldenburg.de\nopac.oldenburg.de\nwww.route.oldenburg.de\nutmi01.oldenburg.de\ncms.oldenburg.de\ngcal.oldenburg.de\numfrage.oldenburg.de\ngisportal4ol.oldenburg.de\nwww.immobilienkreis.oldenburg.de\nwww.museum.oldenburg.de\nopendata.oldenburg.de\nroute.oldenburg.de\nwww.bau-werk.oldenburg.de\nfrauen.oldenburg.de\nklimaportal.oldenburg.de\nmuseumstickets.oldenburg.de\nserviceportal.oldenburg.de\nwissenschaft.oldenburg.de\nkarriere.oldenburg.de\nterminvereinbarung.oldenburg.de\nwww.oldenburg.de\nwww.staatstheater.oldenburg.de\nservices.oldenburg.de\nbuergerinfo.oldenburg.de\nkinder.oldenburg.de\nwahl.oldenburg.de\nwww.buergerhaushalt.oldenburg.de",
+    "raw_output_chars": 1691,
+    "duration_s": 21.1,
+    "is_error": false,
+    "tool_name": "subfinder",
+    "agent_params": null,
+    "phase": "research"
+  }
+]

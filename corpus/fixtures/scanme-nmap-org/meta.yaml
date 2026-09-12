@@ -1,0 +1,17 @@
+target_id: "scanme-nmap-org"
+scan_target: "scanme.nmap.org"
+category: "external_readonly"
+captured_at: "2026-09-10T20:34:12.758089+00:00"
+source_trace: "trace_scanme.nmap.org_20260910_223412.json"
+source_report: "recon_report_scanme.nmap.org_20260910_223412.md"
+notes: "Nmap-Projekt-eigenes, explizit für Scans freigegebenes Ziel. Ground Truth (CLAUDE.md, 2026-06-18): OpenSSH 6.6.1p1 + Apache httpd 2.4.7 (Ubuntu 2014) → CVE-2018-15473, CVE-2016-10009/10010."
+n_tool_calls: 13
+scope: "full"
+pipeline:
+  - research
+  - blue
+  - findings
+  - red_scan
+  - red
+  - coding
+  - report

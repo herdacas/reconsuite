@@ -1,0 +1,226 @@
+[
+  {
+    "seq": 2,
+    "tool_bin": "nmap",
+    "command": [
+      "nmap",
+      "-T4",
+      "-Pn",
+      "-p",
+      "1-65535",
+      "--open",
+      "rastede.de"
+    ],
+    "raw_output": "Starting Nmap 7.94SVN ( https://nmap.org ) at 2026-09-11 18:31 CEST\nNmap scan report for rastede.de (151.106.74.108)\nHost is up (0.014s latency).\nrDNS record for 151.106.74.108: vm110384.psmanaged.com\nNot shown: 65519 closed tcp ports (reset)\nPORT     STATE SERVICE\n21/tcp   open  ftp\n22/tcp   open  ssh\n25/tcp   open  smtp\n53/tcp   open  domain\n80/tcp   open  http\n106/tcp  open  pop3pw\n110/tcp  open  pop3\n143/tcp  open  imap\n443/tcp  open  https\n465/tcp  open  smtps\n993/tcp  open  imaps\n995/tcp  open  pop3s\n4190/tcp open  sieve\n5665/tcp open  unknown\n8443/tcp open  https-alt\n8880/tcp open  cddbp-alt\n\nNmap done: 1 IP address (1 host up) scanned in 7.77 seconds",
+    "raw_output_chars": 666,
+    "duration_s": 7.81,
+    "is_error": false,
+    "tool_name": "nmap",
+    "agent_params": null,
+    "phase": "blue"
+  },
+  {
+    "seq": 3,
+    "tool_bin": "nmap",
+    "command": [
+      "nmap",
+      "-T4",
+      "-Pn",
+      "-p",
+      "21,22,25,53,80,106,110,143,443,465,993,995,4190,5665,8443,8880",
+      "--open",
+      "-sV",
+      "--host-timeout",
+      "540s",
+      "rastede.de"
+    ],
+    "raw_output": "Starting Nmap 7.94SVN ( https://nmap.org ) at 2026-09-11 18:31 CEST\nNmap scan report for rastede.de (151.106.74.108)\nHost is up (0.013s latency).\nrDNS record for 151.106.74.108: vm110384.psmanaged.com\n\nPORT     STATE SERVICE       VERSION\n21/tcp   open  ftp           ProFTPD\n22/tcp   open  ssh           OpenSSH 9.6p1 Ubuntu 3ubuntu13.19 (Ubuntu Linux; protocol 2.0)\n25/tcp   open  smtp          Postfix smtpd\n53/tcp   open  domain        (unknown banner: none)\n80/tcp   open  http          Apache httpd\n106/tcp  open  tcpwrapped\n110/tcp  open  pop3          Dovecot pop3d\n143/tcp  open  imap          Dovecot imapd\n443/tcp  open  ssl/http      Apache httpd (PleskLin)\n465/tcp  open  ssl/smtp      Postfix smtpd\n993/tcp  open  ssl/imap      Dovecot imapd\n995/tcp  open  ssl/pop3      Dovecot pop3d\n4190/tcp open  sieve         Dovecot Pigeonhole sieve 1.0\n5665/tcp open  ssl/http      Icinga 2.14.6-1\n8443/tcp open  ssl/https-alt sw-cp-server\n8880/tcp open  cddbp-alt?\n3 services unrecognized despite returning data. If you know the service/version, please submit the following fingerprints at https://nmap.org/cgi-bin/submit.cgi?new-service :\n==============NEXT SERVICE FINGERPRINT (SUBMIT INDIVIDUALLY)==============\nSF-Port53-TCP:V=7.94SVN%I=7%D=9/11%Time=6AA42D03%P=x86_64-pc-linux-gnu%r(D\nSF:NSVersionBindReqTCP,31,\"\\0/\\0\\x06\\x85\\0\\0\\x01\\0\\x01\\0\\0\\0\\0\\x07version\\\nSF:x04bind\\0\\0\\x10\\0\\x03\\xc0\\x0c\\0\\x10\\0\\x03\\0\\0\\0\\0\\0\\x05\\x04none\");\n==============NEXT SERVICE FINGERPRINT (SUBMIT INDIVIDUALLY)==============\nSF-Port8443-TCP:V=7.94SVN%T=SSL%I=7%D=9/11%Time=6AA42D05%P=x86_64-pc-linux\nSF:-gnu%r(GetRequest,1EC,\"HTTP/1\\.1\\x20303\\x20See\\x20Other\\r\\nServer:\\x20s\nSF:w-cp-server\\r\\nDate:\\x20Fri,\\x2011\\x20Sep\\x202026\\x2016:32:05\\x20GMT\\r\\\nSF:nContent-Type:\\x20text/html;\\x20charset=UTF-8\\r\\nConnection:\\x20close\\r\nSF:\\nExpires:\\x20Fri,\\x2028\\x20May\\x201999\\x2000:00:00\\x20GMT\\r\\nLast-Modi\nSF:fied:\\x20Fri,\\x2011\\x20Sep\\x202026\\x2016:32:05\\x20GMT\\r\\nCache-Control:\nSF:\\x20no-store,\\x20no-cache,\\x20must-revalidate\\r\\nPragma:\\x20no-cache\\r\\\nSF:nP3P:\\x20CP=\\\"NON\\x20COR\\x20CURa\\x20ADMa\\x20OUR\\x20NOR\\x20UNI\\x20COM\\x2\nSF:0NAV\\x20STA\\\"\\r\\nX-Frame-Options:\\x20SAMEORIGIN\\r\\nX-XSS-Protection:\\x2\nSF:01;\\x20mode=block\\r\\nLocation:\\x20https://localhost:8443/login\\.php\\r\\n\nSF:X-Content-Type-Options:\\x20nosniff\\r\\n\\r\\n\")%r(HTTPOptions,494,\"HTTP/1\\\nSF:.1\\x20405\\x20Not\\x20Allowed\\r\\nServer:\\x20sw-cp-server\\r\\nDate:\\x20Fri,\nSF:\\x2011\\x20Sep\\x202026\\x2016:32:05\\x20GMT\\r\\nContent-Type:\\x20text/html\\\nSF:r\\nContent-Length:\\x20998\\r\\nConnection:\\x20close\\r\\nETag:\\x20\\\"6aa1b55\nSF:8-3e6\\\"\\r\\n\\r\\n<!DOCTYPE\\x20html>\\n<!--\\x20Copyright\\x201999-2026\\.\\x20\nSF:WebPros\\x20International\\x20GmbH\\.\\x20All\\x20rights\\x20reserved\\.\\x20--\nSF:>\\n<html\\x20lang=\\\"en\\\"\\x20dir=\\\"ltr\\\">\\n<head>\\n\\x20\\x20\\x20\\x20<meta\\\nSF:x20charset=\\\"utf-8\\\">\\n\\x20\\x20\\x20\\x20<meta\\x20name=\\\"viewport\\\"\\x20co\nSF:ntent=\\\"width=device-width,\\x20initial-scale=1,\\x20shrink-to-fit=no\\\">\\\nSF:n\\x20\\x20\\x20\\x20<title>405\\x20Method\\x20Not\\x20Allowed</title>\\n\\x20\\x\nSF:20\\x20\\x20<link\\x20rel=\\\"shortcut\\x20icon\\\"\\x20href=\\\"/favicon\\.ico\\\">\\\nSF:n\\x20\\x20\\x20\\x20<link\\x20rel=\\\"stylesheet\\\"\\x20href=\\\"/ui-library/ples\nSF:k-ui-library\\.css\\?3\\.46\\.4-d6f41ff193392975ea9a9498f07794c53cb8acf5\\\">\nSF:\\n\\x20\\x20\\x20\\x20<script\\x20src=\\\"/ui-library/plesk-ui-library\\.min\\.j\nSF:s\\?3\\.46\\.4-d6f41ff193392975ea9a9498f07794c53cb8acf5\\\"></script>\\n\\x20\\\nSF:x20\\x20\\x20<script\\x20src=\\\"/cp/javascript/vendors\\.js\\\"></script>\\n\\x2\nSF:0\\x20\\x20\\x20<script\\x20src=\\\"/cp/javascript/main\\.js\\\"></script>\\n\\x20\nSF:\\x20\\x20\\x20<script\\x20src=\\\"/error_docs/uat\\.js\\?v6\\\"></script>\\n<li\")\nSF:%r(FourOhFourRequest,48A,\"HTTP/1\\.1\\x20404\\x20Not\\x20Found\\r\\nServer:\\x\nSF:20sw-cp-server\\r\\nDate:\\x20Fri,\\x2011\\x20Sep\\x202026\\x2016:32:05\\x20GMT\nSF:\\r\\nContent-Type:\\x20text/html\\r\\nContent-Length:\\x20990\\r\\nConnection:\nSF:\\x20close\\r\\nETag:\\x20\\\"6aa1b558-3de\\\"\\r\\n\\r\\n<!DOCTYPE\\x20html>\\n<!--\\\nSF:x20Copyright\\x201999-2026\\.\\x20WebPros\\x20International\\x20GmbH\\.\\x20Al\nSF:l\\x20ri",
+    "raw_output_chars": 8681,
+    "duration_s": 21.34,
+    "is_error": false,
+    "tool_name": "nmap",
+    "agent_params": null,
+    "phase": "blue"
+  },
+  {
+    "seq": 9,
+    "tool_bin": "ddg_search",
+    "command": [
+      "ddg_search",
+      "rastede.de technology stack"
+    ],
+    "raw_output": "**Residenzort Rastede – Gemeinde und Tourismus im Ammerland**\nhttps://www.rastede.de/\nRastede – ein Residenzort. Wir freuen uns, Sie virtuell in der Gemeinde Rastede begrüßen zu können. Hier finden Sie alle Informationen zu den Themen Verwaltung, Kultur, Wirtschaft, Verkehr und Politik.\n\n**elements-show.de/rastede**\nhttps://www.elements-show.de/rastede\nElements.jpg Besuchen Sie uns in der Ausstellung Elements Rastede.\n\n**VfL Rastede**\nhttps://www.vfl-rastede.de/\n120 Handballer des VfL Rastede waren vom 19.Christine Aumann, die fleißigste Fahrerin des VfL Rastede, hat am 30. Juni stellvertretend die Urkunden von der Gemeinde überreicht bekommen.\n\n**FC Rastede**\nhttps://www.fc-rastede.de/\ninfo@fc-rastede.de. Startseite.Jahrhundert aus dem Fußball und ist somit dem FC Rastede verbunden. Die aufstrebende Sportart ist ab 2016 wieder olympisch und wird dem Rugby weiter Aufschwung verleihen.\n\n**Startseite Ihrer Raiffeisenbank Rastede eG - Raiffeisenbank Rastede eG**\nhttps://www.raiba-rastede.de/\nRaiffeisenbank Rastede eG lädt zum Jubiläums-Event: Raiba-Ellernlauf 2026.Crowdfunding führt Menschen zusammen, um Projektideen zu finanzieren. Lachende Kinder in Fußballtrikots. Sterne des Sports. Auszeichnung für gesellschaftliches Engagement in Sportvereinen.",
+    "raw_output_chars": 1266,
+    "duration_s": 1.73,
+    "is_error": false,
+    "tool_name": "ddg_search",
+    "agent_params": null,
+    "phase": "findings"
+  },
+  {
+    "seq": 10,
+    "tool_bin": "ddg_search",
+    "command": [
+      "ddg_search",
+      "rastede.de Apache"
+    ],
+    "raw_output": "**Rastede - Wikipedia**\nhttps://en.wikipedia.org/wiki/Rastede\nJune 26, 2026 - The aerospace machine manufacturer Broetje-Automation GmbH is based in Rastede. Customers include Airbus, Boeing, Bombardier, Embraer, Premium Aerotec, Mitsubishi and many other companies. ↑ \"Verzeichnis der direkt gewählten Bürgermeister/-innen und Landräte/Landrätinnen\".\n\n**Apache - Wikipedia**\nhttps://en.wikipedia.org/wiki/Apache\n2 weeks ago - Historically, the Apache homelands have consisted of high mountains, sheltered and watered valleys, deep canyons, deserts, and the southern Great Plains, including areas in what is now Eastern Arizona, Northern Mexico (Sonora and Chihuahua) and New Mexico, West Texas, and Southern Colo\n\n**Apache (disambiguation) - Wikipedia**\nhttps://en.wikipedia.org/wiki/Apache_(disambiguation)\nNovember 14, 2025 - Look up Apache or apache in Wiktionary, the free dictionary. The Apache are a group of culturally related Native American tribes. ... Apache (dance move) more commonly known as \"Texas Tommy\", a dance move used in Lindy Hop, West Coast Swing, and Salsa · \"Apache\" (instrumental), a\n\n**Apache HTTP Server - Wikipedia**\nhttps://en.wikipedia.org/wiki/Apache_HTTP_Server\n2 weeks ago - The Apache HTTP Server is a free and open-source cross-platform web server, released under the terms of Apache License 2.0. It is developed and maintained by a community of developers under the auspices of the Apache Software Foundation.\n\n**Apache 207 - Wikipedia**\nhttps://en.wikipedia.org/wiki/Apache_207\nJune 30, 2026 - On 23 August 2019, he released \"Roller\" which would debut at number two. In the following week, it reached number one on the chart. In Austria and Switzerland, the song peaked within the Top 10. His follow-up releases \"200 km/h\" and \"2002\" with Sido became Top 10 hits as well. He ach",
+    "raw_output_chars": 1816,
+    "duration_s": 1.49,
+    "is_error": false,
+    "tool_name": "ddg_search",
+    "agent_params": null,
+    "phase": "findings"
+  },
+  {
+    "seq": 11,
+    "tool_bin": "ddg_search",
+    "command": [
+      "ddg_search",
+      "rastede.de server version"
+    ],
+    "raw_output": "**Rastede – Wikipedia**\nhttps://de.wikipedia.org/wiki/Rastede\nSophienstraße 27 26180 Rastede. Website: www.rastede.de.Die Geschichte des Ortes Rastede beginnt im Hochmittelalter 1059 mit der Kirchengründung durch Graf Huno von Rustringen.\n\n**Residenzort Rastede – Gemeinde und Tourismus im Ammerland**\nhttps://www.rastede.de/\nRastede – ein Residenzort. Wir freuen uns, Sie virtuell in der Gemeinde Rastede begrüßen zu können. Hier finden Sie alle Informationen zu den Themen Verwaltung, Kultur, Wirtschaft, Verkehr und Politik.\n\n**VfL Rastede**\nhttps://www.vfl-rastede.de/\nChristine Aumann, die fleißigste Fahrerin des VfL Rastede, hat am 30. Juni stellvertretend die Urkunden von der Gemeinde überreicht bekommen.Infos gibt die Geschäftsstelle: info@vfl-rastede.de.\n\n**Ellernfest Rastede | 11. - 13. September 2026**\nhttps://ellernfest-rastede.de/\n48. Ellernfest Rastede auf dem Turnierplatz am Schloßpark mit tollem Programm für Jung und Alt. Disco, Live-Musik mit Stargästen, Ellernrede u.v.m.\n\n**Blood & Bones EU · The Isle Evrima, wähle deinen Server.**\nhttps://bloodandbones.eu/\nPvPvE + Voicechat · EU. Dashboard, Livemap, Marktplatz, Dinodex und mehr, alles an einem Ort.Wähle deinen ServerChoose your server. Wähle einen Server, um fortzufahren.Select a server to continue.",
+    "raw_output_chars": 1281,
+    "duration_s": 1.47,
+    "is_error": false,
+    "tool_name": "ddg_search",
+    "agent_params": null,
+    "phase": "findings"
+  },
+  {
+    "seq": 12,
+    "tool_bin": "nvd_cpe_lookup",
+    "command": [
+      "nvd_cpe_lookup",
+      "WordPress 6.6.7"
+    ],
+    "raw_output": "[NVD-CPE] CVEs für cpe:2.3:a:wordpress:wordpress (5 Top-Treffer nach CVSS):\n\nCVE-2017-16510 — CVSS 9.8 (CRITICAL)\n  Published: 2017-11-02\n  WordPress before 4.8.3 is affected by an issue where $wpdb->prepare() can create unexpected and unsafe queries leading to potential SQL injection (SQLi) in plugins and themes, as demonstrated by a \"do\n\nCVE-2018-20148 — CVSS 9.8 (CRITICAL)\n  Published: 2018-12-14\n  In WordPress before 4.9.9 and 5.x before 5.0.1, contributors could conduct PHP object injection attacks via crafted metadata in a wp.getMediaItem XMLRPC call. This is caused by mishandling of serializ\n\nCVE-2019-17669 — CVSS 9.8 (CRITICAL)\n  Published: 2019-10-17\n  WordPress before 5.2.4 has a Server Side Request Forgery (SSRF) vulnerability because URL validation does not consider the interpretation of a name as a series of hex characters.\n\nCVE-2019-17670 — CVSS 9.8 (CRITICAL)\n  Published: 2019-10-17\n  WordPress before 5.2.4 has a Server Side Request Forgery (SSRF) vulnerability because Windows paths are mishandled during certain validation of relative URLs.\n\nCVE-2019-20041 — CVSS 9.8 (CRITICAL)\n  Published: 2019-12-27\n  wp_kses_bad_protocol in wp-includes/kses.php in WordPress before 5.3.1 mishandles the HTML5 colon named entity, allowing attackers to bypass input sanitization, as demonstrated by the javascript&colon",
+    "raw_output_chars": 1336,
+    "duration_s": 7.48,
+    "is_error": false,
+    "tool_name": "nvd_cpe_lookup",
+    "agent_params": null,
+    "phase": "findings"
+  },
+  {
+    "seq": 13,
+    "tool_bin": "ddg_search",
+    "command": [
+      "ddg_search",
+      "Blue-Agent rastede.de scan"
+    ],
+    "raw_output": "**Scan GmbH in Rastede 26180 | Bahnhofstr. 12 | meinestadt.de**\nhttps://branchenbuch.meinestadt.de/rastede/company/501085585\nBahnhofstr. 12 26180 Rastede ... Adressdaten von: bedirect GmbH & Co. KG ... Scan GmbH Bahnhofstr.\n\n**Agent_Blue**\nhttps://www.chemie.de/lexikon/Agent_Blue.html\nAgent Blue Bei Agent Blue handelt es sich zu 65 % um die Substanz Dimethylarsinsäure (DMA) und, im geringen Anteil, um Natriumchlorid, Natriumthiosulfat und\n\n**AR vom Marktführer - SCANBLUE**\nhttps://scanblue.com/de/\nApril 17, 2023 - Zu jeder Anlage gehört ein iPad, das zur Steuerung des gesamten Systems dient. Auf diesem wird der Scan gestartet.\n\n**Reconnaissance Detection (Blue Team) - crowdstrike.com**\nhttps://www.crowdstrike.com/en-us/blog/reconnaissance-detection-blue-team/\nDecember 24, 2024 - Scanning activity witnessed in the prior red team post is not difficult to detect on its own. As an example, does this look like normal Googlebot activity? ... Even evasive probes can be identified via frequency analysis like monitoring for number of failures per IP address or st\n\n**Blue Agent App - Apps on Google Play**\nhttps://play.google.com/store/apps/details?id=com.opareta.cyadcongo\nBlue Agent App simplifies your mobile money agent business. Install Blue Agent App and log in with your shop agent line to digitize your agent interactions. Blue Agent App is powered by Opareta.",
+    "raw_output_chars": 1375,
+    "duration_s": 1.54,
+    "is_error": false,
+    "tool_name": "ddg_search",
+    "agent_params": null,
+    "phase": "findings"
+  },
+  {
+    "seq": 14,
+    "tool_bin": "ddg_search",
+    "command": [
+      "ddg_search",
+      "Blue-Agent scan rastede.de"
+    ],
+    "raw_output": "**Scan GmbH in Rastede 26180 | Bahnhofstr. 12 | meinestadt.de**\nhttps://branchenbuch.meinestadt.de/rastede/company/501085585\nBahnhofstr. 12 26180 Rastede ... Adressdaten von: bedirect GmbH & Co. KG ... Scan GmbH Bahnhofstr.\n\n**AR vom Marktführer - SCANBLUE**\nhttps://scanblue.com/de/\nApril 17, 2023 - Zu jeder Anlage gehört ein iPad, das zur Steuerung des gesamten Systems dient. Auf diesem wird der Scan gestartet.\n\n**Über uns ▷ SCANBLUE**\nhttps://scanblue.com/de/ueber-uns/\nSeptember 8, 2021 - Die Firmen der Scanblue-Gruppe stehen seit knapp zwei Jahrzehnten für Spitzentechnologie in den Bereichen Virtual Reality, Augmented Reality und 3D. So sind\n\n**GitHub - snyk/agent-scan: Security scanner for AI agents, MCP servers and agent skills. · GitHub**\nhttps://github.com/snyk/agent-scan\nMay 21, 2026 - When Agent Scan scans an MCP configuration file, it starts the stdio MCP servers by executing the commands and arguments specified in the config. This is necessary to retrieve tool descriptions and perform security analysis.\n\n**Agent Blue – chemie-schule.de**\nhttps://www.chemie-schule.de/KnowHow/Agent_Blue\nWir verwenden Cookies für grundlegende Funktionen, Statistik, Werbung, externe Medien (YouTube/Maps) und Google Fonts. Du kannst alle akzeptieren, nur notwendige oder Einstellungen wählen · Agent Blue ist der militärische Codename eines Entlaubungsmittels, das aus dem wässrigen Gemisch ...",
+    "raw_output_chars": 1403,
+    "duration_s": 1.12,
+    "is_error": false,
+    "tool_name": "ddg_search",
+    "agent_params": null,
+    "phase": "findings"
+  },
+  {
+    "seq": 15,
+    "tool_bin": "nvd_cpe_lookup",
+    "command": [
+      "nvd_cpe_lookup",
+      "Bootstrap 3.4.2"
+    ],
+    "raw_output": "[NVD-CPE] Keine CVEs für getbootstrap:bootstrap: No CVEs for CPE cpe:2.3:a:getbootstrap:bootstrap:3.4.2:*:*:*:*:*:*:*",
+    "raw_output_chars": 117,
+    "duration_s": 0.21,
+    "is_error": false,
+    "tool_name": "nvd_cpe_lookup",
+    "agent_params": null,
+    "phase": "findings"
+  },
+  {
+    "seq": 16,
+    "tool_bin": "ddg_search",
+    "command": [
+      "ddg_search",
+      "Blue-Agent rastede.de scan services"
+    ],
+    "raw_output": "**Scan GmbH in Rastede 26180 | Bahnhofstr. 12 | meinestadt.de**\nhttps://branchenbuch.meinestadt.de/rastede/company/501085585\nBahnhofstr. 12 26180 Rastede ... Adressdaten von: bedirect GmbH & Co. KG ... Scan GmbH Bahnhofstr.\n\n**AR from the Market Leader - SCANBLUE**\nhttps://scanblue.com/\nYou can do the digitalization at your premises with one of our systems – or as Scan-as-a-Service at our Scan Factories.\n\n**The Wiz Blue Agent, now Generally Available | Wiz Blog**\nhttps://www.wiz.io/blog/wiz-blue-agent-generally-available\nMarch 30, 2026 - Security Graph, code-to-cloud visibility, and runtime signals. To turn that into action, today we’re announcing the Wiz Blue Agent is now generally available for all Wiz Defend customers.\n\n**Blue Agent App - Apps on Google Play**\nhttps://play.google.com/store/apps/details?id=com.opareta.cyadcongo\nBlue Agent App simplifies your mobile money agent business. Install Blue Agent App and log in with your shop agent line to digitize your agent interactions. Blue Agent App is powered by Opareta.\n\n**GitHub - clemlesne/blue-agent: Deploy Azure Pipelines agent on Kubernetes. Easy way, cheap. Meet SLSA level 4. Windows and Linux. · GitHub**\nhttps://github.com/clemlesne/blue-agent\nWas previously known as Azure Pipelines Agent. Blue Agent is self-hosted agent in Kubernetes, cheap to run, secure, auto-scaled and easy to deploy.",
+    "raw_output_chars": 1368,
+    "duration_s": 1.89,
+    "is_error": false,
+    "tool_name": "ddg_search",
+    "agent_params": null,
+    "phase": "findings"
+  },
+  {
+    "seq": 17,
+    "tool_bin": "nvd_cpe_lookup",
+    "command": [
+      "nvd_cpe_lookup",
+      "jQuery 3.7.1"
+    ],
+    "raw_output": "[NVD-CPE] Keine CVEs für jquery:jquery: No CVEs for CPE cpe:2.3:a:jquery:jquery:3.7.1:*:*:*:*:*:*:*",
+    "raw_output_chars": 99,
+    "duration_s": 0.16,
+    "is_error": false,
+    "tool_name": "nvd_cpe_lookup",
+    "agent_params": null,
+    "phase": "findings"
+  },
+  {
+    "seq": 18,
+    "tool_bin": "nvd_cpe_lookup",
+    "command": [
+      "nvd_cpe_lookup",
+      "OpenSSL 3.0.13"
+    ],
+    "raw_output": "[NVD-CPE] CVEs für cpe:2.3:a:openssl:openssl:3.0.13 (5 Top-Treffer nach CVSS):\n\nCVE-2026-31789 — CVSS 9.8 (CRITICAL)\n  Published: 2026-04-07\n  Issue summary: Converting an excessively large OCTET STRING value to\na hexadecimal string leads to a heap buffer overflow on 32 bit platforms.\n\nImpact summary: A heap buffer overflow may lead to a cra\n\nCVE-2026-34182 — CVSS 9.1 (CRITICAL)\n  Published: 2026-06-09\n  Issue Summary: Cryptographic Message Services (CMS) processing fails to perform\nsufficient input validation on the cipher and tag length fields of\nAuthEnvelopedData containers, leading to various pote\n\nCVE-2025-15467 — CVSS 8.8 (HIGH)\n  Published: 2026-01-27\n  Issue summary: Parsing CMS AuthEnvelopedData or EnvelopedData message with\nmaliciously crafted AEAD parameters can trigger a stack buffer overflow.\n\nImpact summary: A stack buffer overflow may lead to\n\nCVE-2026-45447 — CVSS 8.8 (HIGH)\n  Published: 2026-06-09\n  Issue summary: A specially crafted PKCS#7 or S/MIME signed message could\ntrigger a use-after-free during PKCS#7 signature verification.\n\nImpact summary: A use-after-free may result in process crashes,\n\nCVE-2026-28387 — CVSS 8.1 (HIGH)\n  Published: 2026-04-07\n  Issue summary: An uncommon configuration of clients performing DANE TLSA-based\nserver authentication, when paired with uncommon server DANE TLSA records, may\nresult in a use-after-free and/or double-f",
+    "raw_output_chars": 1391,
+    "duration_s": 6.98,
+    "is_error": false,
+    "tool_name": "nvd_cpe_lookup",
+    "agent_params": null,
+    "phase": "findings"
+  },
+  {
+    "seq": 19,
+    "tool_bin": "nvd_cpe_lookup",
+    "command": [
+      "nvd_cpe_lookup",
+      "Apache httpd"
+    ],
+    "raw_output": "[NVD-CPE] CVEs für cpe:2.3:a:apache:http_server (5 Top-Treffer nach CVSS):\n\nCVE-2020-11984 — CVSS 9.8 (CRITICAL)\n  Published: 2020-08-07\n  Apache HTTP server 2.4.32 to 2.4.44 mod_proxy_uwsgi info disclosure and possible RCE\n\nCVE-2021-26691 — CVSS 9.8 (CRITICAL)\n  Published: 2021-06-10\n  In Apache HTTP Server versions 2.4.0 to 2.4.46 a specially crafted SessionHeader sent by an origin server could cause a heap overflow\n\nCVE-2021-39275 — CVSS 9.8 (CRITICAL)\n  Published: 2021-09-16\n  ap_escape_quotes() may write beyond the end of a buffer when given malicious input. No included modules pass untrusted data to these functions, but third-party / external modules may. This issue affec\n\nCVE-2021-41773 — CVSS 9.8 (CRITICAL)\n  Published: 2021-10-05\n  A flaw was found in a change made to path normalization in Apache HTTP Server 2.4.49. An attacker could use a path traversal attack to map URLs to files outside the directories configured by Alias-lik\n\nCVE-2021-42013 — CVSS 9.8 (CRITICAL)\n  Published: 2021-10-07\n  It was found that the fix for CVE-2021-41773 in Apache HTTP Server 2.4.50 was insufficient. An attacker could use a path traversal attack to map URLs to files outside the directories configured by Ali",
+    "raw_output_chars": 1216,
+    "duration_s": 7.72,
+    "is_error": false,
+    "tool_name": "nvd_cpe_lookup",
+    "agent_params": null,
+    "phase": "findings"
+  },
+  {
+    "seq": 20,
+    "tool_bin": "searchsploit",
+    "command": [
+      "/usr/local/bin/searchsploit",
+      "--json",
+      "Apache"
+    ],
+    "raw_output": "{\n\t\"SEARCH\": \"Apache\",\n\t\"DB_PATH_EXPLOIT\": \"/opt/exploitdb\",\n\t\"RESULTS_EXPLOIT\": [\n\t\t{\"Title\":\"ActiveMQ < 5.14.0 - Web Shell Upload (Metasploit)\",\"EDB-ID\":\"42283\",\"Date_Published\":\"2017-06-29\",\"Date_Added\":\"2017-06-29\",\"Date_Updated\":\"2017-06-30\",\"Author\":\"Metasploit\",\"Type\":\"remote\",\"Platform\":\"java\",\"Port\":\"\",\"Verified\":\"1\",\"Codes\":\"CVE-2016-3088\",\"Tags\":\"\",\"Aliases\":\"\",\"Screenshot\":\"\",\"Application\":\"http://www.exploit-db.comapache-activemq-5.11.1-bin.zip\",\"Source\":\"https://github.com/rapid7/metasploit-framework/blob/43d8c4c5e7450d46eba2f18e6e0b6ba70c6dc671/modules/exploits/multi/http/apache_activemq_upload_jsp.rb\",\"Path\":\"/opt/exploitdb/exploits/java/remote/42283.rb\"},\n\t\t{\"Title\":\"Apache 0.8.x/1.0.x / NCSA HTTPd 1.x - 'test-cgi' Directory Listing\",\"EDB-ID\":\"20435\",\"Date_Published\":\"1996-04-01\",\"Date_Added\":\"1996-04-01\",\"Date_Updated\":\"2012-08-11\",\"Author\":\"@stake\",\"Type\":\"remote\",\"Platform\":\"cgi\",\"Port\":\"\",\"Verified\":\"1\",\"Codes\":\"CVE-1999-0070;OSVDB-55371\",\"Tags\":\"\",\"Aliases\":\"\",\"Screenshot\":\"\",\"Application\":\"\",\"Source\":\"https://www.securityfocus.com/bid/2003/info\",\"Path\":\"/opt/exploitdb/exploits/cgi/remote/20435.txt\"},\n\t\t{\"Title\":\"Apache 1.0/1.2/1.3 - Server Address Disclosure\",\"EDB-ID\":\"21067\",\"Date_Published\":\"2001-08-21\",\"Date_Added\":\"2001-08-21\",\"Date_Updated\":\"2012-09-04\",\"Author\":\"magnum\",\"Type\":\"remote\",\"Platform\":\"multiple\",\"Port\":\"\",\"Verified\":\"1\",\"Codes\":\"OSVDB-86902\",\"Tags\":\"\",\"Aliases\":\"\",\"Screenshot\":\"\",\"Application\":\"\",\"Source\":\"https://www.securityfocus.com/bid/3169/info\",\"Path\":\"/opt/exploitdb/exploits/multiple/remote/21067.c\"},\n\t\t{\"Title\":\"Apache 1.1 / NCSA HTTPd 1.5.2 / Netscape Server 1.12/1.1/2.0 - a nph-test-cgi\",\"EDB-ID\":\"19536\",\"Date_Published\":\"1996-12-10\",\"Date_Added\":\"1996-12-10\",\"Date_Updated\":\"2012-07-02\",\"Author\":\"Josh Richards\",\"Type\":\"dos\",\"Platform\":\"multiple\",\"Port\":\"\",\"Verified\":\"1\",\"Codes\":\"CVE-1999-0045;OSVDB-128\",\"Tags\":\"\",\"Aliases\":\"\",\"Screenshot\":\"\",\"Application\":\"\",\"Source\":\"https://www.securityfocus.com/bid/686/info\",\"Path\":\"/opt/exploitdb/exploits/multiple/dos/19536.txt\"},\n\t\t{\"Title\":\"Apache 1.2.5/1.3.1 / UnityMail 2.0 - MIME Header Denial of Service\",\"EDB-ID\":\"20272\",\"Date_Published\":\"1998-08-02\",\"Date_Added\":\"1998-08-02\",\"Date_Updated\":\"2012-08-05\",\"Author\":\"L.Facq\",\"Type\":\"dos\",\"Platform\":\"windows\",\"Port\":\"\",\"Verified\":\"1\",\"Codes\":\"CVE-1999-0926;OSVDB-9706;CVE-1999-0925;OSVDB-88225\",\"Tags\":\"\",\"Aliases\":\"\",\"Screenshot\":\"\",\"Application\":\"\",\"Source\":\"https://www.securityfocus.com/bid/1760/info\",\"Path\":\"/opt/exploitdb/exploits/windows/dos/20272.pl\"},\n\t\t{\"Title\":\"Apache 1.2 - Denial of Service\",\"EDB-ID\":\"20558\",\"Date_Published\":\"1997-12-30\",\"Date_Added\":\"1998-01-06\",\"Date_Updated\":\"2012-08-27\",\"Author\":\"Michal Zalewski\",\"Type\":\"dos\",\"Platform\":\"multiple\",\"Port\":\"\",\"Verified\":\"1\",\"Codes\":\"CVE-1999-0107;OSVDB-5821\",\"Tags\":\"\",\"Aliases\":\"\",\"Screenshot\":\"\",\"Application\":\"\",\"Source\":\"https://www.securityfocus.com/bid/2216/info\",\"Path\":\"/opt/exploitdb/exploits/multiple/dos/20558.txt\"},\n\t\t{\"Title\":\"Apache 1.3.12 - WebDAV Directory Listings\",\"EDB-ID\":\"20210\",\"Date_Published\":\"2000-09-07\",\"Date_Added\":\"2000-09-07\",\"Date_Updated\":\"2012-08-03\",\"Author\":\"Mnemonix\",\"Type\":\"remote\",\"Platform\":\"linux\",\"Port\":\"\",\"Verified\":\"1\",\"Codes\":\"CVE-2000-0869;OSVDB-404\",\"Tags\":\"\",\"Aliases\":\"\",\"Screenshot\":\"\",\"Application\":\"\",\"Source\":\"https://www.securityfocus.com/bid/1656/info\",\"Path\":\"/opt/exploitdb/exploits/linux/remote/20210.txt\"},\n\t\t{\"Title\":\"Apache 1.3.14 - Mac File Protection Bypass\",\"EDB-ID\":\"20911\",\"Date_Published\":\"2001-06-10\",\"Date_Added\":\"2001-06-10\",\"Date_Updated\":\"2012-08-29\",\"Author\":\"Stefan Arentz\",\"Type\":\"remote\",\"Platform\":\"osx\",\"Port\":\"\",\"Verified\":\"1\",\"Codes\":\"CVE-2001-0766;OSVDB-7039\",\"Tags\":\"\",\"Aliases\":\"\",\"Screenshot\":\"\",\"Application\":\"\",\"Source\":\"https://www.securityfocus.com/bid/2852/info\",\"Path\":\"/opt/exploitdb/exploits/osx/remote/20911.txt\"},\n\t\t{\"Title\":\"Apache 1.3.20 (Win32) - 'PHP.exe' Remote File Disclosure\",\"EDB-ID\":\"21204\",\"Date_Published\":\"2002-01-04\",\"Date_Added\":\"2002-01-04\",",
+    "raw_output_chars": 141307,
+    "duration_s": 0.59,
+    "is_error": false,
+    "tool_name": "searchsploit",
+    "agent_params": null,
+    "phase": "red"
+  }
+]

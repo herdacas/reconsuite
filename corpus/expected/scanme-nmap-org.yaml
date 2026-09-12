@@ -1,0 +1,23 @@
+# SCHREIBGESCHÜTZT (VALIDATION_SPEC.md Regel 2) — nach dem Schreiben NICHT mehr
+# ändern um einen Test grün zu bekommen. Bei Zweifel -> disputed_expectations.md.
+#
+# Quelle: CLAUDE.md, Abschnitt "Ground-Truth-Verifikation mit VulHub-Containern
+# (2026-06-18)" — bereits gegen NVD verifizierte, dokumentierte Fakten aus einem
+# früheren Scan dieses Ziels (nicht aus diesem Lauf neu behauptet).
+target: scanme.nmap.org
+category: external_readonly
+known_services:
+  - product: OpenSSH
+    version: "6.6.1p1"
+    confidence: CONTROLLED   # historisch per Banner + NVD-Version-Gate verifiziert
+  - product: Apache httpd
+    version: "2.4.7"
+    confidence: CONTROLLED
+must_find_cves:
+  - CVE-2018-15473   # User-Enum, OpenSSH <7.7 — CVSS bestätigt, versions-passend
+allow_cves:
+  - CVE-2016-10009   # Privesc, OpenSSH <7.4 — historisch mitgefunden, versions-passend
+  - CVE-2016-10010
+notes: >
+  Kein TN-Ziel — scanme.nmap.org ist real verwundbar (altes Ubuntu/2014-Stack).
+  "must_find_cves" sind Mindesterwartung, keine Obergrenze.

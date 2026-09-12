@@ -1,0 +1,347 @@
+[
+  {
+    "seq": 5,
+    "tool_bin": "nmap",
+    "command": [
+      "nmap",
+      "-T4",
+      "-Pn",
+      "-p",
+      "1-65535",
+      "--open",
+      "westerstede.de"
+    ],
+    "raw_output": "Starting Nmap 7.94SVN ( https://nmap.org ) at 2026-09-12 02:24 CEST\nNmap done: 1 IP address (1 host up) scanned in 424.63 seconds",
+    "raw_output_chars": 129,
+    "duration_s": 424.66,
+    "is_error": false,
+    "tool_name": "nmap",
+    "agent_params": null,
+    "phase": "blue"
+  },
+  {
+    "seq": 6,
+    "tool_bin": "nmap",
+    "command": [
+      "nmap",
+      "-T4",
+      "-Pn",
+      "-p",
+      "1-65535",
+      "--open",
+      "-n",
+      "--host-timeout",
+      "300s",
+      "mail2.westerstede.de"
+    ],
+    "raw_output": "Starting Nmap 7.94SVN ( https://nmap.org ) at 2026-09-12 02:32 CEST\nNmap scan report for mail2.westerstede.de (80.228.77.170)\nHost is up (0.023s latency).\nNot shown: 65527 filtered tcp ports (no-response), 1 closed tcp port (reset)\nSome closed ports may be reported as filtered due to --defeat-rst-ratelimit\nPORT     STATE SERVICE\n25/tcp   open  smtp\n80/tcp   open  http\n443/tcp  open  https\n587/tcp  open  submission\n993/tcp  open  imaps\n3400/tcp open  csms2\n8443/tcp open  https-alt\n\nNmap done: 1 IP address (1 host up) scanned in 88.31 seconds",
+    "raw_output_chars": 546,
+    "duration_s": 88.34,
+    "is_error": false,
+    "tool_name": "nmap",
+    "agent_params": null,
+    "phase": "blue"
+  },
+  {
+    "seq": 7,
+    "tool_bin": "nmap",
+    "command": [
+      "nmap",
+      "-T4",
+      "-Pn",
+      "-sV",
+      "--host-timeout",
+      "540s",
+      "-p",
+      "25,80,443,587,993,3400,8443",
+      "--open",
+      "mail2.westerstede.de"
+    ],
+    "raw_output": "Starting Nmap 7.94SVN ( https://nmap.org ) at 2026-09-12 02:34 CEST\nNmap scan report for mail2.westerstede.de (80.228.77.170)\nHost is up (0.020s latency).\n\nPORT     STATE SERVICE    VERSION\n25/tcp   open  smtp       hMailServer smtpd\n80/tcp   open  http       Apache httpd\n443/tcp  open  ssl/http   Apache httpd\n587/tcp  open  smtp       hMailServer smtpd\n993/tcp  open  ssl/imap   hMailServer imapd\n3400/tcp open  ssl/csms2?\n8443/tcp open  https-alt?\nService Info: Host: mail5.westerstede.de; OS: Windows; CPE: cpe:/o:microsoft:windows\n\nService detection performed. Please report any incorrect results at https://nmap.org/submit/ .\nNmap done: 1 IP address (1 host up) scanned in 34.59 seconds",
+    "raw_output_chars": 693,
+    "duration_s": 34.63,
+    "is_error": false,
+    "tool_name": "nmap",
+    "agent_params": null,
+    "phase": "blue"
+  },
+  {
+    "seq": 8,
+    "tool_bin": "nmap",
+    "command": [
+      "nmap",
+      "-T4",
+      "-Pn",
+      "-p",
+      "1-65535",
+      "--open",
+      "mail3.westerstede.de"
+    ],
+    "raw_output": "Starting Nmap 7.94SVN ( https://nmap.org ) at 2026-09-12 02:35 CEST\nNmap scan report for mail3.westerstede.de (80.228.77.170)\nHost is up (0.022s latency).\nrDNS record for 80.228.77.170: mail2.westerstede.de\nNot shown: 65527 filtered tcp ports (no-response), 1 closed tcp port (reset)\nSome closed ports may be reported as filtered due to --defeat-rst-ratelimit\nPORT     STATE SERVICE\n25/tcp   open  smtp\n80/tcp   open  http\n443/tcp  open  https\n587/tcp  open  submission\n993/tcp  open  imaps\n3400/tcp open  csms2\n8443/tcp open  https-alt\n\nNmap done: 1 IP address (1 host up) scanned in 88.27 seconds",
+    "raw_output_chars": 598,
+    "duration_s": 88.3,
+    "is_error": false,
+    "tool_name": "nmap",
+    "agent_params": null,
+    "phase": "blue"
+  },
+  {
+    "seq": 9,
+    "tool_bin": "nmap",
+    "command": [
+      "nmap",
+      "-T4",
+      "-Pn",
+      "-p",
+      "1-65535",
+      "--open",
+      "-n",
+      "--host-timeout",
+      "300s",
+      "mail5.westerstede.de"
+    ],
+    "raw_output": "Starting Nmap 7.94SVN ( https://nmap.org ) at 2026-09-12 02:37 CEST\nNmap scan report for mail5.westerstede.de (80.228.77.170)\nHost is up (0.021s latency).\nNot shown: 65527 filtered tcp ports (no-response), 1 closed tcp port (reset)\nSome closed ports may be reported as filtered due to --defeat-rst-ratelimit\nPORT     STATE SERVICE\n25/tcp   open  smtp\n80/tcp   open  http\n443/tcp  open  https\n587/tcp  open  submission\n993/tcp  open  imaps\n3400/tcp open  csms2\n8443/tcp open  https-alt\n\nNmap done: 1 IP address (1 host up) scanned in 88.31 seconds",
+    "raw_output_chars": 546,
+    "duration_s": 88.34,
+    "is_error": false,
+    "tool_name": "nmap",
+    "agent_params": null,
+    "phase": "blue"
+  },
+  {
+    "seq": 10,
+    "tool_bin": "nmap",
+    "command": [
+      "nmap",
+      "-T4",
+      "-Pn",
+      "-sV",
+      "--host-timeout",
+      "540s",
+      "-p",
+      "25,80,443,587,993,3400,8443",
+      "--open",
+      "mail5.westerstede.de"
+    ],
+    "raw_output": "Starting Nmap 7.94SVN ( https://nmap.org ) at 2026-09-12 02:38 CEST\nNmap scan report for mail5.westerstede.de (80.228.77.170)\nHost is up (0.021s latency).\nrDNS record for 80.228.77.170: mail2.westerstede.de\n\nPORT     STATE SERVICE    VERSION\n25/tcp   open  smtp       hMailServer smtpd\n80/tcp   open  http       Apache httpd\n443/tcp  open  ssl/http   Apache httpd\n587/tcp  open  smtp       hMailServer smtpd\n993/tcp  open  ssl/imap   hMailServer imapd\n3400/tcp open  ssl/csms2?\n8443/tcp open  https-alt?\nService Info: Host: mail5.westerstede.de; OS: Windows; CPE: cpe:/o:microsoft:windows\n\nService detection performed. Please report any incorrect results at https://nmap.org/submit/ .\nNmap done: 1 IP address (1 host up) scanned in 34.07 seconds",
+    "raw_output_chars": 745,
+    "duration_s": 34.11,
+    "is_error": false,
+    "tool_name": "nmap",
+    "agent_params": null,
+    "phase": "blue"
+  },
+  {
+    "seq": 14,
+    "tool_bin": "ddg_search",
+    "command": [
+      "ddg_search",
+      "westerstede.de Apache"
+    ],
+    "raw_output": "**Westerstede - Wikipedia**\nhttps://en.wikipedia.org/wiki/Westerstede\nJune 20, 2026 - The current mayor of Westerstede is Michael Rösner (UWG), who has been in office since 2019. ... Eilhardus Lubinus (1565–1621), professor of poetics, theology, mathematics, geography, and Rector of the University of Rostock · Bruno Steinhoff (born 1937), billionaire businessman, foun\n\n**Startseite | Stadt Westerstede**\nhttps://www.westerstede.de/\nStadt Westerstede · Suchen · Hauptnavigation · Navigation schließen · Startseite · Rathaus · Politik · Bürgermeister · Leitbild · Ratsinformationssystem\n\n**Dörfer und Ortschaften | Stadt Westerstede**\nhttps://www.westerstede.de/portal/seiten/doerfer-und-ortschaften-900000012-37280.html\nDas Stadtgebiet Westerstede umfasst ... Stellhorn, Südholt, Tarbarg, Torsholt, Voßbarg, Westerloy, Westerloyerfeld, Westerstede, Westerstederfeld · In unmittelbarer Nähe der Kreisstadt Westerstede liegt das historische Dorf Burgforde....\n\n**Stadt Westerstede**\nhttps://www.ammerland.de/Service/Von-A-Z/Beschäftigte-Telefonverzeichnis/Stadt-Westerstede.php?ModID=9&FID=2843.607.1&La=1&object=tx|2843.1.1&redir=1\n04488 55-0 04488 55-302 E-Mail www.westerstede.de · Nachricht schreiben Karte anzeigen Adresse exportieren · Stadt Westerstede ·\n\n**Westerstede Touristik**\nhttps://www.westerstede-touristik.de/\nWer Radfahren und Wandern in wunderschöner Natur liebt, wird Westerstede mögen. Umgeben von farbenprächtigen Gärten und grünen Parks in der einzigartigen Kulturlandschaft des Landkreises Ammerland, zieht die liebenswerte Stadt im Nordwesten Niedersachsens jedes Jahr unzählige Besucher an.",
+    "raw_output_chars": 1616,
+    "duration_s": 1.37,
+    "is_error": false,
+    "tool_name": "ddg_search",
+    "agent_params": null,
+    "phase": "findings"
+  },
+  {
+    "seq": 15,
+    "tool_bin": "ddg_search",
+    "command": [
+      "ddg_search",
+      "westerstede.de server version"
+    ],
+    "raw_output": "**Westerstede - Wikipedia**\nhttps://de.wikipedia.org/wiki/Westerstede\nWesterstede grenzt - im Uhrzeigersinn von Norden - an die Gemeinden Zetel und Bockhorn im Landkreis Friesland, die Gemeinden Wiefelstede, Bad Zwischenahn, Edewecht und Apen (alle Landkreis Ammerland) und die Gemeinden Detern und Uplengen im Landkreis Leer.\n\n**SSL Server Test: ris.westerstede.de (Powered by Qualys SSL Labs)**\nhttps://www.ssllabs.com/ssltest//analyze.html?d=ris.westerstede.de\nYou are here: Home > Projects > SSL Server Test > ris.westerstede.de SSL Report: ris.westerstede.de (80.228.77.170) Assessed on: Wed, 03 Dec 2025 22:23:21 UTC | Clear cache Scan Another »\n\n**Startseite | Stadt Westerstede**\nhttps://www.westerstede.de/\nStadt Westerstede Am Markt 2 26655 Westerstede T. 04488 55-0 F. 04488 55-55 Kontakt Impressum Sitemap Öffnungszeiten Online Service Startseite Webcam Ratsinformationssystem Datenschutz Barrierefreiheit Folgen Sie uns:\n\n**Is Westerstede.de down? Live status and problems past 24 hours**\nhttps://downforeveryoneorjustme.com/westerstede.de\nLive problems for Westerstede.de. Error received? Down? Slow? Check what is going on.\n\n**Web Server Test: HTTP & HTTP/2 Online Tool (IPv4/IPv6)**\nhttps://servertest.online/\nModern web servers support multiple protocol versions. HTTP/1.1 establishes a standard text-based connection, while HTTP/2 introduces binary framing and multiplexing, allowing multiple concurrent streams over a single TCP connection to significantly reduce latency.",
+    "raw_output_chars": 1491,
+    "duration_s": 1.2,
+    "is_error": false,
+    "tool_name": "ddg_search",
+    "agent_params": null,
+    "phase": "findings"
+  },
+  {
+    "seq": 16,
+    "tool_bin": "ddg_search",
+    "command": [
+      "ddg_search",
+      "westerstede.de Apache version"
+    ],
+    "raw_output": "**Westerstede – Wikipedia**\nhttps://de.wikipedia.org/wiki/Westerstede\nAm Markt 2 26655 Westerstede. Website: www.westerstede.de. Bürgermeister1876 wurde der Ort mit der Eröffnung der Schmalspurbahn nach Ocholt an das Eisenbahnnetz angeschlossen. Weiterhin befindet sich in Westerstede der einzige Jüdische Friedhof des Ammerlandes.\n\n**pcs-westerstede.de**\nhttps://www.pcs-westerstede.de/\nlanguage www.pcs-westerstede.de.\n\n**Apache2 Debian Default Page: It works**\nhttps://deula-westerstede.de/\nDebian's Apache2 default configuration is different from the upstream default configuration, and split into several files optimized for interaction with Debian tools. The configuration system is fully documented in /usr/share/doc/apache2/README.Debian.gz.\n\n**Stadtplan Westerstede und Umgebung | Stadtkarte & Straßenkarte**\nhttps://www.meinestadt.de/westerstede/stadtplan\nMit dem Stadtplan von Westerstede die nächste Route Sehenswürdigkeit oder Restaurant entdecken. Du bist auf der Suche nach deinem Traumjob in Westerstede? Finde passende Angebote im Stellenmarkt auf meinestadt.de.\n\n**Top-Kampfhubschrauber Apache: So wird der AH-64 noch besser**\nhttps://www.flugrevue.de/kult-kampfhubschrauber-ah-64-wie-boeing-die-zukunft-des-apache-plant-v2/\nDer legendäre Apache, einst von der Firma Hughes entwickelt und seit 1975 flügge, steht vor einer reichhaltigen Zukunft. Nur wenige Monate ist es her, dass die US Army Boeing mit einem Vertrag für 184 Apache der gängigen Version AH-64E beglückte.",
+    "raw_output_chars": 1489,
+    "duration_s": 0.95,
+    "is_error": false,
+    "tool_name": "ddg_search",
+    "agent_params": null,
+    "phase": "findings"
+  },
+  {
+    "seq": 17,
+    "tool_bin": "ddg_search",
+    "command": [
+      "ddg_search",
+      "whatweb westerstede.de"
+    ],
+    "raw_output": "**Unsere Stadt - Westerstede**\nhttps://www.westerstede.de/standort/unsere-stadt/\nUnsere Stadt Westerstede auf einen Blick Rathäuser Dörfer & Ortschaften Infobroschüre Westerstede\n\n**Webcam vom Westersteder Rathaus | Stadt Westerstede**\nhttps://www.westerstede.de/portal/seiten/webcam-vom-westersteder-rathaus-900000106-37280.html\nWebcam vom Westersteder Rathaus Blick über den Alten Markt vom Rathaus Eine weitere Webcam ist am Kirchturm montiert.\n\n**Westerstede - Webcam Galore**\nhttps://www.webcamgalore.com/webcam/Germany/Westerstede/36323.html\nDec 20, 2023 · Alter Markt: Webcam (with image archive and timelapse) in Westerstede, Germany. Check yourself what's up in Westerstede right now!\n\n**Rathaus | Stadt Westerstede**\nhttps://www.westerstede.de/rathaus/\nStadt Westerstede Am Markt 2 26655 Westerstede T. 04488 55-0 F. 04488 55-55 Kontakt Impressum Sitemap Öffnungszeiten Online Service Startseite Webcam Ratsinformationssystem Datenschutz Barrierefreiheit Folgen Sie uns:\n\n**Startseite | Stadt Westerstede**\nhttps://www.westerstede.de/\nStartschuss für den Herbstferienpass 2026 in We... Bild „Ameri“ findet dauerhaft Platz im Westerst... Restaurierte Klinkerstraße zwischen Linswege un... Noch zwei Wochen Stadtstrand-Feeling in Westers... Was erledige ich wo?",
+    "raw_output_chars": 1269,
+    "duration_s": 1.48,
+    "is_error": false,
+    "tool_name": "ddg_search",
+    "agent_params": null,
+    "phase": "findings"
+  },
+  {
+    "seq": 18,
+    "tool_bin": "ddg_search",
+    "command": [
+      "ddg_search",
+      "whatweb westerstede.de output"
+    ],
+    "raw_output": "**GitHub - urbanadventurer/WhatWeb: Next generation web scanner · GitHub**\nhttps://github.com/urbanadventurer/WhatWeb\nThe WordPress WhatWeb plugin has over 15 tests, which include checking the favicon, default installation files, login pages, and checking for \"/wp-content/\" within relative links. ... Performance tuning. Control how many websites to scan concurrently with automatic output optimization.\n\n**whatweb | Kali Linux Tools**\nhttps://www.kali.org/tools/whatweb/\nMay 25, 2026 - Default: whatweb --log-elastic-host Host:port of the elastic http interface. Default: 127.0.0.1:9200 PERFORMANCE & STABILITY: --max-threads, -t Number of simultaneous threads. Default: 25. --open-timeout Time in seconds. Default: 15. --read-timeout Time in seconds. Default: 30. --wait\n\n**Startseite | Stadt Westerstede**\nhttps://www.westerstede.de/\nStadt Westerstede · Suchen · Hauptnavigation · Navigation schließen · Startseite · Rathaus · Politik · Bürgermeister · Leitbild · Ratsinformationssystem\n\n**WhatWeb — Next generation web scanner**\nhttps://whatweb.net/\nWhatWeb online scan. Identify CMS, analytics, JS libraries, web servers and more.\n\n**WhatWeb & Wappalyzer Online Website Recon | HackerTarget.com**\nhttps://hackertarget.com/whatweb-scan/\nMarch 13, 2026 - When you visit a web address in your browser the raw source has many unseen pointers about the server and software that is running on the web site. WhatWeb parses this code and identifies known technologies.",
+    "raw_output_chars": 1466,
+    "duration_s": 1.11,
+    "is_error": false,
+    "tool_name": "ddg_search",
+    "agent_params": null,
+    "phase": "findings"
+  },
+  {
+    "seq": 19,
+    "tool_bin": "nvd_cpe_lookup",
+    "command": [
+      "nvd_cpe_lookup",
+      "Apache HTTP Server"
+    ],
+    "raw_output": "[NVD-CPE] CVEs für cpe:2.3:a:apache:http_server (10 Top-Treffer nach CVSS):\n\nCVE-2020-11984 — CVSS 9.8 (CRITICAL)\n  Published: 2020-08-07\n  Apache HTTP server 2.4.32 to 2.4.44 mod_proxy_uwsgi info disclosure and possible RCE\n\nCVE-2021-26691 — CVSS 9.8 (CRITICAL)\n  Published: 2021-06-10\n  In Apache HTTP Server versions 2.4.0 to 2.4.46 a specially crafted SessionHeader sent by an origin server could cause a heap overflow\n\nCVE-2021-39275 — CVSS 9.8 (CRITICAL)\n  Published: 2021-09-16\n  ap_escape_quotes() may write beyond the end of a buffer when given malicious input. No included modules pass untrusted data to these functions, but third-party / external modules may. This issue affec\n\nCVE-2021-41773 — CVSS 9.8 (CRITICAL)\n  Published: 2021-10-05\n  A flaw was found in a change made to path normalization in Apache HTTP Server 2.4.49. An attacker could use a path traversal attack to map URLs to files outside the directories configured by Alias-lik\n\nCVE-2021-42013 — CVSS 9.8 (CRITICAL)\n  Published: 2021-10-07\n  It was found that the fix for CVE-2021-41773 in Apache HTTP Server 2.4.50 was insufficient. An attacker could use a path traversal attack to map URLs to files outside the directories configured by Ali\n\nCVE-2021-44790 — CVSS 9.8 (CRITICAL)\n  Published: 2021-12-20\n  A carefully crafted request body can cause a buffer overflow in the mod_lua multipart parser (r:parsebody() called from Lua scripts). The Apache httpd team is not aware of an exploit for the vulnerabi\n\nCVE-2022-22720 — CVSS 9.8 (CRITICAL)\n  Published: 2022-03-14\n  Apache HTTP Server 2.4.52 and earlier fails to close inbound connection when errors are encountered discarding the request body, exposing the server to HTTP Request Smuggling\n\nCVE-2022-23943 — CVSS 9.8 (CRITICAL)\n  Published: 2022-03-14\n  Out-of-bounds Write vulnerability in mod_sed of Apache HTTP Server allows an attacker to overwrite heap memory with possibly attacker provided data. This issue affects Apache HTTP Server 2.4 version 2\n\nCVE-2022-31813 — CVSS 9.8 (CRITICAL)\n  Published: 2022-06-09\n  Apache HTTP Server 2.4.53 and earlier may not send the X-Forwarded-* headers to the origin server based on client side Connection header hop-by-hop mechanism. This may be used to bypass IP based authe\n\nCVE-2023-25690 — CVSS 9.8 (CRITICAL)\n  Published: 2023-03-07\n  Some mod_proxy configurations on Apache HTTP Server versions 2.4.0 through 2.4.55 allow a HTTP Request Smuggling attack.\n\n\n\n\nConfigurations are affected when mod_proxy is enabled along with some form ",
+    "raw_output_chars": 2516,
+    "duration_s": 7.39,
+    "is_error": false,
+    "tool_name": "nvd_cpe_lookup",
+    "agent_params": null,
+    "phase": "findings"
+  },
+  {
+    "seq": 20,
+    "tool_bin": "ddg_search",
+    "command": [
+      "ddg_search",
+      "site:westerstede.de Apache version"
+    ],
+    "raw_output": "**Ausschüsse - Westerstede**\nhttps://ris.westerstede.de/bi/au010.asp\nALLRIS net Version 3.9.5 (221117m)\n\n**Vorlagen - Rat der Stadt Westerstede**\nhttps://ris.westerstede.de/bi/vo010.asp\nALLRIS net Version 3.9.5 (221117m)\n\n**NH-Elternportal - Westerstede**\nhttps://kita.westerstede.de/nh-elternportal/\nThe NH-Elternportal in Westerstede provides a platform for parents to manage childcare registrations and related services efficiently.\n\n**Pressespiegel | Stadt Westerstede**\nhttps://www.westerstede.de/rathaus/aktuelles/pressespiegel?p0=1&naviID=900000180&brotID=900000180&bereich=3&no_container_bilder=0&typ=1&site=16&id=0&owner=37280&webcode_id=0&navi_typ=1\nNiedersachsen - hier läuft's gut: Freiwillige retten die Mobilität in Westerstede mit Busfahrten und einem Service, der im Rest des Landes ausstirbt weiterlesen\n\n**www.westerstede.de**\nhttps://www.westerstede.de/veranstaltungen/veranstaltung/musikalische-frueherziehung-in-kooperation-mit-der-kreismusikschule-ammerland-e-v--901266249-37280.ical\nBEGIN:VCALENDAR PRODID:-//NOLIS GmbH//NOLIS-Manager Kalender V3.5//DE VERSION:2.0 METHOD:PUBLISH LAST-MODIFIED:20260902T091234Z NAME:Kalender X-WR-CALNAME:Kalender X-WR-TIMEZONE:UTC TZID:UTC X-VCALENDAR-VERSION:3.5 X-MS-OLK-FORCEINSPECTOROPEN:TRUE BEGIN:VEVENT DTSTART:20260924T123000Z SUMMARY:Musika",
+    "raw_output_chars": 1306,
+    "duration_s": 1.4,
+    "is_error": false,
+    "tool_name": "ddg_search",
+    "agent_params": null,
+    "phase": "findings"
+  },
+  {
+    "seq": 21,
+    "tool_bin": "ddg_search",
+    "command": [
+      "ddg_search",
+      "westerstede.de hMailServer version"
+    ],
+    "raw_output": "**hMailServer - Wikipedia**\nhttps://de.wikipedia.org/wiki/HMailServer\nhMailServer ist ein Mailserver für Windows. hMailServer versucht alle wesentlichen Funktionen eines Mailservers in einem einfach zu installierenden und konfigurierenden Programm zusammenzufassen. Das Programm wurde komplett in C++ programmiert und befindet sich in ständiger aktiver Weiterentwicklung\n\n**hMailServer - Wikipedia**\nhttps://en.wikipedia.org/wiki/HMailServer\nhMailServer is a free email server for Windows created by Martin Knafve. It runs as a Windows service and includes administration tools for management and backup.\n\n**hMailServer documentation - hMailServer - Free open source email server ...**\nhttps://www.hmailserver.com/documentation/latest/\nUpgrading: 5.x to Latest Version Upgrading: 3.x to 4.0 Upgrading: 4.x to 5.0 Upgrading: 5.0 to 5.1 Upgrading: 5.1 to 5.2 Upgrading: 5.2 to 5.3 Downgrading Configuration Account Advanced Alias Anti spam Anti virus Auto-ban Backup Distribution list DNS blacklist Domain External accounts Grey listing G\n\n**hMailServer - Free open source email server for Microsoft Windows**\nhttps://www.hmailserver.com/changelog\nVersion 4.1 - Build 132 (2006-01-01) When upgrading from pre-4.0, the installation program copies hMailServer.ini from the Windows directory to the bin directory. But it leaves a copy of hMailServer.ini in the Windows directory, which may cause confusion.\n\n**Progressiverobot/hmailserver: hMailServer 6.2 - GitHub**\nhttps://github.com/Progressiverobot/hmailserver\nBuilding hMailServer Branches The master branch contains the latest development version of hMailServer. This version is typically not yet released for production usage. If you want to add new features to hMailServer, use this branch. The x.y.z (for example 5.6.2) contains the code for the version wi",
+    "raw_output_chars": 1810,
+    "duration_s": 1.29,
+    "is_error": false,
+    "tool_name": "ddg_search",
+    "agent_params": null,
+    "phase": "findings"
+  },
+  {
+    "seq": 22,
+    "tool_bin": "ddg_search",
+    "command": [
+      "ddg_search",
+      "westerstede.de Apache version intitle:download"
+    ],
+    "raw_output": "**Westerstede - Wikipedia**\nhttps://de.wikipedia.org/wiki/Westerstede\nWeitergabe unter gleichen Bedingungen\"verfügbar; Informationen zu den Urhebern und zum Lizenzstatus eingebundener Mediendateien (etwa Bilder oder Videos) können im Regelfall durch Anklicken dieser abgerufen werden. Möglicherweise unterliegen die Inhalte jeweils zusätzlichen Bedingungen. Durch die Nu\n\n**Wetter Westerstede 16 Tage Trend**\nhttps://www.wetter.com/wetter_aktuell/wettervorhersage/16_tagesvorhersage/deutschland/westerstede/DE0011503.html\nDer 16 Tage Wetter Trend für 26655 Westerstede. Temperatur, Wetterzustand, Sonnenstunden und Regenwahrscheinlichkeit in der 16 Tagesübersicht.\n\n**OpenOffice - Download kostenlos in deutsch**\nhttps://www.openoffice.de/\nOpenOffice.de. DOWNLOAD.Der Newsletter informiert über neue Versionen und wichtige Sicherheits Updates! Ihre E-Mail Adresse wird ausschließlich für den Versand des OpenOffice.de Newsletters verwendet. Ihre Anmeldung kann jederzeit widerrufen werden.\n\n**Download DirectX End-User Runtime Web Installer from Official...**\nhttps://www.microsoft.com/en-us/download/details.aspx?id=35\nClick the Download button on this page to start the download, or choose a different language from the drop-down list and click Go. Do one of the following: To start the installation immediately, click Open or Run this program from its current location.\n\n**Download - The Apache HTTP Server Project**\nhttps://httpd.apache.org/download.cgi\nUse the links below to download the Apache HTTP Server from our download servers. You must verify the integrity of the downloaded files using signatures downloaded from our main distribution directory.This version of mod_fcgid is a security release.",
+    "raw_output_chars": 1707,
+    "duration_s": 1.45,
+    "is_error": false,
+    "tool_name": "ddg_search",
+    "agent_params": null,
+    "phase": "findings"
+  },
+  {
+    "seq": 23,
+    "tool_bin": "ddg_search",
+    "command": [
+      "ddg_search",
+      "whatweb westerstede.de version"
+    ],
+    "raw_output": "**GitHub - urbanadventurer/WhatWeb: Next generation web scanner**\nhttps://github.com/urbanadventurer/WhatWeb\nWhatWeb has over 1800 plugins, each to recognise something different. WhatWeb also identifies version numbers, email addresses, account IDs, web framework modules, SQL errors, and more. WhatWeb can be stealthy and fast, or thorough but slow. WhatWeb supports an aggression level to control the trade \n\n**WhatWeb — Next generation web scanner**\nhttps://www.whatweb.net/ \nWhatWeb recognises web technologies including content management systems (CMS), blogging platforms, analytics packages, JavaScript libraries, web servers, and embedded devices. It can identify versions, framework modules, SQL errors, email addresses and more.\n\n**GitHub - Stripeman/whatweb**\nhttps://github.com/Stripeman/whatweb\nWhatWeb has over 1800 plugins, each to recognise something different. WhatWeb also identifies version numbers, email addresses, account IDs, web framework modules, SQL errors, and more. WhatWeb can be stealthy and fast, or thorough but slow. WhatWeb supports an aggression level to control the trade \n\n**WhatWeb - CybersecTools**\nhttps://cybersectools.com/tools/whatweb\nWhatWeb also identifies version numbers, email addresses, account IDs, web servers, and other information. WhatWeb is a next-generation web scanner developed by Andrew Horton (urbanadventurer) and Brendan Coles (bcoles).\n\n**WhatWeb download | SourceForge.net**\nhttps://sourceforge.net/projects/whatweb.mirror/\nDownload WhatWeb for free. Next generation web scanner. WhatWeb is a Ruby-based web scanner for fingerprinting websites. It identifies CMS, server technologies, JavaScript frameworks, and other characteristics by analyzing HTML, headers, JavaScript, cookies, and responses.",
+    "raw_output_chars": 1761,
+    "duration_s": 1.01,
+    "is_error": false,
+    "tool_name": "ddg_search",
+    "agent_params": null,
+    "phase": "findings"
+  },
+  {
+    "seq": 24,
+    "tool_bin": "searchsploit",
+    "command": [
+      "/usr/local/bin/searchsploit",
+      "--json",
+      "CVE-2020-11984"
+    ],
+    "raw_output": "{\n\t\"SEARCH\": \"CVE-2020-11984\",\n\t\"DB_PATH_EXPLOIT\": \"/opt/exploitdb\",\n\t\"RESULTS_EXPLOIT\": [\t],\n\t\"DB_PATH_SHELLCODE\": \"/opt/exploitdb\",\n\t\"RESULTS_SHELLCODE\": [\t]\n}",
+    "raw_output_chars": 161,
+    "duration_s": 0.5,
+    "is_error": false,
+    "tool_name": "searchsploit",
+    "agent_params": null,
+    "phase": "red"
+  },
+  {
+    "seq": 25,
+    "tool_bin": "searchsploit",
+    "command": [
+      "/usr/local/bin/searchsploit",
+      "--json",
+      "CVE-2021-26691"
+    ],
+    "raw_output": "{\n\t\"SEARCH\": \"CVE-2021-26691\",\n\t\"DB_PATH_EXPLOIT\": \"/opt/exploitdb\",\n\t\"RESULTS_EXPLOIT\": [\t],\n\t\"DB_PATH_SHELLCODE\": \"/opt/exploitdb\",\n\t\"RESULTS_SHELLCODE\": [\t]\n}",
+    "raw_output_chars": 161,
+    "duration_s": 0.52,
+    "is_error": false,
+    "tool_name": "searchsploit",
+    "agent_params": null,
+    "phase": "red"
+  },
+  {
+    "seq": 26,
+    "tool_bin": "searchsploit",
+    "command": [
+      "/usr/local/bin/searchsploit",
+      "--json",
+      "CVE-2021-39275"
+    ],
+    "raw_output": "{\n\t\"SEARCH\": \"CVE-2021-39275\",\n\t\"DB_PATH_EXPLOIT\": \"/opt/exploitdb\",\n\t\"RESULTS_EXPLOIT\": [\t],\n\t\"DB_PATH_SHELLCODE\": \"/opt/exploitdb\",\n\t\"RESULTS_SHELLCODE\": [\t]\n}",
+    "raw_output_chars": 161,
+    "duration_s": 0.51,
+    "is_error": false,
+    "tool_name": "searchsploit",
+    "agent_params": null,
+    "phase": "red"
+  },
+  {
+    "seq": 27,
+    "tool_bin": "ddg_search",
+    "command": [
+      "ddg_search",
+      "CVE-2020-11984 PoC"
+    ],
+    "raw_output": "**Apache Http Server 2.4.43 — PoC exploit for CVE-2020-11984**\nhttps://sploitus.com/exploit?id=1337DAY-ID-34882\nApache2 mod_proxy_uwsgi Incorrect Request Handling Exploit. CVE-2020-11984. zdt · 2020-08-31. Description.All known vulnerabilities by product.",
+    "raw_output_chars": 255,
+    "duration_s": 0.94,
+    "is_error": false,
+    "tool_name": "ddg_search",
+    "agent_params": null,
+    "phase": "red"
+  }
+]

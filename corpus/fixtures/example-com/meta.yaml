@@ -1,0 +1,17 @@
+target_id: "example-com"
+scan_target: "example.com"
+category: "external_readonly"
+captured_at: "2026-09-12T02:07:46.883834+00:00"
+source_trace: "trace_example.com_20260912_040746.json"
+source_report: "final_report_example.com_20260912_040914.md"
+notes: "IANA-reserviert, seit Session-Beginn wiederholt als Test-Target genutzt."
+n_tool_calls: 17
+scope: "full"
+pipeline:
+  - research
+  - blue
+  - findings
+  - red_scan
+  - red
+  - coding
+  - report

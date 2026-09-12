@@ -1,0 +1,34 @@
+# scope.yaml — Validierungs-Scope (VALIDATION_SPEC.md Phase 1)
+#
+# User-Vorgabe (2026-09-12): max. 6-7 Targets statt 30-50 (Realitätscheck ggü.
+# Spec). Ausgewählt: 7 Targets, ALLE bereits im Projekt real gescannt und in
+# logs/trace_*.json dokumentiert — kein neuer Live-Scan gegen Drittinfrastruktur
+# für diese Validierungsrunde nötig (Record-Replay-Pflicht, Phase 1). Jedes
+# Target ist in CLAUDE.md als bereits genutztes/autorisiertes Scan-Target
+# dieses Projekts dokumentiert.
+
+allowlist:
+  controlled_domains: []              # kein eigener Domainbesitz in diesem Projekt
+  lab_networks:
+    - "172.17.0.0/16"                 # Docker-Bridge (nginx:alpine-Baseline-Container, lokal, kein externes Routing)
+  external_readonly:
+    - example.com                     # IANA-reserviert für Doku/Tests, seit Session-Beginn wiederholt genutzt
+    - scanme.nmap.org                 # Nmap-Projekt eigenes, explizit für Scans freigegebenes Testziel
+    - oldenburg.de                    # im Projekt wiederholt gescannt (CLAUDE.md-Historie seit mehreren Sessions)
+    - westerstede.de                  # im Projekt wiederholt gescannt (CLAUDE.md-Historie seit mehreren Sessions)
+    - rastede.de                      # im Projekt wiederholt gescannt (CLAUDE.md-Historie seit mehreren Sessions)
+    - www.cloudflare.com              # heute in dieser Session gescannt (Test-Matrix-Nachtrag)
+
+forbidden:
+  - active_exploitation
+  - credential_bruteforce
+  - any_target_not_listed
+
+rate_limits:
+  requests_per_oracle_per_minute: 20
+  total_runtime_minutes: 240
+
+# 7. Target (Lab/TN-Baseline) läuft NICHT über die Allowlist oben, sondern über
+# den lokalen Docker-Container aus testing/targets.yaml (nginx-clean-baseline,
+# Container-IP, kein Routing nach außen — deckt lab_networks ab).
+lab_target_ref: "testing/targets.yaml#nginx-clean-baseline"

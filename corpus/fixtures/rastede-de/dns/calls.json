@@ -1,0 +1,19 @@
+[
+  {
+    "seq": 1,
+    "tool_bin": "subfinder",
+    "command": [
+      "/root/go/bin/subfinder",
+      "-d",
+      "rastede.de",
+      "-silent"
+    ],
+    "raw_output": "www.willkommen.rastede.de\nwww.rastede.de\nautodiscover.rastede.de\nsmarttime.rastede.de\nwillkommen.rastede.de",
+    "raw_output_chars": 107,
+    "duration_s": 8.52,
+    "is_error": false,
+    "tool_name": "subfinder",
+    "agent_params": null,
+    "phase": "research"
+  }
+]

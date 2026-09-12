@@ -1,0 +1,53 @@
+[
+  {
+    "seq": 1,
+    "tool_bin": "subfinder",
+    "command": [
+      "/root/go/bin/subfinder",
+      "-d",
+      "westerstede.de",
+      "-silent"
+    ],
+    "raw_output": "kita.westerstede.de\nmail3.westerstede.de\nmail4.westerstede.de\nprw.westerstede.de\nemm.westerstede.de\nmail2.westerstede.de\nrelaunch.westerstede.de\nris.westerstede.de\nsecgw.westerstede.de\nservice.westerstede.de\nserviceportal.westerstede.de\nwww.westerstede.de\nwww.emm.westerstede.de\nmail5.westerstede.de\npresse.westerstede.de\nwww.bewerbung.westerstede.de\nmdm.westerstede.de\nwww.mdm.westerstede.de\ncms.westerstede.de\nzeitkapsel2023.westerstede.de\nctestdrk.westerstede.de\nintranet.westerstede.de\nbbb.westerstede.de\nbewerbung.westerstede.de\nfwcloud.westerstede.de\ngalerie.westerstede.de",
+    "raw_output_chars": 579,
+    "duration_s": 4.67,
+    "is_error": false,
+    "tool_name": "subfinder",
+    "agent_params": null,
+    "phase": "research"
+  },
+  {
+    "seq": 2,
+    "tool_bin": "dig",
+    "command": [
+      "dig",
+      "westerstede.de",
+      "A",
+      "+short"
+    ],
+    "raw_output": "62.67.46.162",
+    "raw_output_chars": 12,
+    "duration_s": 0.04,
+    "is_error": false,
+    "tool_name": "dig",
+    "agent_params": null,
+    "phase": "research"
+  },
+  {
+    "seq": 3,
+    "tool_bin": "dig",
+    "command": [
+      "dig",
+      "62.67.46.162",
+      "PTR",
+      "+short"
+    ],
+    "raw_output": "",
+    "raw_output_chars": 0,
+    "duration_s": 0.03,
+    "is_error": false,
+    "tool_name": "dig",
+    "agent_params": null,
+    "phase": "research"
+  }
+]

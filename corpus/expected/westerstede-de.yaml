@@ -1,0 +1,11 @@
+# SCHREIBGESCHÜTZT — kein historisch etabliertes must_find_cve für dieses Ziel.
+target: westerstede.de
+category: external_readonly
+known_services: []
+must_find_cves: []
+notes: >
+  Diese Fixture (Trace 20260912_025117) ist derselbe Lauf, den die Session
+  bereits als BUG-26-E2E-Verifikation genutzt hat (CLAUDE.md). Final Report
+  listete 10 Critical Apache-CVEs im Versionsbereich 2.4.49-2.4.55 — dort
+  bereits als "nicht geprüft ob Versions-Gate korrekt griff" vermerkt. Diese
+  Validierungsrunde prüft genau das nach (Phase 3, CVE-Oracle + Versions-Gate).

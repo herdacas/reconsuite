@@ -1,0 +1,18 @@
+[
+  {
+    "seq": 8,
+    "tool_bin": "sslscan",
+    "command": [
+      "sslscan",
+      "www.oldenburg.de",
+      "--no-failed"
+    ],
+    "raw_output": "Version: \u001b[32m2.1.2\u001b[0m\nOpenSSL 3.0.13 30 Jan 2024\n\u001b[0m",
+    "raw_output_chars": 55,
+    "duration_s": 0.01,
+    "is_error": false,
+    "tool_name": "sslscan",
+    "agent_params": null,
+    "phase": "blue"
+  }
+]

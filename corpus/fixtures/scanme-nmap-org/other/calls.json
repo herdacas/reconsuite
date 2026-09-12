@@ -1,0 +1,77 @@
+[
+  {
+    "seq": 5,
+    "tool_bin": "nmap",
+    "command": [
+      "nmap",
+      "-T4",
+      "-Pn",
+      "-p",
+      "1-65535",
+      "--open",
+      "scanme.nmap.org"
+    ],
+    "raw_output": "Starting Nmap 7.94SVN ( https://nmap.org ) at 2026-09-10 22:13 CEST\nNmap scan report for scanme.nmap.org (45.33.32.156)\nHost is up (0.16s latency).\nOther addresses for scanme.nmap.org (not scanned): 2600:3c01::f03c:91ff:fe18:bb2f\nNot shown: 65531 closed tcp ports (reset)\nPORT      STATE SERVICE\n22/tcp    open  ssh\n80/tcp    open  http\n9929/tcp  open  nping-echo\n31337/tcp open  Elite\n\nNmap done: 1 IP address (1 host up) scanned in 41.90 seconds",
+    "raw_output_chars": 447,
+    "duration_s": 41.93,
+    "is_error": false,
+    "tool_name": "nmap",
+    "agent_params": null,
+    "phase": "blue"
+  },
+  {
+    "seq": 6,
+    "tool_bin": "nmap",
+    "command": [
+      "nmap",
+      "-T4",
+      "-Pn",
+      "-p",
+      "22,80,9929,31337",
+      "--open",
+      "-sV",
+      "--host-timeout",
+      "540s",
+      "scanme.nmap.org"
+    ],
+    "raw_output": "Starting Nmap 7.94SVN ( https://nmap.org ) at 2026-09-10 22:14 CEST\nNmap scan report for scanme.nmap.org (45.33.32.156)\nHost is up (0.16s latency).\nOther addresses for scanme.nmap.org (not scanned): 2600:3c01::f03c:91ff:fe18:bb2f\n\nPORT      STATE SERVICE    VERSION\n22/tcp    open  ssh        OpenSSH 6.6.1p1 Ubuntu 2ubuntu2.13 (Ubuntu Linux; protocol 2.0)\n80/tcp    open  http       Apache httpd 2.4.7 ((Ubuntu))\n9929/tcp  open  nping-echo Nping echo\n31337/tcp open  tcpwrapped\nService Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel\n\nService detection performed. Please report any incorrect results at https://nmap.org/submit/ .\nNmap done: 1 IP address (1 host up) scanned in 8.30 seconds",
+    "raw_output_chars": 690,
+    "duration_s": 8.34,
+    "is_error": false,
+    "tool_name": "nmap",
+    "agent_params": null,
+    "phase": "blue"
+  },
+  {
+    "seq": 12,
+    "tool_bin": "nvd_cpe_lookup",
+    "command": [
+      "nvd_cpe_lookup",
+      "Apache HTTP Server 2.4.7"
+    ],
+    "raw_output": "[NVD-CPE] CVEs für cpe:2.3:a:apache:http_server:2.4.7 (7 Top-Treffer nach CVSS):\n\nCVE-2017-3167 — CVSS 9.8 (CRITICAL)\n  Published: 2017-06-20\n  In Apache httpd 2.2.x before 2.2.33 and 2.4.x before 2.4.26, use of the ap_get_basic_auth_pw() by third-party modules outside of the authentication phase may lead to authentication requirements being \n\nCVE-2017-7679 — CVSS 9.8 (CRITICAL)\n  Published: 2017-06-20\n  In Apache httpd 2.2.x before 2.2.33 and 2.4.x before 2.4.26, mod_mime can read one byte past the end of a buffer when sending a malicious Content-Type response header.\n\nCVE-2018-1312 — CVSS 9.8 (CRITICAL)\n  Published: 2018-03-26\n  In Apache httpd 2.2.0 to 2.4.29, when generating an HTTP Digest authentication challenge, the nonce sent to prevent reply attacks was not correctly generated using a pseudo-random seed. In a cluster o\n\nCVE-2021-26691 — CVSS 9.8 (CRITICAL)\n  Published: 2021-06-10\n  In Apache HTTP Server versions 2.4.0 to 2.4.46 a specially crafted SessionHeader sent by an origin server could cause a heap overflow\n\nCVE-2021-39275 — CVSS 9.8 (CRITICAL)\n  Published: 2021-09-16\n  ap_escape_quotes() may write beyond the end of a buffer when given malicious input. No included modules pass untrusted data to these functions, but third-party / external modules may. This issue affec\n\nCVE-2021-41773 — CVSS 9.8 (CRITICAL)\n  Published: 2021-10-05\n  A flaw was found in a change made to path normalization in Apache HTTP Server 2.4.49. An attacker could use a path traversal attack to map URLs to files outside the directories configured by Alias-lik\n\nCVE-2021-42013 — CVSS 9.8 (CRITICAL)\n  Published: 2021-10-07\n  It was found that the fix for CVE-2021-41773 in Apache HTTP Server 2.4.50 was insufficient. An attacker could use a path traversal attack to map URLs to files outside the directories configured by Ali",
+    "raw_output_chars": 1832,
+    "duration_s": 20.51,
+    "is_error": false,
+    "tool_name": "nvd_cpe_lookup",
+    "agent_params": null,
+    "phase": "findings"
+  },
+  {
+    "seq": 13,
+    "tool_bin": "searchsploit",
+    "command": [
+      "/usr/local/bin/searchsploit",
+      "--json",
+      "Apache",
+      "2.4.7"
+    ],
+    "raw_output": "{\n\t\"SEARCH\": \"Apache 2.4.7\",\n\t\"DB_PATH_EXPLOIT\": \"/opt/exploitdb\",\n\t\"RESULTS_EXPLOIT\": [\n\t\t{\"Title\":\"Apache < 2.2.34 / < 2.4.27 - OPTIONS Memory Leak\",\"EDB-ID\":\"42745\",\"Date_Published\":\"2017-09-18\",\"Date_Added\":\"2017-09-18\",\"Date_Updated\":\"2017-09-19\",\"Author\":\"Hanno Bock\",\"Type\":\"webapps\",\"Platform\":\"linux\",\"Port\":\"\",\"Verified\":\"0\",\"Codes\":\"CVE-2017-9798;OPTIONSBLEED\",\"Tags\":\"\",\"Aliases\":\"\",\"Screenshot\":\"\",\"Application\":\"\",\"Source\":\"https://github.com/hannob/optionsbleed/blob/e297ce13cfb0f338b2cabfb81a70349fd6925f82/optionsbleed\",\"Path\":\"/opt/exploitdb/exploits/linux/webapps/42745.py\"},\n\t\t{\"Title\":\"Apache 2.4.7 mod_status - Scoreboard Handling Race Condition\",\"EDB-ID\":\"34133\",\"Date_Published\":\"2014-07-21\",\"Date_Added\":\"2014-07-21\",\"Date_Updated\":\"2016-12-19\",\"Author\":\"Marek Kroemeke\",\"Type\":\"dos\",\"Platform\":\"linux\",\"Port\":\"\",\"Verified\":\"0\",\"Codes\":\"CVE-2014-0226;OSVDB-109216\",\"Tags\":\"\",\"Aliases\":\"\",\"Screenshot\":\"\",\"Application\":\"\",\"Source\":\"\",\"Path\":\"/opt/exploitdb/exploits/linux/dos/34133.txt\"},\n\t\t{\"Title\":\"Apache 2.4.7 + PHP 7.0.2 - 'openssl_seal()' Uninitialized Memory Code Execution\",\"EDB-ID\":\"40142\",\"Date_Published\":\"2016-02-01\",\"Date_Added\":\"2016-07-22\",\"Date_Updated\":\"2017-06-26\",\"Author\":\"akat1\",\"Type\":\"remote\",\"Platform\":\"php\",\"Port\":\"\",\"Verified\":\"0\",\"Codes\":\"\",\"Tags\":\"\",\"Aliases\":\"\",\"Screenshot\":\"\",\"Application\":\"\",\"Source\":\"http://akat1.pl/?id=1\",\"Path\":\"/opt/exploitdb/exploits/php/remote/40142.php\"},\n\t\t{\"Title\":\"Apache CXF < 2.5.10/2.6.7/2.7.4 - Denial of Service\",\"EDB-ID\":\"26710\",\"Date_Published\":\"2013-07-09\",\"Date_Added\":\"2013-07-09\",\"Date_Updated\":\"2013-07-09\",\"Author\":\"SEC Consult\",\"Type\":\"dos\",\"Platform\":\"multiple\",\"Port\":\"\",\"Verified\":\"1\",\"Codes\":\"CVE-2013-2160;OSVDB-95011\",\"Tags\":\"\",\"Aliases\":\"\",\"Screenshot\":\"\",\"Application\":\"\",\"Source\":\"http://cxf.apache.org/security-advisories.data/CVE-2013-2160.txt.asc\",\"Path\":\"/opt/exploitdb/exploits/multiple/dos/26710.txt\"},\n\t\t{\"Title\":\"Apache mod_ssl < 2.8.7 OpenSSL - 'OpenFuck.c' Remote Buffer Overflow\",\"EDB-ID\":\"21671\",\"Date_Published\":\"2002-07-30\",\"Date_Added\":\"2002-07-30\",\"Date_Updated\":\"2017-11-16\",\"Author\":\"spabam\",\"Type\":\"remote\",\"Platform\":\"unix\",\"Port\":\"80\",\"Verified\":\"1\",\"Codes\":\"CVE-2002-0082;OSVDB-857\",\"Tags\":\"\",\"Aliases\":\"OpenFuck;OpenFuck.c\",\"Screenshot\":\"\",\"Application\":\"http://www.exploit-db.comapache-1.3.12-1.i386.rpm\",\"Source\":\"https://www.securityfocus.com/bid/5363/info\",\"Path\":\"/opt/exploitdb/exploits/unix/remote/21671.c\"},\n\t\t{\"Title\":\"Apache mod_ssl < 2.8.7 OpenSSL - 'OpenFuckV2.c' Remote Buffer Overflow (1)\",\"EDB-ID\":\"764\",\"Date_Published\":\"2003-04-04\",\"Date_Added\":\"2003-04-03\",\"Date_Updated\":\"2019-11-01\",\"Author\":\"spabam\",\"Type\":\"remote\",\"Platform\":\"unix\",\"Port\":\"80\",\"Verified\":\"1\",\"Codes\":\"CVE-2002-0082;OSVDB-857\",\"Tags\":\"\",\"Aliases\":\"OpenFuckV2;OpenFuckV2.c\",\"Screenshot\":\"\",\"Application\":\"http://www.exploit-db.comapache-1.3.12-1.i386.rpm\",\"Source\":\"\",\"Path\":\"/opt/exploitdb/exploits/unix/remote/764.c\"},\n\t\t{\"Title\":\"Apache mod_ssl < 2.8.7 OpenSSL - 'OpenFuckV2.c' Remote Buffer Overflow (2)\",\"EDB-ID\":\"47080\",\"Date_Published\":\"2019-07-07\",\"Date_Added\":\"2019-07-09\",\"Date_Updated\":\"2019-11-01\",\"Author\":\"Brian Peters\",\"Type\":\"remote\",\"Platform\":\"unix\",\"Port\":\"80\",\"Verified\":\"0\",\"Codes\":\"CVE-2002-0082;OSVDB-857\",\"Tags\":\"\",\"Aliases\":\"OpenFuckV2;OpenFuckV2.c\",\"Screenshot\":\"\",\"Application\":\"http://www.exploit-db.comapache-1.3.12-1.i386.rpm\",\"Source\":\"\",\"Path\":\"/opt/exploitdb/exploits/unix/remote/47080.c\"},\n\t\t{\"Title\":\"Apache OpenMeetings 1.9.x < 3.1.0 - '.ZIP' File Directory Traversal\",\"EDB-ID\":\"39642\",\"Date_Published\":\"2016-03-31\",\"Date_Added\":\"2016-03-31\",\"Date_Updated\":\"2016-03-31\",\"Author\":\"Andreas Lindh\",\"Type\":\"webapps\",\"Platform\":\"linux\",\"Port\":\"5080\",\"Verified\":\"0\",\"Codes\":\"CVE-2016-0784\",\"Tags\":\"\",\"Aliases\":\"\",\"Screenshot\":\"\",\"Application\":\"\",\"Source\":\"\",\"Path\":\"/opt/exploitdb/exploits/linux/webapps/39642.txt\"},\n\t\t{\"Title\":\"Apache + PHP < 5.3.12 / < 5.4.2 - cgi-bin Remote Code Execution\",\"EDB-ID\":\"29290\",\"Date_Published\":\"2013-10-29\",\"Date_Adde",
+    "raw_output_chars": 7863,
+    "duration_s": 1.87,
+    "is_error": false,
+    "tool_name": "searchsploit",
+    "agent_params": null,
+    "phase": "findings"
+  }
+]

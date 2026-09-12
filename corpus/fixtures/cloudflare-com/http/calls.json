@@ -1,0 +1,18 @@
+[
+  {
+    "seq": 5,
+    "tool_bin": "httpx",
+    "command": [
+      "/snap/bin/httpx",
+      "-silent",
+      "-follow-redirects"
+    ],
+    "raw_output": "https://www.cloudflare.com",
+    "raw_output_chars": 26,
+    "duration_s": 0.51,
+    "is_error": false,
+    "tool_name": "httpx",
+    "agent_params": null,
+    "phase": "blue"
+  }
+]

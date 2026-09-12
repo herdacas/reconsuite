@@ -1,0 +1,150 @@
+{
+  "target": "example.com",
+  "objective": "Full vulnerability assessment of example.com",
+  "scope": "full",
+  "pipeline": [
+    "research",
+    "blue",
+    "findings",
+    "red_scan",
+    "red",
+    "coding",
+    "report"
+  ],
+  "timestamp": "20260912_040746",
+  "report": "/opt/projects/agentic-ai/recon-suite/logs/recon_report_example.com_20260912_040746.md",
+  "memory_hit": true,
+  "tasks": {
+    "research": {
+      "status": "completed",
+      "preview": [
+        "{   \"target_type\": \"domain\",   \"summary\": \"Passive reconnaissance using subfinder_passive enumerated many subdomains;",
+        "WHOIS shows registrar RESERVED-Internet Assigned Numbers Authority with Cloudflare nameservers. No security-relevant",
+        "subdomains identified after filtering.\",   \"subdomains\": [],   \"technologies\": [],   \"osint_notes\": [     \"Subdomains",
+        "enumerated via subfinder_passive\",     \"WHOIS record retrieved via whois_lookup\",     \"No reverse DNS data available\",",
+        "\"No ASN information available\"   ],   \"reverse_dns\": null,   \"asn_info\": null,   \"memory_hit\": false }"
+      ],
+      "memory_hit": false
+    },
+    "blue": {
+      "status": "completed",
+      "preview": [
+        "{   \"tools_executed\": [     \"nmap_scanner\",     \"httpx_prober\",     \"whatweb_fingerprint\",     \"sslscan_tls\",",
+        "\"nikto_scanner\"   ],   \"open_ports\": [     2052,     2053,     2082,     2083,     2086,     2087,     2095,     2096,",
+        "80,     443,     8080,     8443   ],   \"services\": {},   \"vulnerabilities\": [     \"Missing X-Frame-Options header on",
+        "HTTPS endpoint.\",     \"Exposed Cloudflare internal headers (cf-ray, cf-cache-status) may disclose server details.\",",
+        "\"Multiple internal management ports (2052-2096) open, potentially increasing attack surface.\",     \"OpenSSL 3.0.13",
+        "detected; w"
+      ],
+      "open_ports": [
+        2052,
+        2053,
+        2082,
+        2083,
+        2086,
+        2087,
+        2095,
+        2096,
+        80,
+        443,
+        8080,
+        8443
+      ],
+      "vulnerabilities": [
+        "Missing X-Frame-Options header on HTTPS endpoint.",
+        "Exposed Cloudflare internal headers (cf-ray, cf-cache-status) may disclose server details.",
+        "Multiple internal management ports (2052-2096) open, potentially increasing attack surface.",
+        "OpenSSL 3.0.13 detected; while not currently known to have critical CVEs, continuous patching is recommended.",
+        "No HSTS header observed on HTTPS endpoint."
+      ]
+    },
+    "findings": {
+      "status": "completed",
+      "preview": [
+        "{   \"service_versions\": [     \"OpenSSL 3.0.13\"   ],   \"cve_references\": [     \"CVE-2026-31789\",     \"CVE-2026-34182\",",
+        "\"CVE-2026-75803\",     \"CVE-2026-45447\",     \"CVE-2026-28387\",     \"CVE-2026-7383\",     \"CVE-2019-0190\",",
+        "\"CVE-2024-6119\",     \"CVE-2025-69420\",     \"CVE-2011-1468\"   ],   \"risk_summary\": \"Missing X-Frame-Options header on",
+        "HTTPS endpoint. Exposed Cloudflare internal headers (cf-ray, cf-cache-status) are present on HTTPS endpoint. Multiple",
+        "internal management ports (2052-2096) are open. OpenSSL 3.0.13 detected. No HSTS header observed on HTTPS endpoint.\" }"
+      ],
+      "cve_references": [
+        "CVE-2026-31789",
+        "CVE-2026-34182",
+        "CVE-2026-75803",
+        "CVE-2026-45447",
+        "CVE-2026-28387",
+        "CVE-2026-7383",
+        "CVE-2019-0190",
+        "CVE-2024-6119",
+        "CVE-2025-69420",
+        "CVE-2011-1468"
+      ]
+    },
+    "red_scan": {
+      "status": "completed",
+      "preview": [
+        "{   \"targeted_findings\": [     \"OpenSSL 3.0.13\"   ],   \"tools_executed\": [     \"nmap_scanner\",     \"httpx_prober\",",
+        "\"whatweb_fingerprint\",     \"sslscan_tls\",     \"nikto_scanner\"   ],   \"open_ports\": [     2052,     2053,     2082,",
+        "2083,     2086,     2087,     2095,     2096,     80,     443,     8080,     8443   ],   \"vulnerabilities\": [",
+        "\"Missing X-Frame-Options header on HTTPS endpoint.\",     \"Exposed Cloudflare internal headers (cf-ray, cf-cache-status)",
+        "may disclose server details.\",     \"Multiple internal management ports (2052-2096) open, potentially increasing attack",
+        "surface.\""
+      ],
+      "open_ports": [
+        2052,
+        2053,
+        2082,
+        2083,
+        2086,
+        2087,
+        2095,
+        2096,
+        80,
+        443,
+        8080,
+        8443
+      ],
+      "vulnerabilities": [
+        "Missing X-Frame-Options header on HTTPS endpoint.",
+        "Exposed Cloudflare internal headers (cf-ray, cf-cache-status) may disclose server details.",
+        "Multiple internal management ports (2052-2096) open, potentially increasing attack surface.",
+        "OpenSSL 3.0.13 detected; while not currently known to have critical CVEs, continuous patching is recommended.",
+        "No HSTS header observed on HTTPS endpoint."
+      ]
+    },
+    "red": {
+      "status": "completed",
+      "preview": [
+        "{   \"confirmed_attack_surface\": [     \"sslscan:443 — OpenSSL 3.0.13 detected\"   ],   \"exploitable_findings\": [",
+        "\"CVE-2011-1468\"   ],   \"exploitable_findings_count\": 1,   \"cve_references\": [     \"CVE-2011-1468\"   ] }"
+      ],
+      "cve_references": [
+        "CVE-2011-1468"
+      ],
+      "attack_surface_count": 1,
+      "exploitable_findings_count": 1
+    },
+    "coding": {
+      "status": "completed",
+      "preview": [
+        "{   \"filename\": \"scan_heise.py\",   \"code\": \"import subprocess\\\\nimport logging\\\\nimport",
+        "sys\\\\n\\\\nlogging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')\\\\n\\\\nopen_ports =",
+        "[2052, 2053, 2082, 2083, 2086, 2087, 2095, 2096, 80, 443, 8080, 8443]\\\\n\\\\nopen_ports_str =",
+        "'2052,2053,2082,2083,2086,2087,2095,2096,80,443,8080,8443'\\\\n\\\\n\\\\ndef run_tool(command):\\\\n    try:\\\\n        result =",
+        "subprocess.run(command, shell=True, capture_output=True, text=True)\\\\n        if result.returncode != 0:\\\\n",
+        "logging.error(f'Command {command} failed with exit code {resul"
+      ]
+    },
+    "report": {
+      "status": "completed",
+      "preview": [
+        "{\"path\":\"pending\",\"executive_summary\":\"# Recon Report: example.com\\n## Reconnaissance Summary\\n  Domain: example.com\\n",
+        "Open ports: 2052,2053,2082,2083,2086,2087,2095,2096,80,443,8080,8443\\n\\n## Scope & Methodik\\n| Tool | Zweck | Abgedeckte",
+        "Assets |\\n|------|-------|-------------------|\\n| ddg_search | Domain enumeration via search engine | Domain enumeration",
+        "|\\n| httpx | HTTP probing | HTTP/HTTPS endpoint discovery |\\n| nikto | Web vulnerability scanning | Known vulnerable",
+        "components |\\n| nmap | Port scanning | All listed open ports |\\n| nvd_cpe_lookup | CPE version detection | Service",
+        "versio"
+      ]
+    }
+  }
+}

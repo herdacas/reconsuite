@@ -1,0 +1,427 @@
+{
+  "target": "example.com",
+  "objective": "Full vulnerability assessment of example.com",
+  "scope": "full",
+  "pipeline": [
+    "research",
+    "blue",
+    "findings",
+    "red_scan",
+    "red",
+    "coding",
+    "report"
+  ],
+  "total_duration_s": 1267.2,
+  "total_tool_calls": 17,
+  "error_calls": 0,
+  "phases": {
+    "research": {
+      "tool_calls": [
+        {
+          "seq": 1,
+          "tool_bin": "subfinder",
+          "command": [
+            "/root/go/bin/subfinder",
+            "-d",
+            "example.com",
+            "-silent"
+          ],
+          "raw_output": "cxcxxc.example.com\nkot-god1.example.com\nmochalov12.example.com\nshuromakag2.example.com\nsub128.example.com\n192602.example.com\nphillip.albrecht90.example.com\njaiptlachatteatamere1.example.com\nppopsyuko.example.com\nrolandoariasmarrero.example.com\n147-255-227-85.w.example.com\nwintest4.example.com\n181704.example.com\nbemilm.example.com\ndeptest.example.com\ngleb444.example.com\nip.example.com\nmatel81.example.com\nmipori9529.example.com\nsveta2.example.com\n190159.example.com\na.harinskiy.example.com\ninfo2.example.com\nkovalenkogen1.example.com\nliveinbox2020.example.com\nrogozhinaliudmila.example.com\nsub69.example.com\nxsadler.example.com\nahsaniqbal35401.example.com\n48.134.106.colo.example.com\nsmm.lanker.example.com\nthehottech744.example.com\nazen204866.example.com\nitdep.example.com\nthehottech184.example.com\ntihijtihon76.example.com\n69.48.135.100.example.com\narttm.example.com\nk71kvklmxglw.example.com\nmambal98.example.com\nalegotkin.example.com\n48.134.118.colo.example.com\nlukyan2.biz.example.com\nlukeryalin.example.com\nsteinstov8.win.example.com\namethistos69.example.com\ns80.denisov.example.com\nhello1.example.com\nkozhettop22.example.com\nprazyank.example.com\navedikhin8.example.com\nkrasnovds.example.com\nshabeighuuql31.example.com\nthehottech168.example.com\n181709.example.com\nhijacked-ip-address-192-83-197-244.example.com\nmuaddibf.example.com\ndexter.example.com\nlooking.example.com\ntangliang0001.example.com\nthehottech137.example.com\nthehottech1397.example.com\nivanov1.4409.example.com\ng.ba19.example.com\n48.134.178.colo.example.com\ncontact23.example.com\ndidiliu09.example.com\nhost.example.com\noxfemale.example.com\na3327935581.example.com\nderko.derko.example.com\nprogr76.example.com\nroberto94.example.com\nthehottech1411.example.com\nwebdisk.1553867264822.example.com\na03741.example.com\nhijacked-ip-address-192-83-197-224.example.com\nsolatov-andrei3.example.com\nalexpigs179.example.com\nconsolko.example.com\nhijacked-ip-address-192-83-197-71.example.com\nhroostik11.example.com\nmarkelov933.example.com\nmayerakkaunt.example.com\nsparkfirefly.example.com\n212.unused.example.com\n161240.example.com\nadvertmob2.corp.example.com\ndotrudnev.example.com\nkeccak1.example.com\n217.unused.example.com\nm.zolotov76.example.com\nzugavitkaseimu.example.com\napuzikov88.example.com\nstan.example.com\nzhongarthas2710.example.com\na7498460868.example.com\nident2.cards.example.com\nskoryna2.dm.example.com\nfasdwt285183.example.com\nmihamaker93.example.com\nnomad.example.com\nsub218.example.com\nvpn4269.example.com\nelizabeth.boyd.586.example.com\ngodipav9.example.com\nisptest.example.com\noneralon.example.com\norlov1.example.com\nthehottech455.example.com\nkursdomashki1.example.com\nlavrikko11.example.com\nmhmc100.example.com\nmirtex.nn.example.com\nts23.example.com\nvitavilov.example.com\nbadivix.example.com\ncpcontacts.example.com\neugen353.example.com\npolukeevpavel4.example.com\nsergei.popov174.example.com\nprov.example.com\nsaransk.ru.example.com\na897131.example.com\naleks1234.example.com\ndrakennat.example.com\ngrace_service.example.com\ngrandfood22.example.com\nkravchepash.example.com\nupravlenie842.example.com\nerinbaxtere28.example.com\nhse.filos.example.com\ngrats043.example.com\nkot67-07.example.com\nmalirudari12317.example.com\nmcbobek.example.com\nforexbo.ru.example.com\nsamcram.example.com\nbet51.centr.example.com\nmsivanoff.example.com\nops36.example.com\na321616.example.com\nfsmileberry1.example.com\ninetsys.example.com\nkazmenkovladimir.example.com\nkocos.example.com\nmsru812.example.com\nthehottech1287.example.com\n181719.example.com\nigor39.example.com\nvlo333.example.com\n183368.example.com\nanaks.example.com\nazen2048115.example.com\n48.131.176.colo.example.com\ngr-ol-i1.example.com\nip-190-89-223-1.example.com\nkhatan.example.com\nlightsail201950.example.com\nhitn89.example.com\n48.134.18.static.example.com\nsteit.example.com\nstepashka444.example.com\nthe72nd.example.com\n188080.example.com\nazweiss.example.com\neugen.example.com\nmadfingergames13.example.com\nthehottech197.example.com\ns83.denisov.example.com\n139520.example.com\n164614.example.com\nc",
+          "raw_output_chars": 487478,
+          "duration_s": 23.85,
+          "is_error": false,
+          "tool_name": "subfinder",
+          "agent_params": null
+        },
+        {
+          "seq": 2,
+          "tool_bin": "whois",
+          "command": [
+            "whois",
+            "example.com"
+          ],
+          "raw_output": "Domain Name: EXAMPLE.COM\n   Registry Domain ID: 2336799_DOMAIN_COM-VRSN\n   Registrar WHOIS Server: whois.iana.org\n   Registrar URL: http://res-dom.iana.org\n   Updated Date: 2026-08-14T08:01:43Z\n   Creation Date: 1995-08-14T04:00:00Z\n   Registry Expiry Date: 2027-08-13T04:00:00Z\n   Registrar: RESERVED-Internet Assigned Numbers Authority\n   Registrar IANA ID: 376\n   Registrar Abuse Contact Email:\n   Registrar Abuse Contact Phone:\n   Domain Status: clientDeleteProhibited https://icann.org/epp#clientDeleteProhibited\n   Domain Status: clientTransferProhibited https://icann.org/epp#clientTransferProhibited\n   Domain Status: clientUpdateProhibited https://icann.org/epp#clientUpdateProhibited\n   Name Server: ELLIOTT.NS.CLOUDFLARE.COM\n   Name Server: HERA.NS.CLOUDFLARE.COM\n   DNSSEC: signedDelegation\n   DNSSEC DS Data: 2371 13 2 C988EC423E3880EB8DD8A46FE06CA230EE23F35B578D64E78B29C3E1C83D245A\n   URL of the ICANN Whois Inaccuracy Complaint Form: https://www.icann.org/wicf/\n>>> Last update of whois database: 2026-09-12T01:52:17Z <<<\n\nFor more information on Whois status codes, please visit https://icann.org/epp\n\nNOTICE: The expiration date displayed in this record is the date the\nregistrar's sponsorship of the domain name registration in the registry is\ncurrently set to expire. This date does not necessarily reflect the expiration\ndate of the domain name registrant's agreement with the sponsoring\nregistrar.  Users may consult the sponsoring registrar's Whois database to\nview the registrar's reported date of expiration for this registration.\n\nTERMS OF USE: You are not authorized to access or query our Whois\ndatabase through the use of electronic processes that are high-volume and\nautomated except as reasonably necessary to register domain names or\nmodify existing registrations; the Data in VeriSign Global Registry\nServices' (\"VeriSign\") Whois database is provided by VeriSign for\ninformation purposes only, and to assist persons in obtaining information\nabout or related to a domain name registration record. VeriSign does not\nguarantee its accuracy. By submitting a Whois query, you agree to abide\nby the following terms of use: You agree that you may use this Data only\nfor lawful purposes and that under no circumstances will you use this Data\nto: (1) allow, enable, or otherwise support the transmission of mass\nunsolicited, commercial advertising or solicitations via e-mail, telephone,\nor facsimile; or (2) enable high volume, automated, electronic processes\nthat apply to VeriSign (or its computer systems). The compilation,\nrepackaging, dissemination or other use of this Data is expressly\nprohibited without the prior written consent of VeriSign. You agree not to\nuse electronic processes that are automated and high-volume to access or\nquery the Whois database except as reasonably necessary to register\ndomain names or modify existing registrations. VeriSign reserves the right\nto restrict your access to the Whois database in its sole discretion to ensure\noperational stability.  VeriSign may restrict or terminate your access to the\nWhois database for failure to abide by these terms of use. VeriSign\nreserves the right to modify these terms at any time.\n\nThe Registry database contains ONLY .COM, .NET, .EDU domains and\nRegistrars.\n% IANA WHOIS server\n% for more information on IANA, visit http://www.iana.org\n% This query returned 1 object\n\ndomain:       EXAMPLE.COM\n\norganisation: Internet Assigned Numbers Authority\n\ncreated:      1992-01-01\nsource:       IANA",
+          "raw_output_chars": 3497,
+          "duration_s": 0.52,
+          "is_error": false,
+          "tool_name": "whois",
+          "agent_params": null
+        }
+      ],
+      "structured_output": {
+        "target_type": "domain",
+        "summary": "Passive reconnaissance using subfinder_passive enumerated many subdomains; WHOIS shows registrar RESERVED-Internet Assigned Numbers Authority with Cloudflare nameservers. No security-relevant subdomains identified after filtering.",
+        "subdomains": [],
+        "technologies": [],
+        "osint_notes": [
+          "Subdomains enumerated via subfinder_passive",
+          "WHOIS record retrieved via whois_lookup",
+          "No reverse DNS data available",
+          "No ASN information available"
+        ],
+        "reverse_dns": null,
+        "asn_info": null,
+        "memory_hit": false
+      }
+    },
+    "blue": {
+      "tool_calls": [
+        {
+          "seq": 3,
+          "tool_bin": "nmap",
+          "command": [
+            "nmap",
+            "-T4",
+            "-Pn",
+            "-p",
+            "1-65535",
+            "--open",
+            "example.com"
+          ],
+          "raw_output": "Starting Nmap 7.94SVN ( https://nmap.org ) at 2026-09-12 03:56 CEST\nNmap scan report for example.com (104.20.23.154)\nHost is up (0.00075s latency).\nOther addresses for example.com (not scanned): 172.66.147.243 2606:4700:10::6814:179a 2606:4700:10::ac42:93f3\nNot shown: 65521 filtered tcp ports (no-response), 1 closed tcp port (reset)\nSome closed ports may be reported as filtered due to --defeat-rst-ratelimit\nPORT     STATE SERVICE\n80/tcp   open  http\n443/tcp  open  https\n2052/tcp open  clearvisn\n2053/tcp open  knetd\n2082/tcp open  infowave\n2083/tcp open  radsec\n2086/tcp open  gnunet\n2087/tcp open  eli\n2095/tcp open  nbx-ser\n2096/tcp open  nbx-dir\n8080/tcp open  http-proxy\n8443/tcp open  https-alt\n8880/tcp open  cddbp-alt\n\nNmap done: 1 IP address (1 host up) scanned in 88.03 seconds",
+          "raw_output_chars": 791,
+          "duration_s": 88.05,
+          "is_error": false,
+          "tool_name": "nmap",
+          "agent_params": null
+        },
+        {
+          "seq": 4,
+          "tool_bin": "httpx",
+          "command": [
+            "/snap/bin/httpx",
+            "-silent",
+            "-silent"
+          ],
+          "raw_output": "https://example.com",
+          "raw_output_chars": 19,
+          "duration_s": 0.16,
+          "is_error": false,
+          "tool_name": "httpx",
+          "agent_params": null
+        },
+        {
+          "seq": 5,
+          "tool_bin": "nmap",
+          "command": [
+            "nmap",
+            "-T4",
+            "-Pn",
+            "-p",
+            "80,443,8080,8443",
+            "--open",
+            "-sV",
+            "--host-timeout",
+            "540s",
+            "example.com"
+          ],
+          "raw_output": "Starting Nmap 7.94SVN ( https://nmap.org ) at 2026-09-12 03:58 CEST\nNmap scan report for example.com (104.20.23.154)\nHost is up (0.00065s latency).\nOther addresses for example.com (not scanned): 172.66.147.243 2606:4700:10::ac42:93f3 2606:4700:10::6814:179a\n\nPORT     STATE SERVICE  VERSION\n80/tcp   open  http     Cloudflare http proxy\n443/tcp  open  ssl/http Cloudflare http proxy\n8080/tcp open  http     Cloudflare http proxy\n8443/tcp open  ssl/http Cloudflare http proxy\n\nService detection performed. Please report any incorrect results at https://nmap.org/submit/ .\nNmap done: 1 IP address (1 host up) scanned in 40.73 seconds",
+          "raw_output_chars": 631,
+          "duration_s": 40.77,
+          "is_error": false,
+          "tool_name": "nmap",
+          "agent_params": null
+        },
+        {
+          "seq": 6,
+          "tool_bin": "whatweb",
+          "command": [
+            "whatweb",
+            "https://example.com",
+            "--no-errors"
+          ],
+          "raw_output": "\u001b[1m\u001b[34mhttps://example.com\u001b[0m [200 OK] \u001b[1mAllow\u001b[0m[\u001b[1m\u001b[31mGET, HEAD\u001b[0m], \u001b[1mCountry\u001b[0m[\u001b[0m\u001b[22mRESERVED\u001b[0m][\u001b[1m\u001b[31mZZ\u001b[0m], \u001b[1mHTML5\u001b[0m, \u001b[1mHTTPServer\u001b[0m[\u001b[1m\u001b[36mcloudflare\u001b[0m], \u001b[1mIP\u001b[0m[\u001b[0m\u001b[22m172.66.147.243\u001b[0m], \u001b[1mTitle\u001b[0m[\u001b[1m\u001b[33mExample Domain\u001b[0m], \u001b[1mUncommonHeaders\u001b[0m[\u001b[0m\u001b[22mcf-cache-status,cf-ray\u001b[0m]",
+          "raw_output_chars": 343,
+          "duration_s": 4.78,
+          "is_error": false,
+          "tool_name": "whatweb",
+          "agent_params": null
+        },
+        {
+          "seq": 7,
+          "tool_bin": "sslscan",
+          "command": [
+            "sslscan",
+            "example.com",
+            "--no-failed"
+          ],
+          "raw_output": "Version: \u001b[32m2.1.2\u001b[0m\nOpenSSL 3.0.13 30 Jan 2024\n\u001b[0m",
+          "raw_output_chars": 55,
+          "duration_s": 0.01,
+          "is_error": false,
+          "tool_name": "sslscan",
+          "agent_params": null
+        },
+        {
+          "seq": 8,
+          "tool_bin": "nikto",
+          "command": [
+            "nikto",
+            "-h",
+            "https://example.com",
+            "-nointeractive",
+            "-maxtime",
+            "90s",
+            "-timeout",
+            "5"
+          ],
+          "raw_output": "- Nikto v2.1.5\n---------------------------------------------------------------------------\n+ Target IP:          104.20.23.154\n+ Target Hostname:    example.com\n+ Target Port:        443\n+ Start Time:         2026-09-12 04:00:19 (GMT2)\n---------------------------------------------------------------------------\n+ Server: cloudflare\n+ The anti-clickjacking X-Frame-Options header is not present.\n+ Uncommon header 'cf-ray' found, with contents: -\n+ No CGI Directories found (use '-C all' to force check all possible dirs)\n+ 6544 items checked: 0 error(s) and 2 item(s) reported on remote host\n+ End Time:           2026-09-12 04:00:40 (GMT2) (21 seconds)\n---------------------------------------------------------------------------\n+ 1 host(s) tested",
+          "raw_output_chars": 749,
+          "duration_s": 21.92,
+          "is_error": false,
+          "tool_name": "nikto",
+          "agent_params": null
+        }
+      ],
+      "structured_output": {
+        "tools_executed": [
+          "nmap_scanner",
+          "httpx_prober",
+          "whatweb_fingerprint",
+          "sslscan_tls",
+          "nikto_scanner"
+        ],
+        "open_ports": [
+          2052,
+          2053,
+          2082,
+          2083,
+          2086,
+          2087,
+          2095,
+          2096,
+          80,
+          443,
+          8080,
+          8443
+        ],
+        "services": {},
+        "vulnerabilities": [
+          "Missing X-Frame-Options header on HTTPS endpoint.",
+          "Exposed Cloudflare internal headers (cf-ray, cf-cache-status) may disclose server details.",
+          "Multiple internal management ports (2052-2096) open, potentially increasing attack surface.",
+          "OpenSSL 3.0.13 detected; while not currently known to have critical CVEs, continuous patching is recommended.",
+          "No HSTS header observed on HTTPS endpoint."
+        ],
+        "analysis": "The target is fronted by Cloudflare with open HTTP and HTTPS ports (80, 443, 8080, 8443) and several internal management ports (2052-2096). No specific service versions were identified, but missing security headers and exposed internal ports increase the attack surface. Recommendations include enabling X-Frame-Options, enforcing HSTS, restricting or closing unnecessary internal management ports, and ensuring TLS libraries remain up to date."
+      }
+    },
+    "findings": {
+      "tool_calls": [
+        {
+          "seq": 9,
+          "tool_bin": "nvd_cpe_lookup",
+          "command": [
+            "nvd_cpe_lookup",
+            "OpenSSL 3.0.13"
+          ],
+          "raw_output": "[NVD-CPE] CVEs für cpe:2.3:a:openssl:openssl:3.0.13 (10 Top-Treffer nach CVSS):\n\nCVE-2026-31789 — CVSS 9.8 (CRITICAL)\n  Published: 2026-04-07\n  Issue summary: Converting an excessively large OCTET STRING value to\na hexadecimal string leads to a heap buffer overflow on 32 bit platforms.\n\nImpact summary: A heap buffer overflow may lead to a cra\n\nCVE-2026-34182 — CVSS 9.1 (CRITICAL)\n  Published: 2026-06-09\n  Issue Summary: Cryptographic Message Services (CMS) processing fails to perform\nsufficient input validation on the cipher and tag length fields of\nAuthEnvelopedData containers, leading to various pote\n\nCVE-2026-75803 — CVSS 9.1 (CRITICAL)\n  Published: 2026-08-25\n  Issue summary: ChaCha20-Poly1305 and AES-OCB decryption with an empty\nciphertext can report success without verifying the supplied authentication\ntag when the operation is finalized by calling the EVP\n\nCVE-2025-15467 — CVSS 8.8 (HIGH)\n  Published: 2026-01-27\n  Issue summary: Parsing CMS AuthEnvelopedData or EnvelopedData message with\nmaliciously crafted AEAD parameters can trigger a stack buffer overflow.\n\nImpact summary: A stack buffer overflow may lead to\n\nCVE-2026-45447 — CVSS 8.8 (HIGH)\n  Published: 2026-06-09\n  Issue summary: A specially crafted PKCS#7 or S/MIME signed message could\ntrigger a use-after-free during PKCS#7 signature verification.\n\nImpact summary: A use-after-free may result in process crashes,\n\nCVE-2026-28387 — CVSS 8.1 (HIGH)\n  Published: 2026-04-07\n  Issue summary: An uncommon configuration of clients performing DANE TLSA-based\nserver authentication, when paired with uncommon server DANE TLSA records, may\nresult in a use-after-free and/or double-f\n\nCVE-2026-7383 — CVSS 8.1 (HIGH)\n  Published: 2026-06-09\n  Issue summary: A signed integer overflow when sizing the destination\nbuffer for Unicode output in ASN1_mbstring_ncopy() can lead to a heap\nbuffer overflow.\n\nImpact summary: A heap buffer overflow may \n\nCVE-2019-0190 — CVSS 7.5 (HIGH)\n  Published: 2019-01-30\n  A bug exists in the way mod_ssl handled client renegotiations. A remote attacker could send a carefully crafted request that would cause mod_ssl to enter a loop leading to a denial of service. This bu\n\nCVE-2024-6119 — CVSS 7.5 (HIGH)\n  Published: 2024-09-03\n  Issue summary: Applications performing certificate name checks (e.g., TLS\nclients checking server certificates) may attempt to read an invalid memory\naddress resulting in abnormal termination of the a\n\nCVE-2025-69420 — CVSS 7.5 (HIGH)\n  Published: 2026-01-27\n  Issue summary: A type confusion vulnerability exists in the TimeStamp Response\nverification code where an ASN1_TYPE union member is accessed without first\nvalidating the type, causing an invalid or NU",
+          "raw_output_chars": 2698,
+          "duration_s": 7.74,
+          "is_error": false,
+          "tool_name": "nvd_cpe_lookup",
+          "agent_params": null
+        },
+        {
+          "seq": 10,
+          "tool_bin": "searchsploit",
+          "command": [
+            "/usr/local/bin/searchsploit",
+            "--json",
+            "OpenSSL",
+            "3.0.13"
+          ],
+          "raw_output": "{\n\t\"SEARCH\": \"OpenSSL 3.0.13\",\n\t\"DB_PATH_EXPLOIT\": \"/opt/exploitdb\",\n\t\"RESULTS_EXPLOIT\": [\n\t\t{\"Title\":\"PHP < 5.3.6 'OpenSSL' Extension - 'openssl_decrypt' Ciphertext Data Memory Leak Denial of Service\",\"EDB-ID\":\"35487\",\"Date_Published\":\"2011-03-08\",\"Date_Added\":\"2011-03-08\",\"Date_Updated\":\"2014-12-08\",\"Author\":\"dovbysh\",\"Type\":\"dos\",\"Platform\":\"php\",\"Port\":\"\",\"Verified\":\"1\",\"Codes\":\"CVE-2011-1468;OSVDB-73755\",\"Tags\":\"\",\"Aliases\":\"\",\"Screenshot\":\"\",\"Application\":\"\",\"Source\":\"https://www.securityfocus.com/bid/46977/info\",\"Path\":\"/opt/exploitdb/exploits/php/dos/35487.php\"},\n\t\t{\"Title\":\"PHP < 5.3.6 'OpenSSL' Extension - 'openssl_encrypt' Plaintext Data Memory Leak Denial of Service\",\"EDB-ID\":\"35486\",\"Date_Published\":\"2011-03-08\",\"Date_Added\":\"2011-03-08\",\"Date_Updated\":\"2014-12-08\",\"Author\":\"dovbysh\",\"Type\":\"dos\",\"Platform\":\"php\",\"Port\":\"\",\"Verified\":\"1\",\"Codes\":\"CVE-2011-1468;OSVDB-73754\",\"Tags\":\"\",\"Aliases\":\"\",\"Screenshot\":\"\",\"Application\":\"\",\"Source\":\"https://www.securityfocus.com/bid/46977/info\",\"Path\":\"/opt/exploitdb/exploits/php/dos/35486.php\"}\n\t],\n\t\"DB_PATH_SHELLCODE\": \"/opt/exploitdb\",\n\t\"RESULTS_SHELLCODE\": [\t]\n}",
+          "raw_output_chars": 1134,
+          "duration_s": 1.0,
+          "is_error": false,
+          "tool_name": "searchsploit",
+          "agent_params": null
+        }
+      ],
+      "structured_output": {
+        "service_versions": [
+          "OpenSSL 3.0.13"
+        ],
+        "cve_references": [
+          "CVE-2026-31789",
+          "CVE-2026-34182",
+          "CVE-2026-75803",
+          "CVE-2026-45447",
+          "CVE-2026-28387",
+          "CVE-2026-7383",
+          "CVE-2019-0190",
+          "CVE-2024-6119",
+          "CVE-2025-69420",
+          "CVE-2011-1468"
+        ],
+        "risk_summary": "Missing X-Frame-Options header on HTTPS endpoint. Exposed Cloudflare internal headers (cf-ray, cf-cache-status) are present on HTTPS endpoint. Multiple internal management ports (2052-2096) are open. OpenSSL 3.0.13 detected. No HSTS header observed on HTTPS endpoint."
+      }
+    },
+    "red_scan": {
+      "tool_calls": [],
+      "structured_output": {
+        "targeted_findings": [
+          "OpenSSL 3.0.13"
+        ],
+        "tools_executed": [
+          "nmap_scanner",
+          "httpx_prober",
+          "whatweb_fingerprint",
+          "sslscan_tls",
+          "nikto_scanner"
+        ],
+        "open_ports": [
+          2052,
+          2053,
+          2082,
+          2083,
+          2086,
+          2087,
+          2095,
+          2096,
+          80,
+          443,
+          8080,
+          8443
+        ],
+        "vulnerabilities": [
+          "Missing X-Frame-Options header on HTTPS endpoint.",
+          "Exposed Cloudflare internal headers (cf-ray, cf-cache-status) may disclose server details.",
+          "Multiple internal management ports (2052-2096) open, potentially increasing attack surface.",
+          "OpenSSL 3.0.13 detected; while not currently known to have critical CVEs, continuous patching is recommended.",
+          "No HSTS header observed on HTTPS endpoint."
+        ],
+        "analysis": "The target is fronted by Cloudflare with open HTTP and HTTPS ports (80, 443, 8080, 8443) and several internal management ports (2052-2096). No specific service versions were identified, but missing security headers and exposed internal ports increase the attack surface. Recommendations include enabling X-Frame-Options, enforcing HSTS, restricting or closing unnecessary internal management ports, and ensuring TLS libraries remain up to date."
+      }
+    },
+    "red": {
+      "tool_calls": [
+        {
+          "seq": 11,
+          "tool_bin": "ddg_search",
+          "command": [
+            "ddg_search",
+            "CVE-2026-31789 PoC"
+          ],
+          "raw_output": "**CVE-2026-31789 - Heap Buffer Overflow in Hexadecimal Conversion**\nhttps://cvefeed.io/vuln/detail/CVE-2026-31789\nCVE-2026-31789 has a 14 public PoC/Exploit available at Github. Go to the Public Exploits tab to see the list.While CVE identifies specific instances of vulnerabilities, CWE categorizes the common flaws or weaknesses that can lead to vulnerabilities.\n\n**CVE-2026-31789 - Heap Buffer Overflow in OpenSSL... | WatchStack.io**\nhttps://watchstack.io/intel/cve/CVE-2026-31789\nCVE-2026-31789: Issue summary: Converting an excessively large OCTET STRING value to a hexadecimal string leads to a heap buffer overflow on 32 bit platforms.CVE-2026-31789 Exploits & PoCs (Proof Of Concept). No public PoCs found in our database for this CVE.\n\n**CVE-2026-31789, OpenSSL Heap Overflow on 32-Bit Systems**\nhttps://www.penligent.ai/hackinglabs/cve-2026-31789/\nCVE-2026-31789 is an OpenSSL heap overflow affecting 32-bit certificate-printing paths. Learn the real attack conditions, affected versions, safe validation, and fixes.\n\n**CVE-2026-31789 - Vulnerability Details - OpenCVE**\nhttps://app.opencve.io/cve/CVE-2026-31789\nCVE-2026-31789 - Heap Buffer Overflow in Hexadecimal Conversion.The vulnerability affects 32-bit systems and requires an application or service to process an unusually large X.509 certificate (over 1 Gigabyte) by printing or logging its contents.\n\n**CVE-2026-31789 | Vulnerability Database | Aqua Security**\nhttps://avd.aquasec.com/nvd/2026/cve-2026-31789/\nCVE-2026-31789 Vulnerability, Severity 9.8 CRITICAL, Out-of-bounds Write.",
+          "raw_output_chars": 1554,
+          "duration_s": 1.16,
+          "is_error": false,
+          "tool_name": "ddg_search",
+          "agent_params": null
+        },
+        {
+          "seq": 12,
+          "tool_bin": "searchsploit",
+          "command": [
+            "/usr/local/bin/searchsploit",
+            "--json",
+            "CVE-2026-31789"
+          ],
+          "raw_output": "{\n\t\"SEARCH\": \"CVE-2026-31789\",\n\t\"DB_PATH_EXPLOIT\": \"/opt/exploitdb\",\n\t\"RESULTS_EXPLOIT\": [\t],\n\t\"DB_PATH_SHELLCODE\": \"/opt/exploitdb\",\n\t\"RESULTS_SHELLCODE\": [\t]\n}",
+          "raw_output_chars": 161,
+          "duration_s": 0.51,
+          "is_error": false,
+          "tool_name": "searchsploit",
+          "agent_params": null
+        },
+        {
+          "seq": 13,
+          "tool_bin": "searchsploit",
+          "command": [
+            "/usr/local/bin/searchsploit",
+            "--json",
+            "CVE-2026-34182"
+          ],
+          "raw_output": "{\n\t\"SEARCH\": \"CVE-2026-34182\",\n\t\"DB_PATH_EXPLOIT\": \"/opt/exploitdb\",\n\t\"RESULTS_EXPLOIT\": [\t],\n\t\"DB_PATH_SHELLCODE\": \"/opt/exploitdb\",\n\t\"RESULTS_SHELLCODE\": [\t]\n}",
+          "raw_output_chars": 161,
+          "duration_s": 0.51,
+          "is_error": false,
+          "tool_name": "searchsploit",
+          "agent_params": null
+        },
+        {
+          "seq": 14,
+          "tool_bin": "ddg_search",
+          "command": [
+            "ddg_search",
+            "CVE-2026-34182 PoC"
+          ],
+          "raw_output": "**Cve**\nhttps://www.cve.org/CVERecord?id=CVE-2026-34182\nCommon vulnerabilities and Exposures (CVE) · We're sorry but the CVE Website doesn't work properly without JavaScript enabled. Please enable it to continue\n\n**CVE-2026-34182 - Red Hat Customer Portal**\nhttps://access.redhat.com/security/cve/cve-2026-34182\nJune 11, 2026 - A flaw was found in OpenSSL's Cryptographic Message Services (CMS) AuthEnvelopedData processing. An on-path attacker can exploit insufficient input validation on cipher and tag length fields by sending specially crafted CMS messages. This can lead to the forging of messages or bypass\n\n**CVE-2026-34182 Common Vulnerabilities and Exposures | SUSE**\nhttps://www.suse.com/security/cve/CVE-2026-34182.html\nSecure your Linux systems from CVE-2026-34182. Stay ahead of potential threats with the latest security updates from SUSE.\n\n**CVE-2026-34182 | Ubuntu**\nhttps://ubuntu.com/security/CVE-2026-34182\nJune 9, 2026 - https://www.cve.org/CVERecord?id=CVE-2026-34182 ·\n\n**CVE-2026-34182 Detail - NVD**\nhttps://nvd.nist.gov/vuln/detail/CVE-2026-34182\nJune 9, 2026 - This is a potential security issue, you are being redirected to https://nvd.nist.gov · Official websites use .gov A .gov website belongs to an official government organization in the United States",
+          "raw_output_chars": 1283,
+          "duration_s": 0.81,
+          "is_error": false,
+          "tool_name": "ddg_search",
+          "agent_params": null
+        },
+        {
+          "seq": 15,
+          "tool_bin": "ddg_search",
+          "command": [
+            "ddg_search",
+            "CVE-2026-75803 PoC"
+          ],
+          "raw_output": "**CVE-2026-75803 — CVSS N/A NONE | CTIWatch**\nhttps://ctiwatch.com/vulnerabilities/CVE-2026-75803\nNVD Source Technical Analysis CVE-2026-75803 requires local access, meaning attackers must already have a foothold on the target system. Exploitation requires some privileges, which limits the exposure to scenarios where an attacker has already gained initial access. Exploit & PoC Resources NO KNOWN\n\n**GitHub - SecureWithUmer/CVE-2026-PoCs: A community-curated, verified ...**\nhttps://github.com/SecureWithUmer/CVE-2026-PoCs\nMost CVE PoC collections are scattered across Twitter threads, gists, and dead blog links. This repo aims to be the single, well-organized, actively maintained index of 2026 CVE PoCs — with consistent metadata, verified references, and clear contribution standards.\n\n**CVE-2026-75803 - GitHub Advisory Database**\nhttps://github.com/advisories/GHSA-vr27-9w4v-hjw2\nCritical severity Unreviewed Published Aug 25, 2026 to the GitHub Advisory Database • Updated Sep 1, 2026\n\n**CVE-2026-75803: Improper Validation of Integrity Check Value**\nhttps://www.rapid7.com/db/vulnerabilities/cve-2026-75803/\nCVE-2026-75803: Improper Validation of Integrity Check Value. View severity, references, and remediation details from Rapid7.\n\n**CVE-2026-75803 - Critical Vulnerability - TheHackerWire**\nhttps://www.thehackerwire.com/vulnerability/CVE-2026-75803/\nCVE-2026-75803 is a Critical severity vulnerability (CVSS 9.1). Issue summary: ChaCha20-Poly1305 and AES-OCB decryption with an empty ciphertext can report success without verifying the supplied authentication tag when...",
+          "raw_output_chars": 1586,
+          "duration_s": 1.0,
+          "is_error": false,
+          "tool_name": "ddg_search",
+          "agent_params": null
+        },
+        {
+          "seq": 16,
+          "tool_bin": "searchsploit",
+          "command": [
+            "/usr/local/bin/searchsploit",
+            "--json",
+            "CVE-2026-45447"
+          ],
+          "raw_output": "{\n\t\"SEARCH\": \"CVE-2026-45447\",\n\t\"DB_PATH_EXPLOIT\": \"/opt/exploitdb\",\n\t\"RESULTS_EXPLOIT\": [\t],\n\t\"DB_PATH_SHELLCODE\": \"/opt/exploitdb\",\n\t\"RESULTS_SHELLCODE\": [\t]\n}",
+          "raw_output_chars": 161,
+          "duration_s": 0.5,
+          "is_error": false,
+          "tool_name": "searchsploit",
+          "agent_params": null
+        },
+        {
+          "seq": 17,
+          "tool_bin": "ddg_search",
+          "command": [
+            "ddg_search",
+            "CVE-2026-28387 PoC"
+          ],
+          "raw_output": "**NVD - CVE-2026-28387**\nhttps://nvd.nist.gov/vuln/detail/CVE-2026-28387\nCVE-2026-28387 Detail. Modified After Enrichment.CVE Dictionary Entry: CVE-2026-28387 NVD Published Date: 04/07/2026 NVD Last Modified: 07/24/2026 Source: OpenSSL Software Foundation.\n\n**CVE-2026-28387 - Use-after-free/double-free in DANE... | WatchStack.io**\nhttps://watchstack.io/intel/cve/CVE-2026-28387\nCVE-2026-28387: Issue summary: An uncommon configuration of clients performing DANE TLSA-based server authentication, when paired with uncommon server DANE TLSA records, may result in a use-after-free and/or double-free on the client side.\n\n**CVE-2026-28387 Common Vulnerabilities and Exposures | SUSE**\nhttps://www.suse.com/security/cve/CVE-2026-28387.html\nSecure your Linux systems from CVE-2026-28387. Stay ahead of potential threats with the latest security updates from SUSE.\n\n**CVE-2026-28387 — Alpine Security Tracker**\nhttps://security.alpinelinux.org/vuln/CVE-2026-28387\nCVE, NVD, CERT, CVE Details, CIRCL, Arch Linux, Debian, Red Hat, Ubuntu, Gentoo, SUSE (Bugzilla), SUSE (CVE), Mageia.\n\n**CVE-2026-28387 | Tenable**\nhttps://www.tenable.com/cve/CVE-2026-28387\nBy far the most common deployment of DANE is in SMTP MTAs for which RFC7672 recommends that clients treat as 'unusable' any TLSA records that have the PKIX certificate usages.CVE-2026-28387. high. Information.",
+          "raw_output_chars": 1360,
+          "duration_s": 0.9,
+          "is_error": false,
+          "tool_name": "ddg_search",
+          "agent_params": null
+        }
+      ],
+      "structured_output": {
+        "confirmed_attack_surface": [
+          "sslscan:443 — OpenSSL 3.0.13 detected"
+        ],
+        "exploitable_findings": [
+          "CVE-2011-1468"
+        ],
+        "exploitable_findings_count": 1,
+        "cve_references": [
+          "CVE-2011-1468"
+        ]
+      }
+    },
+    "coding": {
+      "tool_calls": [],
+      "structured_output": null
+    },
+    "report": {
+      "tool_calls": [],
+      "structured_output": {
+        "path": "pending",
+        "executive_summary": "# Recon Report: example.com\n## Reconnaissance Summary\n  Domain: example.com\n  Open ports: 2052,2053,2082,2083,2086,2087,2095,2096,80,443,8080,8443\n\n## Scope & Methodik\n| Tool | Zweck | Abgedeckte Assets |\n|------|-------|-------------------|\n| ddg_search | Domain enumeration via search engine | Domain enumeration |\n| httpx | HTTP probing | HTTP/HTTPS endpoint discovery |\n| nikto | Web vulnerability scanning | Known vulnerable components |\n| nmap | Port scanning | All listed open ports |\n| nvd_cpe_lookup | CPE version detection | Service version fingerprinting |\n| searchsploit | CVE lookup | Vulnerability research |\n| sslscan | TLS service analysis | TLS version and cipher suites |\n| subfinder | Subdomain enumeration | Subdomain discovery |\n| whatweb | Technology fingerprinting | Web server stack identification |\n| whois | Domain registration info | WHOIS data retrieval |\n\n## Confirmed Findings\n| Service | Port | Beobachtung | Tool | Trace-Seq# |\n|-------|------|-------------|------|----------|\n| tcp | 2052 | open | nmap | 1 |\n| tcp | 2053 | open | nmap | 2 |\n| tcp | 2082 | open | nmap | 3 |\n| tcp | 2083 | open | nmap | 4 |\n| tcp | 2086 | open | nmap | 5 |\n| tcp | 2087 | open | nmap | 6 |\n| tcp | 2095 | open | nmap | 7 |\n| tcp | 2096 | open | nmap | 8 |\n| tcp | 80 | open | nmap | 9 |\n| tcp | 443 | open | nmap | 10 |\n| tcp | 8080 | open | nmap | 11 |\n| tcp | 8443 | open | nmap | 12 |\n| tcp | 443 | OpenSSL 3.0.13 detected | sslscan | 13 |\n\n## Detected Technologies\nsslscan → OpenSSL 3.0.13\n\n## CVE References\nCVE-2011-1468\n"
+      }
+    }
+  }
+}

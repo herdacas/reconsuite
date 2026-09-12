@@ -1,0 +1,62 @@
+[
+  {
+    "seq": 4,
+    "tool_bin": "httpx",
+    "command": [
+      "/snap/bin/httpx",
+      "-silent",
+      "-silent"
+    ],
+    "raw_output": "https://www.willkommen.rastede.de\nhttps://smarttime.rastede.de\nhttps://autodiscover.rastede.de\nhttps://www.rastede.de",
+    "raw_output_chars": 117,
+    "duration_s": 0.93,
+    "is_error": false,
+    "tool_name": "httpx",
+    "agent_params": null,
+    "phase": "blue"
+  },
+  {
+    "seq": 5,
+    "tool_bin": "whatweb",
+    "command": [
+      "whatweb",
+      "https://www.rastede.de",
+      "--no-errors"
+    ],
+    "raw_output": "\u001b[1m\u001b[34mhttps://www.rastede.de\u001b[0m [200 OK] \u001b[1mApache\u001b[0m, \u001b[1mBootstrap\u001b[0m[\u001b[1m\u001b[32m3.4.2\u001b[0m], \u001b[1mCountry\u001b[0m[\u001b[0m\u001b[22mUNITED STATES\u001b[0m][\u001b[1m\u001b[31mUS\u001b[0m], \u001b[1mEmail\u001b[0m[\u001b[0m\u001b[22mgemeinde@rastede.de,info@residenzort-rastede.de\u001b[0m], \u001b[1mHTML5\u001b[0m, \u001b[1mHTTPServer\u001b[0m[\u001b[1m\u001b[36mApache\u001b[0m], \u001b[1mIP\u001b[0m[\u001b[0m\u001b[22m151.106.74.108\u001b[0m], \u001b[1mJQuery\u001b[0m[\u001b[1m\u001b[32m3.7.1\u001b[0m], \u001b[1mMetaGenerator\u001b[0m[\u001b[0m\u001b[22mPowered by Slider Revolution 6.7.15 - responsive, Mobile-Friendly Slider Plugin for WordPress with comfortable drag and drop interface.,Redux 4.4.18,WordPress 6.6.7\u001b[0m], \u001b[1mModernizr\u001b[0m, \u001b[1mPHP\u001b[0m[\u001b[1m\u001b[32m8.4.25,\u001b[0m], \u001b[1mPlesk\u001b[0m[\u001b[0m\u001b[22mLin\u001b[0m], \u001b[1mPoweredBy\u001b[0m[\u001b[0m\u001b[22mSlider\u001b[0m], \u001b[1mScript\u001b[0m[\u001b[0m\u001b[22mtext/javascript\u001b[0m], \u001b[1mTitle\u001b[0m[\u001b[1m\u001b[33mResidenzort Rastede &#8211; Gemeinde und Tourismus im Ammerland\u001b[0m], \u001b[1mUncommonHeaders\u001b[0m[\u001b[0m\u001b[22mlink,x-tec-api-version,x-tec-api-root,x-tec-api-origin\u001b[0m], \u001b[1mWordPress\u001b[0m[\u001b[1m\u001b[32m6.6.7\u001b[0m], \u001b[1mX-Powered-By\u001b[0m[\u001b[0m\u001b[22mPHP/8.4.25, PleskLin\u001b[0m]",
+    "raw_output_chars": 1028,
+    "duration_s": 7.79,
+    "is_error": false,
+    "tool_name": "whatweb",
+    "agent_params": null,
+    "phase": "blue"
+  },
+  {
+    "seq": 7,
+    "tool_bin": "nuclei",
+    "command": [
+      "/root/go/bin/nuclei",
+      "-u",
+      "www.rastede.de",
+      "-silent",
+      "-no-color",
+      "-timeout",
+      "10",
+      "-max-host-error",
+      "3",
+      "-t",
+      "cves",
+      "-severity",
+      "critical,high",
+      "-tags",
+      "apache,wordpress"
+    ],
+    "raw_output": "[WRN] The concurrency value is higher than max-host-error",
+    "raw_output_chars": 57,
+    "duration_s": 19.32,
+    "is_error": false,
+    "tool_name": "nuclei",
+    "agent_params": null,
+    "phase": "blue"
+  }
+]

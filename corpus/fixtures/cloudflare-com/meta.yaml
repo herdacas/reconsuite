@@ -1,0 +1,15 @@
+target_id: "cloudflare-com"
+scan_target: "www.cloudflare.com"
+category: "external_readonly"
+captured_at: "2026-09-12T03:18:55.123277+00:00"
+source_trace: "trace_www.cloudflare.com_20260912_051855.json"
+source_report: "final_report_www.cloudflare.com_20260912_051937.md"
+notes: "Heute in dieser Session gescannt (Test-Matrix-Nachtrag) — deckte den tools_executed-Fabrikationsfall (wafw00f) auf."
+n_tool_calls: 17
+scope: "web"
+pipeline:
+  - research
+  - blue
+  - findings
+  - red
+  - report

@@ -1,0 +1,17 @@
+target_id: "rastede-de"
+scan_target: "rastede.de"
+category: "external_readonly"
+captured_at: "2026-09-11T16:39:42.842866+00:00"
+source_trace: "trace_rastede.de_20260911_183942.json"
+source_report: "final_report_rastede.de_20260911_184953.md"
+notes: "Ground Truth (CLAUDE.md, 2026-09-11): OpenSSH 9.6p1 → CVE-2024-6387 (regreSSHion, CVSS 8.1) real zutreffend."
+n_tool_calls: 20
+scope: "full"
+pipeline:
+  - research
+  - blue
+  - findings
+  - red_scan
+  - red
+  - coding
+  - report

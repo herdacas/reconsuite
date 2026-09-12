@@ -1,0 +1,17 @@
+target_id: "westerstede-de"
+scan_target: "westerstede.de"
+category: "external_readonly"
+captured_at: "2026-09-12T00:51:17.139380+00:00"
+source_trace: "trace_westerstede.de_20260912_025117.json"
+source_report: "final_report_westerstede.de_20260912_025251.md"
+notes: "Im Projekt wiederholt gescannt (deutsche Kommune, CLAUDE.md-Historie)."
+n_tool_calls: 27
+scope: "full"
+pipeline:
+  - research
+  - blue
+  - findings
+  - red_scan
+  - red
+  - coding
+  - report

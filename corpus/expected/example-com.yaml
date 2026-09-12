@@ -1,0 +1,15 @@
+# SCHREIBGESCHÜTZT — kein historisch etabliertes must_find_cve für dieses Ziel
+# (im Gegensatz zu scanme/rastede). Bewertung läuft rein über dynamische Oracles
+# (DNS/Zert/CVE-Existenz) in Phase 2/3, nicht über einen statischen Soll-Wert hier.
+target: example.com
+category: external_readonly
+known_services: []
+must_find_cves: []
+notes: >
+  Bewusst kein CONTROLLED-Ground-Truth-Eintrag — würde ohne echten historischen
+  Beleg erfunden sein (verstößt gegen Regel 1). Live-relevant für diesen Corpus:
+  BUG-25-Nachtrag (sslscan-Eigenbanner "OpenSSL 3.0.13") wurde genau an diesem
+  Target gefunden — die Fixture stammt aus dem Lauf VOR diesem Fix (Trace
+  20260912_040746, Fix committet danach) und ist damit ein Positivfall zum
+  Nachweis, dass der Fix rückwirkend greift wenn score.py denselben Report
+  erneut prüft.

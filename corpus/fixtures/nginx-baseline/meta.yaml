@@ -1,0 +1,15 @@
+target_id: "nginx-baseline"
+scan_target: "172.17.0.2"
+category: "lab_networks"
+captured_at: "2026-09-12T02:23:22.176383+00:00"
+source_trace: "trace_172.17.0.2_20260912_042322.json"
+source_report: "final_report_172.17.0.2_20260912_042322.md"
+notes: "Docker-Container nginx:alpine, testing/targets.yaml#nginx-clean-baseline. TN-Baseline: erwartet minimale Angriffsfläche (Port 80 only)."
+n_tool_calls: 8
+scope: "network"
+pipeline:
+  - research
+  - blue
+  - findings
+  - red
+  - report

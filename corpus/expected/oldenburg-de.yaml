@@ -1,0 +1,11 @@
+# SCHREIBGESCHÜTZT — kein historisch etabliertes must_find_cve für dieses Ziel.
+target: oldenburg.de
+category: external_readonly
+known_services: []
+must_find_cves: []
+notes: >
+  Diese Fixture-Session (Trace 20260912_014331) erreichte laut Dateilage nur
+  den recon_report — kein final_report in derselben Session gefunden (siehe
+  build_corpus.py _find_session()-Fix). Kein Blocker für die Team-1-Feld-
+  Validierung, schränkt aber die Team-3-Report-Prüfung (Confirmed-Findings-
+  Tabelle) für DIESE Fixture ein — als Limitierung in Phase 6 vermerkt.

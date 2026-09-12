@@ -1,0 +1,17 @@
+target_id: "oldenburg-de"
+scan_target: "oldenburg.de"
+category: "external_readonly"
+captured_at: "2026-09-11T23:43:31.876921+00:00"
+source_trace: "trace_oldenburg.de_20260912_014331.json"
+source_report: "recon_report_oldenburg.de_20260912_014331.md"
+notes: "Im Projekt wiederholt gescannt (deutsche Kommune, CLAUDE.md-Historie)."
+n_tool_calls: 15
+scope: "full"
+pipeline:
+  - research
+  - blue
+  - findings
+  - red_scan
+  - red
+  - coding
+  - report

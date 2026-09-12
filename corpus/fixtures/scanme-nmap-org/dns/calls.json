@@ -1,0 +1,53 @@
+[
+  {
+    "seq": 1,
+    "tool_bin": "dig",
+    "command": [
+      "dig",
+      "scanme.nmap.org",
+      "A",
+      "+short"
+    ],
+    "raw_output": "45.33.32.156",
+    "raw_output_chars": 12,
+    "duration_s": 0.03,
+    "is_error": false,
+    "tool_name": "dig",
+    "agent_params": null,
+    "phase": "research"
+  },
+  {
+    "seq": 2,
+    "tool_bin": "subfinder",
+    "command": [
+      "/root/go/bin/subfinder",
+      "-d",
+      "scanme.nmap.org",
+      "-silent"
+    ],
+    "raw_output": "",
+    "raw_output_chars": 0,
+    "duration_s": 1.19,
+    "is_error": false,
+    "tool_name": "subfinder",
+    "agent_params": null,
+    "phase": "research"
+  },
+  {
+    "seq": 3,
+    "tool_bin": "dig",
+    "command": [
+      "dig",
+      "45.33.32.156",
+      "PTR",
+      "+short"
+    ],
+    "raw_output": "",
+    "raw_output_chars": 0,
+    "duration_s": 0.03,
+    "is_error": false,
+    "tool_name": "dig",
+    "agent_params": null,
+    "phase": "research"
+  }
+]

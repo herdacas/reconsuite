@@ -1,0 +1,17 @@
+[
+  {
+    "seq": 8,
+    "tool_bin": "whois",
+    "command": [
+      "whois",
+      "rastede.de"
+    ],
+    "raw_output": "% Restricted rights.\n% \n% Terms and Conditions of Use\n% \n% The above data may only be used within the scope of technical or\n% administrative necessities of Internet operation or to remedy legal\n% problems.\n% The use for other purposes, in particular for advertising, is not permitted.\n% \n% The DENIC whois service on port 43 doesn't disclose any information concerning\n% the domain holder, general request and abuse contact.\n% This information can be obtained through use of our web-based whois service\n% available at the DENIC website:\n% https://webwhois.denic.de/?lang=en\n% \n% \n\nDomain: rastede.de\nNserver: ns1.plusserver.com\nNserver: ns2.plusserver.com\nNserver: ns3.plusserver.com\nStatus: connect\nChanged: 2023-07-26T09:01:30+02:00",
+    "raw_output_chars": 734,
+    "duration_s": 0.04,
+    "is_error": false,
+    "tool_name": "whois",
+    "agent_params": null,
+    "phase": "findings"
+  }
+]

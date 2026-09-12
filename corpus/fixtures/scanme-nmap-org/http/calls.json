@@ -1,0 +1,95 @@
+[
+  {
+    "seq": 7,
+    "tool_bin": "whatweb",
+    "command": [
+      "whatweb",
+      "http://scanme.nmap.org",
+      "--no-errors"
+    ],
+    "raw_output": "\u001b[1m\u001b[34mhttp://scanme.nmap.org\u001b[0m [200 OK] \u001b[1mApache\u001b[0m[\u001b[1m\u001b[32m2.4.7\u001b[0m], \u001b[1mCountry\u001b[0m[\u001b[0m\u001b[22mRESERVED\u001b[0m][\u001b[1m\u001b[31mZZ\u001b[0m], \u001b[1mGoogle-Analytics\u001b[0m[\u001b[1m\u001b[32mUniversal\u001b[0m][\u001b[1m\u001b[36mUA-11009417-1\u001b[0m], \u001b[1mHTML5\u001b[0m, \u001b[1mHTTPServer\u001b[0m[\u001b[1m\u001b[31mUbuntu Linux\u001b[0m][\u001b[1m\u001b[36mApache/2.4.7 (Ubuntu)\u001b[0m], \u001b[1mIP\u001b[0m[\u001b[0m\u001b[22m45.33.32.156\u001b[0m], \u001b[1mScript\u001b[0m, \u001b[1mTitle\u001b[0m[\u001b[1m\u001b[33mGo ahead and ScanMe!\u001b[0m]",
+    "raw_output_chars": 417,
+    "duration_s": 4.75,
+    "is_error": false,
+    "tool_name": "whatweb",
+    "agent_params": null,
+    "phase": "blue"
+  },
+  {
+    "seq": 8,
+    "tool_bin": "httpx",
+    "command": [
+      "/snap/bin/httpx",
+      "-silent",
+      "-silent"
+    ],
+    "raw_output": "http://scanme.nmap.org",
+    "raw_output_chars": 22,
+    "duration_s": 0.72,
+    "is_error": false,
+    "tool_name": "httpx",
+    "agent_params": null,
+    "phase": "blue"
+  },
+  {
+    "seq": 9,
+    "tool_bin": "wafw00f",
+    "command": [
+      "/opt/projects/agentic-ai/recon-suite/venv/bin/wafw00f",
+      "-a",
+      "https://scanme.nmap.org"
+    ],
+    "raw_output": "?              ,.   (   .      )        .      \"\n         __        ??          (\"     )  )'     ,'        )  . (`     '`\n    (___()'`;   ???          .; )  ' (( (\" )    ;(,     ((  (  ;)  \"  )\")\n    /,___ /`                 _\"., ,._'_.,)_(..,( . )_  _' )_') (. _..( ' )\n    \\\\   \\\\                 |____|____|____|____|____|____|____|____|____|\n\n                                ~ WAFW00F : v2.4.2 ~\n                    ~ Sniffing Web Application Firewalls since 2009 ~\n\n[*] Checking https://scanme.nmap.org",
+    "raw_output_chars": 507,
+    "duration_s": 0.39,
+    "is_error": false,
+    "tool_name": "wafw00f",
+    "agent_params": null,
+    "phase": "blue"
+  },
+  {
+    "seq": 10,
+    "tool_bin": "nikto",
+    "command": [
+      "nikto",
+      "-h",
+      "http://scanme.nmap.org",
+      "-nointeractive",
+      "-maxtime",
+      "90s",
+      "-timeout",
+      "5",
+      "-p",
+      "80",
+      "-Tuning",
+      "4"
+    ],
+    "raw_output": "- Nikto v2.1.5\n---------------------------------------------------------------------------\n+ Target IP:          45.33.32.156\n+ Target Hostname:    scanme.nmap.org\n+ Target Port:        80\n+ Start Time:         2026-09-10 22:15:56 (GMT2)\n---------------------------------------------------------------------------\n+ Server: Apache/2.4.7 (Ubuntu)\n+ The anti-clickjacking X-Frame-Options header is not present.\n+ No CGI Directories found (use '-C all' to force check all possible dirs)\n+ Allowed HTTP Methods: POST, OPTIONS, GET, HEAD \n+ 413 items checked: 0 error(s) and 2 item(s) reported on remote host\n+ End Time:           2026-09-10 22:17:12 (GMT2) (76 seconds)\n---------------------------------------------------------------------------\n+ 1 host(s) tested",
+    "raw_output_chars": 760,
+    "duration_s": 76.23,
+    "is_error": false,
+    "tool_name": "nikto",
+    "agent_params": null,
+    "phase": "blue"
+  },
+  {
+    "seq": 11,
+    "tool_bin": "curl",
+    "command": [
+      "curl",
+      "-s",
+      "-I",
+      "--max-time",
+      "15",
+      "-L",
+      "https://scanme.nmap.org"
+    ],
+    "raw_output": "",
+    "raw_output_chars": 0,
+    "duration_s": 0.17,
+    "is_error": false,
+    "tool_name": "curl",
+    "agent_params": null,
+    "phase": "blue"
+  }
+]

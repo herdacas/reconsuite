@@ -1,0 +1,19 @@
+[
+  {
+    "seq": 1,
+    "tool_bin": "dig",
+    "command": [
+      "dig",
+      "172.17.0.2.in-addr.arpa",
+      "PTR",
+      "+short"
+    ],
+    "raw_output": "",
+    "raw_output_chars": 0,
+    "duration_s": 0.04,
+    "is_error": false,
+    "tool_name": "dig",
+    "agent_params": null,
+    "phase": "research"
+  }
+]
