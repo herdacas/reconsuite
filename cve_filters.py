@@ -25,6 +25,9 @@ _TOO_GENERIC = {"server", "http", "https", "service", "manager", "core", "web",
                 "linux", "enterprise", "framework"}
 
 _KEV_PHRASES = ("exploited in the wild", "known to be exploited", "actively exploited")
+# Verneinungs-Cues — ein Satz mit KEV-Phrase UND einem dieser Cues gilt NICHT als KEV
+# (z.B. "not known to be exploited", "no evidence of exploitation in the wild").
+_NEGATION_CUES = ("not ", "no ", "n't", "without", "never", "unlikely", "no known", "not been")
 
 
 def cve_product_keywords(cve: dict) -> set[str]:
@@ -71,9 +74,22 @@ def version_confirmed_in_scan(cve: dict, scan_body: str) -> bool:
 
 
 def is_kev(cve: dict) -> bool:
-    """CISA-KEV-Heuristik: NVD-Beschreibung nennt aktive Ausnutzung."""
+    """CISA-KEV-Heuristik: NVD-Beschreibung nennt aktive Ausnutzung.
+
+    Nebenbefund BACKLOG-FIX (2026-09-11, jetzt gefixt): reiner Substring-Match auf die
+    KEV-Phrasen würde auch eine Verneinung im selben Satz fälschlich als KEV werten
+    (z.B. "not known to be exploited", "no evidence of exploitation in the wild").
+    Fix: Beschreibung satzweise prüfen — ein Satz zählt nur als KEV-Treffer, wenn er
+    eine KEV-Phrase enthält UND KEINEN Verneinungs-Cue im selben Satz.
+    """
     desc = (cve.get("description") or "").lower()
-    return any(phrase in desc for phrase in _KEV_PHRASES)
+    if not desc:
+        return False
+    for sentence in re.split(r"(?<=[.!?])\s+", desc):
+        if any(phrase in sentence for phrase in _KEV_PHRASES):
+            if not any(cue in sentence for cue in _NEGATION_CUES):
+                return True
+    return False
 
 
 def valid_nvd_results(nvd_results: list[dict]) -> list[dict]:
