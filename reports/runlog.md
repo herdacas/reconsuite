@@ -44,3 +44,25 @@ Keine nachträgliche Bearbeitung — nur Anhängen. Zeitstempel = Ausführungsze
   - Gesamt: 159/197 → 161/197 verifizierbare Felder korrekt (Wilson-95%-CI 0.746–0.856 → 0.757–0.865).
 
 **06:00** — Fix committet (siehe Commit-Historie, Score-Delta in der Message).
+
+**06:02** — Zusätzliche Oracle-Nutzung (RDAP/Cert) über den restlichen Corpus. Echter Bug
+gefunden: rdap.org's Bootstrap unterstützt `.de` nicht (3 von 4 Apex-Domains im Corpus sind
+`.de`) — Fix: DENIC-Direct-Fallback in `rdap_oracle.py`. Verifiziert (alle 3 `.de`-Domains
+liefern jetzt echte RDAP-Daten, `.com`-Regressionscheck unverändert korrekt). Committet
+(`8a7afcb`).
+
+**06:03** — Cert-Oracle-Batch über die restlichen 5 Domains: 4/5 OK (echte CT-Log-Daten),
+1/5 ERROR (oldenburg.de, crt.sh 502 nach 3 Retries — reale transiente Instabilität,
+dokumentiert, kein Fix versucht — Retry-Budget bereits ausgeschöpft, weiteres Retryen wäre
+gegen die Rate-Limit-Schonung).
+
+**06:04** — `rastede-de`-Report explizit gegen die `forbid_cves`-Erwartung geprüft (CVE-2023-
+38408 darf NICHT gelistet sein) — 0 Treffer, Erwartung bestätigt, keine strittige Erwartung.
+
+**06:04** — Phase 6: `reports/FINAL_REPORT.md` geschrieben (8 Abschnitte laut Spec). 2 neue,
+in dieser Runde NICHT gefixte Defekte dokumentiert (5.2: red_scan kopiert open_ports/
+vulnerabilities von blue ohne neue Verifikation; 5.3: 1 FALSE_NEGATIVE bei open_ports).
+Abdeckungsgrenzen explizit benannt (nur 7/34 Inventar-Felder gescort, Cert/TLS/RDAP-Oracle
+nicht in die automatisierte Klassifikation integriert, Phase 4 nicht neu durchgeführt).
+
+**06:05** — Session-Ende. Autonomer Auftrag abgeschlossen, Bericht an den User geht raus.
