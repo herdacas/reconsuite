@@ -9,6 +9,11 @@ Wir arbeiten die Roadmap (`roadmap.md`) phasenweise ab. Im Ablauf wird entschied
 
 **WICHTIG — Keine pauschalen Antworten. Faktenbasierte Responses auf jede Frage.**
 
+### Neuer Backlog-Punkt (2026-09-12, gefunden bei der BUG-25-Nachtrag-Verifikation, NICHT gefixt)
+
+- **sslscan-Banner-Kontamination erreicht auch Team 5/6 (compliance/risk_scorer), nicht nur den Reporter-Task.** Der `_strip_sslscan_self_banner()`-Fix (siehe BUG-25-Nachtrag oben) schützt nur die "Confirmed Findings"/"Detected Technologies"-Sektionen des `report`-Tasks. Im selben `example.com full`-Lauf, der diesen Fix auslöste, übernahm `compliance_example.com_20260912_040914.md` (Team 5) "OpenSSL 3.0.13" ebenfalls unter "A03:2025 – Software Supply Chain Failures" mit Bezug auf `CVE-2011-1468` — die Kontamination sitzt bereits eine Stufe früher (blue/findings-Phase selbst schreibt die Fehlinterpretation in ihren strukturierten Output, den Team 5/6 direkt konsumieren, nicht erst der finale Markdown-Report). Root Cause identisch zu BUG-25: reine Prompt-Anweisung im blue-Task (kein Guardrail) reicht nicht.
+  - **Nicht gefixt, bewusst zurückgestellt** — würde einen Guardrail auf dem `blue`/`findings`-Task selbst erfordern (analog `_value_grounding_guardrail`, aber auf Pydantic-Feldern statt Markdown-Text), plus Prüfung ob das bestehende BUG-17-Versions-Gate (`cve_filters.version_confirmed_in_scan`) ebenfalls auf den kontaminierten `scan_body`-Text anspricht (wahrscheinlich ja, da "OpenSSL" + "3.0.13" dort literal nebeneinander stehen). Eigene Design-Runde nötig, nicht spontan mitgefixt.
+
 ### Aktueller Stand (2026-09-12, Fortsetzung — BUG-26: drei Scan-Crashes nach BUG-25-Verifikation)
 
 - **BUG-26 (2026-09-12, UMGESETZT, Unit-verifiziert, E2E-Verifikation läuft) — Required-Field-Crashes + BUG-24-Rezidiv, gefunden bei 3 manuellen Scans in Folge (example.com full [Crash], oldenburg.de [durchgelaufen trotz Fehlern], westerstede.de full [Crash]):**
