@@ -28,3 +28,6 @@ phase7.md
 # Laufzeit-Artefakte / Backups (nicht ins Repo)
 agentscanit/knowledge_storage/
 *.json_backup
+
+# Validierungs-Harness (VALIDATION_SPEC.md) — Oracle-Antworten-Cache, regenerierbar
+validation/oracles/_cache/

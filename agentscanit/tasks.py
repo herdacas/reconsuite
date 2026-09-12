@@ -518,11 +518,7 @@ def _tools_executed_guardrail(output: Any) -> tuple[bool, Any]:
         if not real_used:
             return True, raw
 
-        def _grounded(name: str) -> bool:
-            low = name.lower()
-            return any(low == r.lower() or low.startswith(r.lower()) for r in real_used)
-
-        fabricated = [t for t in claimed if not _grounded(t)]
+        fabricated = [t for t in claimed if not _tool_name_grounded(t, real_used)]
         if fabricated and run_trace._guardrail_reject_count < 1:
             run_trace._guardrail_reject_count += 1
             return False, (
@@ -714,6 +710,33 @@ def _extract_report_text(output: Any) -> tuple[str, Any]:
     return text, raw
 
 
+def _tool_name_grounded(claimed: str, real_tools) -> bool:
+    """True wenn `claimed` echt gelaufen ist — exakt, als Präfix (CrewAI-Tool-
+    Klassennamen wie 'httpx_prober'/'nuclei_vulnerability_scanner' für die
+    realen Bin-Namen 'httpx'/'nuclei') ODER als führendes Wort vor einem
+    Nicht-Alnum-Suffix ('nmap (step_1)' -> 'nmap').
+
+    Gemeinsamer Helper für alle drei Tool-Namen-Guardrails (gefunden bei der
+    Validierungsrunde 2026-09-12: _confirmed_findings_tool_guardrail prüfte
+    bisher nur exakte Gleichheit — 'nuclei_vulnerability_scanner' (real:
+    nuclei) und 'nmap (step_1)' (real: nmap) wurden dadurch FÄLSCHLICH als
+    fabriziert gemeldet, obwohl die Tools echt liefen. _tools_executed_
+    guardrail und der Detected-Technologies-Teil von _value_grounding_
+    guardrail hatten diese Toleranz bereits — jetzt konsolidiert, damit alle
+    drei Guardrails denselben, bereits bewährten Maßstab anlegen.
+
+    Toleriert nur Paraphrasierung DES TOOL-NAMENS, nicht des behaupteten
+    WERTS — ein Tool das nie lief, bleibt weiterhin ein Reject.
+    """
+    low = claimed.strip().strip("`").lower()
+    lead = _re.split(r"[\s(]", low, 1)[0]
+    for real in real_tools:
+        rl = real.lower()
+        if low == rl or low.startswith(rl) or lead == rl:
+            return True
+    return False
+
+
 def _confirmed_findings_tool_guardrail(output: Any) -> tuple[bool, Any]:
     """Guardrail (report): 'Tool'-Spalte der Confirmed-Findings-Tabelle gegen die
     real in dieser Session gelaufenen Tools validieren.
@@ -785,7 +808,7 @@ def _confirmed_findings_tool_guardrail(output: Any) -> tuple[bool, Any]:
                 continue
             for name in _re.split(r'[,/]', tool_col):
                 name = name.strip().strip('`')
-                if name and name not in real_tools:
+                if name and not _tool_name_grounded(name, real_tools):
                     fabricated.add(name)
 
         if (fabricated or unattributed) and run_trace._guardrail_reject_count < 1:
@@ -924,12 +947,20 @@ def _value_grounding_guardrail(output: Any) -> tuple[bool, Any]:
         real_tools = run_trace.get_all_tool_names()
 
         def _grounded_haystack(tool_names: list) -> list:
+            # Präfix-tolerante Tool-Auflösung (2026-09-12, Validierungsrunde):
+            # ein zitierter Name wie 'nuclei_vulnerability_scanner' hat sonst
+            # KEINEN Raw-Output unter genau diesem String im Trace (real:
+            # 'nuclei') — get_all_tool_names() + _tool_name_grounded() löst das
+            # auf denselben real gelaufenen Tool-Namen auf, statt stillschweigend
+            # 0 Ergebnisse zu liefern (und damit die Wertprüfung zu überspringen).
             parts = []
             for name in tool_names:
-                for out in run_trace.get_raw_outputs_for_tool(name):
-                    if name.lower().startswith("sslscan"):
-                        out = _strip_sslscan_self_banner(out)
-                    parts.append(out)
+                resolved = [r for r in real_tools if _tool_name_grounded(name, {r})] or [name]
+                for r in resolved:
+                    for out in run_trace.get_raw_outputs_for_tool(r):
+                        if r.lower().startswith("sslscan"):
+                            out = _strip_sslscan_self_banner(out)
+                        parts.append(out)
             return parts
 
         ungrounded: list = []
@@ -960,7 +991,12 @@ def _value_grounding_guardrail(output: Any) -> tuple[bool, Any]:
                               # hier kein Doppel-Reject auf denselben Root Cause
 
                 haystack = "\n".join(haystack_parts)
-                if not any(anchor in haystack for anchor in anchors):
+                # Case-insensitiv (2026-09-12, Validierungsrunde): whois liefert
+                # Domains z.B. als 'WWW.CLOUDFLARE.COM', die Beobachtung zitiert
+                # 'www.cloudflare.com' — Hostnamen sind laut RFC 4343 ohnehin
+                # case-insensitiv; ein case-sensitiver Vergleich hätte hier eine
+                # korrekt gegroundete Aussage fälschlich als Fehler gewertet.
+                if not any(anchor.lower() in haystack.lower() for anchor in anchors):
                     ungrounded.append((observation, tool_col, anchors))
 
         # --- Sektion 2: Detected Technologies (Zeilen 'label → wert') ---
@@ -988,7 +1024,7 @@ def _value_grounding_guardrail(output: Any) -> tuple[bool, Any]:
                     continue
 
                 haystack = "\n".join(haystack_parts)
-                if not any(anchor in haystack for anchor in anchors):
+                if not any(anchor.lower() in haystack.lower() for anchor in anchors):
                     ungrounded.append((value, label, anchors))
 
         if ungrounded and run_trace._guardrail_reject_count < 1:
