@@ -685,6 +685,16 @@ def _confirmed_findings_tool_guardrail(output: Any) -> tuple[bool, Any]:
     liefen leer durch und akzeptierten stillschweigend. Fix: bevorzugt aus dem
     bereits geparsten 'output.pydantic.executive_summary' lesen (dort echte
     Python-Newlines); Fallback: 'raw' selbst als JSON parsen und entpacken.
+
+    Zweiter Folgefund (www.cloudflare.com, 2026-09-12): eine Zeile mit KOMPLETT
+    LEERER Tool-Spalte ('| Cloudflare | 443 | WAF/CDN detected: ... |  |  |',
+    wafw00f wurde in dieser Session nie aufgerufen) wurde bisher übersprungen
+    ('not tool_col' → continue) statt geprüft — eine unbelegte Behauptung ohne
+    JEDE Tool-Angabe ist mindestens so verdächtig wie ein falscher Tool-Name,
+    entging aber beiden Guardrails (auch _value_grounding_guardrail überspringt
+    Zeilen ohne Tool-Spalte). Fix: eine echte Datenzeile (Beobachtung vorhanden,
+    keine Kopf-/Trennzeile) mit leerer Tool-Spalte gilt jetzt selbst als
+    Fabrikation.
     """
     text, raw = _extract_report_text(output)
     if not text or "## Confirmed Findings" not in text:
@@ -704,6 +714,7 @@ def _confirmed_findings_tool_guardrail(output: Any) -> tuple[bool, Any]:
             return True, raw
 
         fabricated: set = set()
+        unattributed: list = []
         for row in section_match.group(1).splitlines():
             row = row.strip()
             if not row.startswith("|"):
@@ -711,23 +722,38 @@ def _confirmed_findings_tool_guardrail(output: Any) -> tuple[bool, Any]:
             cols = [c.strip() for c in row.strip("|").split("|")]
             if len(cols) < 4:
                 continue
-            tool_col = cols[3]  # Service | Port | Beobachtung | Tool | Trace-Seq#
-            if not tool_col or tool_col == "Tool" or _re.fullmatch(r'-+', tool_col):
+            observation, tool_col = cols[2], cols[3]
+            if tool_col == "Tool" or (tool_col and _re.fullmatch(r'-+', tool_col)):
                 continue  # Kopfzeile / Trennzeile
+            if not tool_col:
+                # Echte Datenzeile (Beobachtung vorhanden, keine Kopf-/Trennzeile)
+                # ohne JEDE Tool-Angabe — unbelegte Behauptung, siehe Docstring.
+                if observation and not _re.fullmatch(r'-+', observation):
+                    unattributed.append(observation)
+                continue
             for name in _re.split(r'[,/]', tool_col):
                 name = name.strip().strip('`')
                 if name and name not in real_tools:
                     fabricated.add(name)
 
-        if fabricated and run_trace._guardrail_reject_count < 1:
+        if (fabricated or unattributed) and run_trace._guardrail_reject_count < 1:
             run_trace._guardrail_reject_count += 1
+            parts = []
+            if fabricated:
+                parts.append(
+                    f"Tool(s) {sorted(fabricated)} als Quelle genannt, die in dieser "
+                    f"Session NIE aufgerufen wurden"
+                )
+            if unattributed:
+                parts.append(
+                    f"Zeile(n) ohne JEDE Tool-Angabe: {unattributed[:5]}"
+                )
             return False, (
-                f"FEHLER: Die 'Confirmed Findings'-Tabelle nennt Tool(s) "
-                f"{sorted(fabricated)} als Quelle, die in dieser Session NIE "
-                f"aufgerufen wurden. Real gelaufene Tools: {sorted(real_tools)}. "
-                f"Korrigiere die 'Tool'-Spalte auf das Tool, das die jeweilige "
-                f"Beobachtung laut Kontext tatsächlich lieferte (z.B. searchsploit "
-                f"statt eines Scanners der nichts fand)."
+                f"FEHLER: Die 'Confirmed Findings'-Tabelle enthält unbelegte "
+                f"Behauptungen — {'; '.join(parts)}. Real gelaufene Tools: "
+                f"{sorted(real_tools)}. Korrigiere die 'Tool'-Spalte auf das Tool, "
+                f"das die jeweilige Beobachtung laut Kontext tatsächlich lieferte, "
+                f"oder entferne die Zeile falls kein Tool sie bestätigt."
             )
     except Exception:
         pass
