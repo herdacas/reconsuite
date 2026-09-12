@@ -152,6 +152,11 @@ def run_scan(target: str, scope: str, objective: str = "matrix-scan") -> dict:
                  or _newest("", "llm_debug", ".jsonl", t0),
         "exit": p.returncode,
         "dur_s": round(time.time() - t0, 1),
+        # 2026-09-12-Fund: bei exit!=0 wurde stdout/stderr bisher nirgends
+        # ausgegeben — ein Fehlschlag ließ sich nur durch manuelle Reproduktion
+        # diagnostizieren (siehe CLAUDE.md, waf-cloudflare-Matrixlauf). Letzte
+        # 2000 Zeichen genügen für die üblichen Traceback/ValidationError-Fälle.
+        "tail": (p.stdout + p.stderr)[-2000:] if p.returncode != 0 else "",
     }
 
 
@@ -255,6 +260,10 @@ def main():
                 print(f"    exit={art['exit']} dur={art['dur_s']}s "
                       f"trace={'✓' if art['trace'] else '✗'} report={'✓' if art['report'] else '✗'}"
                       f"{'  [FAILED → nicht ausgewertet]' if failed else ''}")
+                if failed and art.get("tail"):
+                    print(f"    ↳ letzte Ausgabe:\n" + "\n".join(
+                        f"      {ln}" for ln in art["tail"].splitlines()[-15:]
+                    ))
         finally:
             if is_docker:
                 container_down(spec)
