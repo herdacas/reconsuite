@@ -274,28 +274,16 @@ class AgentScanITCrew:
             },
         }
 
-        # ─── AgentPlanner-Gate (BUG-18, 2026-06-18) ──────────────────────────
-        # Der CrewAI AgentPlanner baut EINEN Plan-Prompt der ALLE Tasks +
-        # Tool-Definitionen + Backstories enthält. Bei full (7 Tasks) ist dieser
-        # Prompt ~129.000 Zeichen ≈ 32k Tokens groß (bewiesen via RECON_LLM_DEBUG,
-        # 2026-06-18: Call #0 "Task Execution Planner", prompt_chars=129302,
-        # dur=237s). Der Planner läuft lokal (qwen2.5:7b, num_ctx=4096) → der
-        # 32k-Prompt überläuft das 4096-Fenster um das ~8-fache → der lokale
-        # Server generiert minutenlang und kippt intermittierend in leere/
-        # fehlerhafte Antworten ("Invalid response from LLM call - None or empty"),
-        # was den GANZEN full-Scan abbrechen ließ. web/network (5 Tasks) bleiben
-        # unter der Schwelle und liefen immer durch.
-        #
-        # Fix: Planner nur bei ≤5 Tasks aktiv. _SCOPE_CEILING legt die Pipeline
-        # ohnehin deterministisch fest — der Planner optimiert nur die AUSFÜHRUNG,
-        # nicht WELCHE Tasks laufen; bei full ist der Verlust also gering.
-        #
-        # TODO (echte Lösung, siehe roadmap "Offen"): Planner-Prompt für große
-        # Scopes verkleinern (Task-Beschreibungen kürzen / Tools aus dem Plan-
-        # Prompt nehmen) ODER Planner-num_ctx an die Prompt-Größe koppeln ODER
-        # ein lokales Planner-Modell mit größerem nativem Kontext. Dann kann das
-        # Gate wieder fallen.
-        _use_planning = len(self._active_tasks) <= 5
+        # ─── AgentPlanner num_ctx (BUG-18 "echte Lösung", 2026-09-12) ─────────
+        # Ursprünglicher Fix (BUG-18, 2026-06-18): Planner nur bei ≤5 Tasks aktiv,
+        # weil der fixe num_ctx=4096 bei full (7 Tasks, Plan-Prompt empirisch
+        # 129.302 Zeichen) intermittierend zu Leerantworten führte. Die "echte
+        # Lösung" ist jetzt in agents.py umgesetzt: `llm_planner` läuft durchgängig
+        # mit der nativen Kontextgrenze des lokalen Modells (PLANNER_NUM_CTX=32768,
+        # qwen2.5:7b-instruct). Das ≤5-Tasks-Gate entfällt — Planning ist für ALLE
+        # Scopes aktiv (Details/Begründung siehe Kommentar bei `llm_planner` in
+        # agents.py).
+        _use_planning = True
 
         # memory=False: LanceDB's Rust embedder callback fires from a background
         # thread without the GIL → PyO3 panic on save → corrupts thread-local

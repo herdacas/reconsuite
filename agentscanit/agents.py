@@ -172,6 +172,25 @@ llm_reporter = _llm(ACTIVE_ANALYSIS, TEMP_ANALYSIS, max_tokens=12000 if OLLAMA_A
 # Grund: CrewAI AgentPlanner nutzt call_llm_native_tools (Ollama native FC-API),
 # die remote Modelle (gpt-oss) nicht unterstützen → "Invalid response from LLM call - None or empty."
 # PLANNER_BASE_URL ist hardcoded auf localhost; LOCAL_MODEL_PLANNER = qwen2.5:7b-instruct.
+# ─── Planner num_ctx auf native Modellgrenze (BUG-18 "echte Lösung", 2026-09-12) ───
+# BUG-18 (2026-06-18) hatte Planning bei >5 Tasks komplett deaktiviert, weil der
+# fixe num_ctx=4096 bei full (7 Tasks, Plan-Prompt empirisch 129.302 Zeichen)
+# intermittierend zu Leerantworten führte. Ein Versuch, num_ctx linear an die
+# Task-Zahl zu koppeln (Zeichen/Task-Schätzung), scheiterte an echten historischen
+# Daten (`logs/llm_debug_*.jsonl`): auch ≤5-Task-Scopes hatten dort schon
+# Plan-Prompts >100.000 Zeichen und liefen trotzdem bei fixem num_ctx=4096
+# NICHT-leer durch (Ollama/litellm truncated intern statt hart zu scheitern) —
+# eine lineare Zeichen/Task-Schätzung ist also kein verlässlicher Prädiktor und
+# hätte im Zielfall (full, 7 Tasks) das exakt gemessene Problem sogar erneut
+# ausgelöst.
+# Robusterer Fix: num_ctx durchgängig auf die native Kontextgrenze des lokalen
+# Planner-Modells setzen (qwen2.5:7b-instruct: 32768, laut Ollama-Modellkarte
+# `context_length`), statt auf einem knappen Fixwert zu bleiben. Kostet nur
+# Rechenzeit (lokal CPU-only, aber 59GB RAM frei — kein Ressourcenrisiko),
+# keine Korrektheitsgefahr. Planning bleibt damit für ALLE Scopes aktiv
+# (crew.py: der ≤5-Tasks-Gate entfällt).
+PLANNER_NUM_CTX = 32768  # native Grenze qwen2.5:7b-instruct (Ollama-Modellkarte)
+
 llm_planner = LLM(
     model=f"ollama/{ACTIVE_PLANNER}",
     base_url=PLANNER_BASE_URL,
@@ -179,7 +198,7 @@ llm_planner = LLM(
     max_tokens=2000,
     extra_body={
         "keep_alive": "30m",
-        "num_ctx":    4096,
+        "num_ctx":    PLANNER_NUM_CTX,
         "think":      False,
     },
 )
