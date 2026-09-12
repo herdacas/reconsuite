@@ -9,6 +9,22 @@ Wir arbeiten die Roadmap (`roadmap.md`) phasenweise ab. Im Ablauf wird entschied
 
 **WICHTIG — Keine pauschalen Antworten. Faktenbasierte Responses auf jede Frage.**
 
+### Aktueller Stand (2026-09-12, Abarbeitung offener Punkte — 7 Fixes, alle committet)
+
+Systematisches Abarbeiten der zu diesem Zeitpunkt bekannten offenen Punkte, jeweils Fix → Verifikation → Commit. Alle unten genannten Commit-Hashes sind auf `main`, nichts gepusht.
+
+1. **`is_kev()`-Negation** (`b0c9d8c`): satzweise Prüfung statt Substring-Match, siehe Fix-Historie unten.
+2. **Strg+C-Fix** (`235c871`): `subprocess.Popen`-Registry + SIGINT-Handler, siehe „Bekannte Probleme" unten.
+3. **BUG-18 echte Lösung** (`2669866`): Planner-`num_ctx` auf native Modellgrenze (32768) statt `≤5`-Tasks-Gate, live verifiziert bei `full`.
+4. **BUG-25-Nachtrag: sslscan-Eigenbanner** (`34e9607`): live bestätigt, dass der reine Prompt-Fix unzureichend war — jetzt deterministisch in `_value_grounding_guardrail` gefixt.
+5. **Confirmed-Findings-Zeile mit leerer Tool-Spalte** (`efd6a27`): live gefunden bei `www.cloudflare.com` (WAF-Behauptung ohne jede Tool-Angabe) — `_confirmed_findings_tool_guardrail` erkennt das jetzt.
+6. **`run_matrix.py` Fehlerausgabe** (`7413166`): Harness gab bei Scan-Fehlschlag bisher keine Fehlermeldung aus — jetzt stdout/stderr-Tail.
+7. **Neuer `_tools_executed_guardrail`** (`c8431fb`): live gefunden bei `www.cloudflare.com` — `BlueOutput.tools_executed` nannte `wafw00f`, das nie lief. Gleiche Fabrikationsklasse wie BUG-23/25, jetzt auch im strukturierten Pydantic-Feld (nicht nur im Markdown-Report) gefixt.
+
+Details zu jedem Punkt (Root Cause, Verifikation) stehen in den jeweiligen Sektionen weiter unten bzw. in den Commit-Messages. Nebenbei erledigt: Testing-Harness-Matrix komplettiert (`nginx-clean-baseline` + `waf-cloudflare`, siehe Voll-Matrix-Abschnitt unten), „Gesamt-E2E-Beweis Pentest-Scope" bestätigt.
+
+**Neu gefundener, NICHT gefixter Backlog-Punkt** (eigene Design-Runde nötig): sslscan-Banner-Kontamination erreicht auch Team 5/6 (compliance/risk_scorer) — Details direkt darunter.
+
 ### Neuer Backlog-Punkt (2026-09-12, gefunden bei der BUG-25-Nachtrag-Verifikation, NICHT gefixt)
 
 - **sslscan-Banner-Kontamination erreicht auch Team 5/6 (compliance/risk_scorer), nicht nur den Reporter-Task.** Der `_strip_sslscan_self_banner()`-Fix (siehe BUG-25-Nachtrag oben) schützt nur die "Confirmed Findings"/"Detected Technologies"-Sektionen des `report`-Tasks. Im selben `example.com full`-Lauf, der diesen Fix auslöste, übernahm `compliance_example.com_20260912_040914.md` (Team 5) "OpenSSL 3.0.13" ebenfalls unter "A03:2025 – Software Supply Chain Failures" mit Bezug auf `CVE-2011-1468` — die Kontamination sitzt bereits eine Stufe früher (blue/findings-Phase selbst schreibt die Fehlinterpretation in ihren strukturierten Output, den Team 5/6 direkt konsumieren, nicht erst der finale Markdown-Report). Root Cause identisch zu BUG-25: reine Prompt-Anweisung im blue-Task (kein Guardrail) reicht nicht.
@@ -183,7 +199,7 @@ rm -f scope_gate.py authorized_scopes.json.example testing/test_scope_gate.py
   - ✅ **scanme.nmap.org** (TP): CVE-2018-15473 gefunden (1 valider Lauf; Rest nmap.org 12/Tag-Limit)
   - ✅ **petstore.swagger.io** (feature): PASS — swagger.json [200] via httpx `api_probe`
   - ✅ **proofpoint.com** (feature): PASS — **dnsx + katana ERSTMALS vom Agenten ausgelöst** (tool-bestätigt, katana crawlte 8 Subdomains). LÖST den seit Projektbeginn offenen Punkt „dnsx/katana mit qwen3-coder nie provoziert".
-  - ⏳ **OFFEN (Abbruch durch Session-Limit): nginx-TN + waf-cloudflare** — nachzuholen NÄCHSTE SESSION nach User-Freigabe: `venv/bin/python testing/run_matrix.py --targets nginx-clean-baseline waf-cloudflare --runs 1` (~2 Scans, Weekly-Budget beachten).
+  - ✅ **Nachgeholt (2026-09-12): nginx-TN + waf-cloudflare.** `nginx-clean-baseline`: PASS, alle 3 Dimensionen 1/1. `waf-cloudflare`: erster Lauf `exit=1` nach 1746s (`run_matrix.py` gab dabei keine Fehlermeldung aus — Harness-Gap, siehe unten). Direkte Reproduktion zeigte den echten Fehler: bekannte `ReportOutput`-JSON-Trunkierung (BUG-24/26-Muster) plus zwei NEUE, live gefundene Fabrikationsfälle (Confirmed-Findings-Zeile mit leerer Tool-Spalte + `tools_executed` nannte `wafw00f`, das nie lief) — beide noch am selben Tag gefixt (siehe `efd6a27`/`c8431fb` unten) und der Matrixlauf danach wiederholt: `exit=0`, Dim1 1/1, Dim2 1/1, **Feature 0/1** (ehrliches Ergebnis: `wafw00f` wird vom Modell nicht zuverlässig aufgerufen — agent-ermessensabhängig, gleiche Kategorie wie `dnsx`/`katana`, kein Guardrail erzwingt den Aufruf selbst, nur die Fabrikation bei Nicht-Aufruf ist jetzt verhindert). `run_matrix.py` gibt bei Fehlschlag jetzt stdout/stderr aus (`7413166`).
   - **Kern-Erkenntnis:** CVE-Recall 1.0 + 0 Halluzinationen über alle TP-Läufe → Wahrheitsgehalt für versions-präzise Targets bestätigt. **Methodischer Befund (kein Framework-Fehler):** Tomcat+WebLogic liefen parallel auf 127.0.0.1 (Container-Lifecycle überlappte, beide Ports in allen Traces) → beide CVEs gefunden, aber nicht isoliert getrennt. Backlog: `container_up`/`container_down` strikt sequenziell.
   - **NUR LOKAL:** Matrix-Artefakte + TESTKONZEPT §8/§9 (testing/, nicht gepusht). CLAUDE.md (dieser Block) ist push-bar.
 
