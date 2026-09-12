@@ -114,19 +114,27 @@ def _step_callback(step_output) -> None:
 
 # ─── LLM-Instanzen (eine pro Temperaturprofil) ────────────────────────────────
 
-def _llm(model: str, temperature: float) -> LLM:
+def _llm(model: str, temperature: float, max_tokens: int | None = None) -> LLM:
+    # Output-Längen-Limit (BUG-24, 2026-09-11): ohne explizites max_tokens fällt
+    # der Remote-Endpoint (ollama.com) auf einen knappen Default zurück, der bei
+    # langen Reports (v.a. full-Scope mit vielen Findings) das JSON mitten im
+    # Objekt abschneidet ("EOF while parsing an object" in ReportOutput —
+    # beobachtet bei oldenburg.de full). 8000 remote (num_ctx=16384, lässt genug
+    # Raum für Input-Context) / 4000 lokal (num_ctx=8192) als DEFAULT für alle
+    # Agents außer dem Reporter (siehe llm_reporter unten, BUG-24-Folgefund
+    # 2026-09-12: 8000 reichte bei westerstede.de full NICHT —
+    # "Could not parse response content as the length limit was reached"
+    # (completion_tokens=8000 exakt ausgeschöpft, total nur 11540 von 16384 —
+    # reines max_tokens-Limit, kein Context-Overflow). caller kann override via
+    # max_tokens=.
+    if max_tokens is None:
+        max_tokens = 8000 if OLLAMA_API_KEY else 4000
     kwargs = dict(
         model=f"ollama/{model}",
         base_url=ACTIVE_BASE_URL,
         temperature=temperature,
         timeout=300,
-        # Output-Längen-Limit (BUG-24, 2026-09-11): ohne explizites max_tokens fällt
-        # der Remote-Endpoint (ollama.com) auf einen knappen Default zurück, der bei
-        # langen Reports (v.a. full-Scope mit vielen Findings) das JSON mitten im
-        # Objekt abschneidet ("EOF while parsing an object" in ReportOutput —
-        # beobachtet bei oldenburg.de full). 8000 remote (num_ctx=16384, lässt genug
-        # Raum für Input-Context) / 4000 lokal (num_ctx=8192).
-        max_tokens=8000 if OLLAMA_API_KEY else 4000,
+        max_tokens=max_tokens,
     )
     if OLLAMA_API_KEY:
         kwargs["api_key"] = OLLAMA_API_KEY
@@ -147,6 +155,18 @@ def _llm(model: str, temperature: float) -> LLM:
 llm_analysis = _llm(ACTIVE_ANALYSIS, TEMP_ANALYSIS)
 llm_code     = _llm(ACTIVE_CODE,     TEMP_CODE)
 llm_research = _llm(ACTIVE_RESEARCH, TEMP_RESEARCH)
+
+# Dedizierte LLM-Instanz für reporter_agent (BUG-24-Folgefund, 2026-09-12): der
+# Report-Task erzeugt strukturell den längsten Single-Shot-Output der ganzen Pipeline
+# (vollständiger Markdown-Report als ein JSON-Feld) — teilte sich bisher max_tokens=8000
+# mit blue_agent/red_agent (beide llm_analysis), deren finale Turns viel kürzer sind
+# (Tool-Calls + kompakte Struktur-Listen). Live beobachtet (westerstede.de full):
+# completion_tokens=8000 exakt ausgeschöpft, total_tokens=11540 von num_ctx=16384 —
+# reichlich Spielraum ungenutzt, das Limit war ausschließlich max_tokens, kein
+# Context-Overflow. Höheres max_tokens NUR für den Reporter (nicht global auf
+# llm_analysis) — blue/red bleiben bei 8000/4000, ihr Bedarf ist ungeprüft anders
+# und soll nicht durch eine unbegründete globale Änderung mitbetroffen sein.
+llm_reporter = _llm(ACTIVE_ANALYSIS, TEMP_ANALYSIS, max_tokens=12000 if OLLAMA_API_KEY else 6000)
 
 # Planner LLM läuft IMMER lokal (localhost:11434) — auch im Remote-Mode.
 # Grund: CrewAI AgentPlanner nutzt call_llm_native_tools (Ollama native FC-API),
@@ -317,8 +337,8 @@ reporter_agent = Agent(
         "und Techniken das Team als nächstes einsetzen soll. "
         "Dein Bericht ist ein internes Arbeitsdokument – kein Kundendokument."
     ),
-    llm=llm_analysis,
-    function_calling_llm=llm_analysis,
+    llm=llm_reporter,
+    function_calling_llm=llm_reporter,
     executor_class=_EXECUTOR_CLASS,
     verbose=False,
     memory=False,

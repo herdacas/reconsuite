@@ -487,8 +487,11 @@ def _waf_detection_guardrail(output: Any) -> tuple[bool, Any]:
 # ─── Output-Modelle ───────────────────────────────────────────────────────────
 
 class ResearchOutput(BaseModel):
-    target_type: str                    # "domain" oder "ip"
-    summary: str
+    # BUG-26 (2026-09-12): beide Felder werden nirgends im Code konsumiert (reine
+    # Anzeige-/Kontext-Felder) — gleiches Default-""-Muster wie BlueOutput.analysis
+    # etc., verhindert einen Pipeline-Crash falls das Modell eines weglässt.
+    target_type: str = ""               # "domain" oder "ip"
+    summary: str = ""
     subdomains: List[str] = Field(default_factory=list)
     technologies: List[str] = Field(default_factory=list)
     osint_notes: List[str] = Field(default_factory=list)
@@ -511,18 +514,31 @@ class ResearchOutput(BaseModel):
     )
 
 
+# BUG-26 (2026-09-12): analysis/risk_summary waren die einzigen bare-required str-
+# Felder (kein Default) in ihren jeweiligen Output-Modellen — jedes andere Feld hat
+# bereits default_factory. Live beobachtet in zwei separaten Sessions (example.com
+# full, BlueOutput.analysis fehlte; FindingsOutput.risk_summary fehlte): wenn
+# nemotron-3-nano:30b dieses eine Feld im JSON wegließ, warf Pydantic einen harten
+# ValidationError, der main.py als "Field required" klassifiziert (structural,
+# nur 3 Vollneustart-Versuche statt 5 bei LLM-Fehlern) — bei ungünstigem Timing
+# (Fehler auf dem letzten Versuch) crashte der GESAMTE Scan wegen EINES fehlenden
+# Freitext-Felds, das für nachgelagerte Teams (interpret/risk_scorer/reporting)
+# nicht strukturell benötigt wird (die nutzen cve_references/vulnerabilities etc.,
+# nicht analysis/risk_summary direkt). Default "" verhindert den Crash; der Prompt
+# fordert das Feld weiterhin an (Verhaltensänderung nur bei Modell-Fehlverhalten
+# sichtbar, nicht bei normalem Betrieb).
 class BlueOutput(BaseModel):
     tools_executed: List[str] = Field(default_factory=list)
     open_ports: List[int] = Field(default_factory=list)
     services: Dict[str, Any] = Field(default_factory=dict)
     vulnerabilities: List[str] = Field(default_factory=list)
-    analysis: str
+    analysis: str = ""
 
 
 class FindingsOutput(BaseModel):
     service_versions: List[str] = Field(default_factory=list)
     cve_references: List[str] = Field(default_factory=list)
-    risk_summary: str
+    risk_summary: str = ""
 
     @field_validator("cve_references")
     @classmethod
@@ -535,7 +551,7 @@ class RedScanOutput(BaseModel):
     tools_executed: List[str] = Field(default_factory=list)
     open_ports: List[int] = Field(default_factory=list)
     vulnerabilities: List[str] = Field(default_factory=list)
-    analysis: str
+    analysis: str = ""
 
 
 class RedOutput(BaseModel):
