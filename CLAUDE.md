@@ -24,7 +24,10 @@ Wir arbeiten die Roadmap (`roadmap.md`) phasenweise ab. Im Ablauf wird entschied
     2. Reale Fehlerpayloads (exakt die beobachteten JSON-Shapes ohne `analysis`/`risk_summary`) gegen `BlueOutput`/`FindingsOutput`/`ResearchOutput`/`RedScanOutput` → alle 4 parsen jetzt erfolgreich mit leerem String statt `ValidationError`.
     3. Konstruktionstest: `llm_analysis.max_tokens == 8000` (unverändert), `llm_reporter.max_tokens == 12000`, `reporter_agent.llm is llm_reporter`, `blue_agent.llm`/`red_agent.llm` weiterhin `is llm_analysis` — alle 4 Scopes bauen weiterhin fehlerfrei.
     4. Regressionscheck BUG-25: `_value_grounding_guardrail` erkennt den echten fabrizierten example.com-Report weiterhin korrekt (unverändert durch diese Änderung).
-  - **E2E-Verifikation:** läuft (Ergebnis wird nachgetragen).
+  - **E2E-Verifikation (2026-09-12, `westerstede.de full`, Log `llm_debug_1201295.jsonl` + `trace_westerstede.de_20260912_025117.json`):** ✅ Bestanden — kompletter Durchlauf, alle Teams bis Team 6 (Risk Scorer) fertig (`recon_report`/`interpret`/`final_report`/`compliance`/`risk_score` vorhanden), kein Crash. `has_exploitable=False` auf dieser Route → Team 4 (Threat-Intel) planmäßig übersprungen, kein Fehler.
+    - Ein `ReportOutput`-`ValidationError` (`EOF while parsing an object`, 02:49:03 — gleiches Muster wie Befund 2/BUG-24) trat weiterhin auf, wurde aber diesmal durch einen reinen Task-LLM-Retry (nicht durch einen vollen Flow-Neustart) sofort behoben (Folge-Call 02:50:08 erfolgreich, 1591 Zeichen) — kein Kaskadenausfall wie zuvor. Zeigt: der `llm_reporter`-max_tokens-Fix (12000) reduziert die Trunkierungsrate, schließt sie aber nicht vollständig aus — für dieses Szenario griff die bestehende Retry-Infrastruktur wie vorgesehen.
+    - **Nebenbefund (kein neuer Bug, nur notiert):** `risk_score_westerstede.de_20260912_025251.md` zeigt 10 Critical-CVEs, alle Apache-HTTP-Server-CVEs für Versionsbereiche 2.4.49–2.4.55 — nicht im Rahmen dieser Verifikation gegen den tatsächlich erkannten Apache-Versions-Banner geprüft (BUG-17/25-Versions-Gate-Frage bleibt offen, separat zu prüfen falls die Zahl auffällt).
+  - **Status: BUG-26 vollständig abgeschlossen** (umgesetzt, Unit- UND E2E-verifiziert). Noch nicht committet.
 
 ### Aktueller Stand (2026-09-12 — BUG-25 gefunden, NOCH NICHT gefixt: Content-Fabrikation trotz korrekter Tool-Zuschreibung)
 
