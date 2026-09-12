@@ -751,6 +751,35 @@ _DETECTED_TECH_SECTION_RE = _re.compile(
 )
 _TECH_LINE_RE = _re.compile(r'^([\w./`\'"\[\] -]+?)\s*(?:→|->)\s*(.+)$')
 
+# BUG-25-Nachtrag (2026-09-12, live bestätigt bei erneutem example.com-full-Lauf):
+# der im ursprünglichen BUG-25-Fix dokumentierte "Sonderfall sslscan-Eigenbanner"
+# wurde bewusst NUR im blue-Prompt behandelt (reine Prompt-Anweisung), NICHT als
+# Guardrail — mit genau dem im Projekt schon mehrfach belegten Ergebnis (BUG-20/
+# BUG-23-Lehre: "CVE-/Werte-Kontrolle braucht Guardrail, nicht Prompt-Bitte"):
+# der Live-Scan übernahm sslscans Eigenbanner ("Version: 2.1.2\nOpenSSL 3.0.13
+# ...") trotzdem erneut als angebliche Ziel-TLS-Version, in BEIDEN Sektionen
+# (Confirmed Findings UND Detected Technologies). Die reine Substring-Prüfung
+# von _value_grounding_guardrail hätte das nicht gefangen — der Wert steht ja
+# wörtlich im Raw-Output, nur die Interpretation ist falsch. Fix: die ersten
+# 1-2 Banner-Zeilen werden aus dem Grounding-Haystack für sslscan-Tools entfernt,
+# BEVOR die Anker-Suche läuft — ein Anker der NUR im Banner vorkommt (wie bei
+# 55-Zeichen-sslscan-Outputs ohne echte Scan-Daten, z.B. hinter Cloudflare-TLS-
+# Terminierung) gilt dann korrekt als nicht belegt.
+_ANSI_ESCAPE_RE = _re.compile(r'\x1b\[[0-9;]*m')
+_SSLSCAN_SELF_BANNER_RE = _re.compile(
+    r'^\s*Version:\s*\d+(?:\.\d+){1,3}\s*\n\s*OpenSSL\s+\d+(?:\.\d+){1,3}[^\n]*\n?',
+    _re.IGNORECASE,
+)
+
+
+def _strip_sslscan_self_banner(raw: str) -> str:
+    """sslscans eigenen Versions-Banner (Tool-Version + kompilierte OpenSSL-
+    Version) aus dem Raw-Output entfernen, bevor er als Grounding-Nachweis dient.
+    Diese Zeilen sind immer die ersten 1-2 Zeilen von sslscan-Output, nie das
+    Scan-Ergebnis gegen das Ziel (siehe Modul-Kommentar oben, BUG-25-Nachtrag)."""
+    cleaned = _ANSI_ESCAPE_RE.sub('', raw or '')
+    return _SSLSCAN_SELF_BANNER_RE.sub('', cleaned, count=1)
+
 
 def _extract_value_anchors(text: str) -> list:
     """Faktische Anker aus einer Beobachtungs-Zeichenkette extrahieren (BUG-25).
@@ -797,12 +826,13 @@ def _value_grounding_guardrail(output: Any) -> tuple[bool, Any]:
     nicht in der Confirmed-Findings-Tabelle — beide Sektionen müssen geprüft
     werden, sonst bleibt genau dieser Fall unentdeckt.
 
-    Sonderfall sslscan-Eigenbanner (NICHT von dieser Guardrail behandelt): die
-    ersten Zeilen von sslscan-Output sind das Tool selbst (Versions-Banner), nicht
-    das Scan-Ergebnis — der Versionsanker steht dort zwar wörtlich, ist aber
-    trotzdem eine Fehlinterpretation. Das fängt diese Guardrail strukturell NICHT
-    (der Wert IST ja im Trace vorhanden) — behoben stattdessen im blue-Prompt
-    (separater Fix, siehe make_tasks()).
+    Sonderfall sslscan-Eigenbanner (BUG-25-Nachtrag, jetzt AUCH hier behandelt):
+    die ersten Zeilen von sslscan-Output sind das Tool selbst (Versions-Banner),
+    nicht das Scan-Ergebnis — der Versionsanker steht dort zwar wörtlich, ist
+    aber trotzdem eine Fehlinterpretation. Ursprünglich nur im blue-Prompt
+    adressiert (reine Prompt-Anweisung) — live bestätigt UNZUREICHEND (siehe
+    _strip_sslscan_self_banner()). _grounded_haystack() entfernt den Banner jetzt
+    deterministisch, bevor die Anker-Suche läuft.
     """
     text, raw = _extract_report_text(output)
     if not text or ("## Confirmed Findings" not in text and "## Detected Technologies" not in text):
@@ -818,7 +848,10 @@ def _value_grounding_guardrail(output: Any) -> tuple[bool, Any]:
         def _grounded_haystack(tool_names: list) -> list:
             parts = []
             for name in tool_names:
-                parts += run_trace.get_raw_outputs_for_tool(name)
+                for out in run_trace.get_raw_outputs_for_tool(name):
+                    if name.lower().startswith("sslscan"):
+                        out = _strip_sslscan_self_banner(out)
+                    parts.append(out)
             return parts
 
         ungrounded: list = []
