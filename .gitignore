@@ -31,3 +31,16 @@ agentscanit/knowledge_storage/
 
 # Validierungs-Harness (VALIDATION_SPEC.md) — Oracle-Antworten-Cache, regenerierbar
 validation/oracles/_cache/
+
+# Lokale Tool-/Editor-Umgebung (kein Projekt-Code, gehört nicht ins Repo)
+.agents/
+.vscode/
+skills-lock.json
+
+# Backups von gitignoreten Configs (agentscanit/models.json.pre-*.bak enthielt
+# 2026-09-13 den Klartext-Ollama-API-Key — nie versehentlich committen)
+*.bak
+
+# Versehentliche Log-Verzeichnis-Duplikate (2026-09-13: "logs copy"/"logs copy 2"
+# waren 314MB byte-identische Altkopien von logs/, gelöscht)
+logs copy*/
