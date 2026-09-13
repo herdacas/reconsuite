@@ -1,0 +1,1743 @@
+{
+  "generated_at": "2026-09-12T03:56:08Z",
+  "overall": {
+    "p": 0.8173,
+    "lower": 0.7574,
+    "upper": 0.865,
+    "n": 197
+  },
+  "coverage_verifiable_fraction": 1.0,
+  "n_raw_findings": 197,
+  "per_check": {
+    "_confirmed_findings_tool_guardrail": {
+      "p": 1.0,
+      "lower": 0.6457,
+      "upper": 1.0,
+      "n": 7,
+      "n_total_incl_unverifiable": 7,
+      "n_unverifiable": 0,
+      "classes": {
+        "CORRECT": 7
+      }
+    },
+    "_value_grounding_guardrail": {
+      "p": 0.2857,
+      "lower": 0.0822,
+      "upper": 0.6411,
+      "n": 7,
+      "n_total_incl_unverifiable": 7,
+      "n_unverifiable": 0,
+      "classes": {
+        "CORRECT": 2,
+        "FABRICATED": 5
+      }
+    },
+    "tools_executed[blue]": {
+      "p": 0.9412,
+      "lower": 0.8091,
+      "upper": 0.9837,
+      "n": 34,
+      "n_total_incl_unverifiable": 34,
+      "n_unverifiable": 0,
+      "classes": {
+        "CORRECT": 32,
+        "FABRICATED": 2
+      }
+    },
+    "cve_references": {
+      "p": 1.0,
+      "lower": 0.948,
+      "upper": 1.0,
+      "n": 70,
+      "n_total_incl_unverifiable": 70,
+      "n_unverifiable": 0,
+      "classes": {
+        "CORRECT": 70
+      }
+    },
+    "subdomains": {
+      "p": 1.0,
+      "lower": 0.6457,
+      "upper": 1.0,
+      "n": 7,
+      "n_total_incl_unverifiable": 7,
+      "n_unverifiable": 0,
+      "classes": {
+        "CORRECT": 7
+      }
+    },
+    "tools_executed[red_scan]": {
+      "p": 0.0,
+      "lower": 0.0,
+      "upper": 0.1206,
+      "n": 28,
+      "n_total_incl_unverifiable": 28,
+      "n_unverifiable": 0,
+      "classes": {
+        "FABRICATED": 28
+      }
+    },
+    "open_ports": {
+      "p": 0.9773,
+      "lower": 0.8819,
+      "upper": 0.996,
+      "n": 44,
+      "n_total_incl_unverifiable": 44,
+      "n_unverifiable": 0,
+      "classes": {
+        "FALSE_NEGATIVE": 1,
+        "CORRECT": 43
+      }
+    }
+  },
+  "raw_findings": [
+    {
+      "target": "cloudflare-com",
+      "check": "_confirmed_findings_tool_guardrail",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "cloudflare-com",
+      "check": "_value_grounding_guardrail",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "cloudflare-com",
+      "check": "tools_executed[blue]",
+      "field_value": "wafw00f",
+      "class": "FABRICATED",
+      "detail": "kein Call zu 'wafw00f' im Trace (real: ['httpx'])"
+    },
+    {
+      "target": "cloudflare-com",
+      "check": "tools_executed[blue]",
+      "field_value": "httpx_prober",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "cloudflare-com",
+      "check": "cve_references",
+      "field_value": "CVE-2019-10842",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "cloudflare-com",
+      "check": "cve_references",
+      "field_value": "CVE-2022-4428",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 8.9,
+        "severity": "HIGH"
+      }
+    },
+    {
+      "target": "cloudflare-com",
+      "check": "cve_references",
+      "field_value": "CVE-2025-58048",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.9,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "cloudflare-com",
+      "check": "cve_references",
+      "field_value": "CVE-2025-6087",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.1,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "cloudflare-com",
+      "check": "cve_references",
+      "field_value": "CVE-2025-8723",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "cloudflare-com",
+      "check": "subdomains",
+      "field_value": "api.www.cloudflare.com",
+      "class": "CORRECT",
+      "detail": {
+        "status": "RESOLVED",
+        "records": [
+          "104.16.123.96",
+          "104.16.124.96"
+        ],
+        "per_resolver": {
+          "1.1.1.1": [
+            "104.16.123.96",
+            "104.16.124.96"
+          ],
+          "8.8.8.8": [
+            "104.16.123.96",
+            "104.16.124.96"
+          ],
+          "9.9.9.9": [
+            "104.16.123.96",
+            "104.16.124.96"
+          ]
+        }
+      }
+    },
+    {
+      "target": "example-com",
+      "check": "_confirmed_findings_tool_guardrail",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "example-com",
+      "check": "_value_grounding_guardrail",
+      "class": "FABRICATED",
+      "detail": "FEHLER: Die 'Confirmed Findings'-Tabelle enthält Beobachtungen, deren zitiertes Tool NIE diesen Wert geliefert hat: 'OpenSSL 3.0.13 detected' (Tool: sslscan, Anker ['3.0.13'] nicht im Raw-Output gefunden); 'OpenSSL 3.0.13' (Tool: sslscan, Anker ['3.0.13'] nicht im Raw-Output gefunden). Jede Beobachtung muss WÖRTLICH aus dem Tool-Kontext dieser Session stammen — keine Produktnamen/Versionen/Subdoma"
+    },
+    {
+      "target": "example-com",
+      "check": "tools_executed[blue]",
+      "field_value": "nmap_scanner",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "example-com",
+      "check": "tools_executed[blue]",
+      "field_value": "httpx_prober",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "example-com",
+      "check": "tools_executed[blue]",
+      "field_value": "whatweb_fingerprint",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "example-com",
+      "check": "tools_executed[blue]",
+      "field_value": "sslscan_tls",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "example-com",
+      "check": "tools_executed[blue]",
+      "field_value": "nikto_scanner",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "example-com",
+      "check": "tools_executed[red_scan]",
+      "field_value": "nmap_scanner",
+      "class": "FABRICATED",
+      "detail": "kein Call zu 'nmap_scanner' im Trace (real: [])"
+    },
+    {
+      "target": "example-com",
+      "check": "tools_executed[red_scan]",
+      "field_value": "httpx_prober",
+      "class": "FABRICATED",
+      "detail": "kein Call zu 'httpx_prober' im Trace (real: [])"
+    },
+    {
+      "target": "example-com",
+      "check": "tools_executed[red_scan]",
+      "field_value": "whatweb_fingerprint",
+      "class": "FABRICATED",
+      "detail": "kein Call zu 'whatweb_fingerprint' im Trace (real: [])"
+    },
+    {
+      "target": "example-com",
+      "check": "tools_executed[red_scan]",
+      "field_value": "sslscan_tls",
+      "class": "FABRICATED",
+      "detail": "kein Call zu 'sslscan_tls' im Trace (real: [])"
+    },
+    {
+      "target": "example-com",
+      "check": "tools_executed[red_scan]",
+      "field_value": "nikto_scanner",
+      "class": "FABRICATED",
+      "detail": "kein Call zu 'nikto_scanner' im Trace (real: [])"
+    },
+    {
+      "target": "example-com",
+      "check": "open_ports",
+      "field_value": 2082,
+      "class": "CORRECT"
+    },
+    {
+      "target": "example-com",
+      "check": "open_ports",
+      "field_value": 2083,
+      "class": "CORRECT"
+    },
+    {
+      "target": "example-com",
+      "check": "open_ports",
+      "field_value": 2052,
+      "class": "CORRECT"
+    },
+    {
+      "target": "example-com",
+      "check": "open_ports",
+      "field_value": 2053,
+      "class": "CORRECT"
+    },
+    {
+      "target": "example-com",
+      "check": "open_ports",
+      "field_value": 2086,
+      "class": "CORRECT"
+    },
+    {
+      "target": "example-com",
+      "check": "open_ports",
+      "field_value": 2087,
+      "class": "CORRECT"
+    },
+    {
+      "target": "example-com",
+      "check": "open_ports",
+      "field_value": 2095,
+      "class": "CORRECT"
+    },
+    {
+      "target": "example-com",
+      "check": "open_ports",
+      "field_value": 2096,
+      "class": "CORRECT"
+    },
+    {
+      "target": "example-com",
+      "check": "open_ports",
+      "field_value": 80,
+      "class": "CORRECT"
+    },
+    {
+      "target": "example-com",
+      "check": "open_ports",
+      "field_value": 8080,
+      "class": "CORRECT"
+    },
+    {
+      "target": "example-com",
+      "check": "open_ports",
+      "field_value": 8443,
+      "class": "CORRECT"
+    },
+    {
+      "target": "example-com",
+      "check": "open_ports",
+      "field_value": 443,
+      "class": "CORRECT"
+    },
+    {
+      "target": "example-com",
+      "check": "open_ports",
+      "field_value": 8880,
+      "class": "FALSE_NEGATIVE",
+      "detail": "im nmap-Output offen, aber nicht gemeldet"
+    },
+    {
+      "target": "example-com",
+      "check": "cve_references",
+      "field_value": "CVE-2011-1468",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 4.3,
+        "severity": "MEDIUM"
+      }
+    },
+    {
+      "target": "example-com",
+      "check": "cve_references",
+      "field_value": "CVE-2019-0190",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 7.5,
+        "severity": "HIGH"
+      }
+    },
+    {
+      "target": "example-com",
+      "check": "cve_references",
+      "field_value": "CVE-2024-6119",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 7.5,
+        "severity": "HIGH"
+      }
+    },
+    {
+      "target": "example-com",
+      "check": "cve_references",
+      "field_value": "CVE-2025-69420",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 7.5,
+        "severity": "HIGH"
+      }
+    },
+    {
+      "target": "example-com",
+      "check": "cve_references",
+      "field_value": "CVE-2026-28387",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 8.1,
+        "severity": "HIGH"
+      }
+    },
+    {
+      "target": "example-com",
+      "check": "cve_references",
+      "field_value": "CVE-2026-31789",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "example-com",
+      "check": "cve_references",
+      "field_value": "CVE-2026-34182",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.1,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "example-com",
+      "check": "cve_references",
+      "field_value": "CVE-2026-45447",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 8.8,
+        "severity": "HIGH"
+      }
+    },
+    {
+      "target": "example-com",
+      "check": "cve_references",
+      "field_value": "CVE-2026-7383",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 8.1,
+        "severity": "HIGH"
+      }
+    },
+    {
+      "target": "example-com",
+      "check": "cve_references",
+      "field_value": "CVE-2026-75803",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.1,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "nginx-baseline",
+      "check": "_confirmed_findings_tool_guardrail",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "nginx-baseline",
+      "check": "_value_grounding_guardrail",
+      "class": "FABRICATED",
+      "detail": "FEHLER: Die 'Confirmed Findings'-Tabelle enthält Beobachtungen, deren zitiertes Tool NIE diesen Wert geliefert hat: 'OpenSSH 8.9p1 Ubuntu 3ubuntu0.1' (Tool: nmap, Anker ['8.9p1', '0.1'] nicht im Raw-Output gefunden); 'Apache 2.4.54 (Ubuntu)' (Tool: nmap, Anker ['2.4.54'] nicht im Raw-Output gefunden); 'Drupal CMS 9.3.0 identified' (Tool: whatweb, Anker ['9.3.0'] nicht im Raw-Output gefunden); 'Ope"
+    },
+    {
+      "target": "nginx-baseline",
+      "check": "tools_executed[blue]",
+      "field_value": "nmap_scanner",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "nginx-baseline",
+      "check": "tools_executed[blue]",
+      "field_value": "httpx_prober",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "nginx-baseline",
+      "check": "tools_executed[blue]",
+      "field_value": "whatweb_fingerprint",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "nginx-baseline",
+      "check": "tools_executed[blue]",
+      "field_value": "wafw00f_detect",
+      "class": "FABRICATED",
+      "detail": "kein Call zu 'wafw00f_detect' im Trace (real: ['httpx', 'nmap', 'whatweb'])"
+    },
+    {
+      "target": "nginx-baseline",
+      "check": "open_ports",
+      "field_value": 80,
+      "class": "CORRECT"
+    },
+    {
+      "target": "oldenburg-de",
+      "check": "_confirmed_findings_tool_guardrail",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "oldenburg-de",
+      "check": "_value_grounding_guardrail",
+      "class": "FABRICATED",
+      "detail": "FEHLER: Die 'Confirmed Findings'-Tabelle enthält Beobachtungen, deren zitiertes Tool NIE diesen Wert geliefert hat: 'OpenSSH 10.5' (Tool: whatweb, Anker ['10.5'] nicht im Raw-Output gefunden); 'OpenSSL 3.0.13 supports legacy TLS versions' (Tool: sslscan, Anker ['3.0.13'] nicht im Raw-Output gefunden). Jede Beobachtung muss WÖRTLICH aus dem Tool-Kontext dieser Session stammen — keine Produktnamen/V"
+    },
+    {
+      "target": "oldenburg-de",
+      "check": "tools_executed[blue]",
+      "field_value": "nmap_scanner",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "oldenburg-de",
+      "check": "tools_executed[blue]",
+      "field_value": "httpx_prober",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "oldenburg-de",
+      "check": "tools_executed[blue]",
+      "field_value": "whatweb_fingerprint",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "oldenburg-de",
+      "check": "tools_executed[blue]",
+      "field_value": "wafw00f_detect",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "oldenburg-de",
+      "check": "tools_executed[blue]",
+      "field_value": "curl_http_headers",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "oldenburg-de",
+      "check": "tools_executed[blue]",
+      "field_value": "sslscan_tls",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "oldenburg-de",
+      "check": "tools_executed[red_scan]",
+      "field_value": "nmap_scanner",
+      "class": "FABRICATED",
+      "detail": "kein Call zu 'nmap_scanner' im Trace (real: [])"
+    },
+    {
+      "target": "oldenburg-de",
+      "check": "tools_executed[red_scan]",
+      "field_value": "httpx_prober",
+      "class": "FABRICATED",
+      "detail": "kein Call zu 'httpx_prober' im Trace (real: [])"
+    },
+    {
+      "target": "oldenburg-de",
+      "check": "tools_executed[red_scan]",
+      "field_value": "whatweb_fingerprint",
+      "class": "FABRICATED",
+      "detail": "kein Call zu 'whatweb_fingerprint' im Trace (real: [])"
+    },
+    {
+      "target": "oldenburg-de",
+      "check": "tools_executed[red_scan]",
+      "field_value": "wafw00f_detect",
+      "class": "FABRICATED",
+      "detail": "kein Call zu 'wafw00f_detect' im Trace (real: [])"
+    },
+    {
+      "target": "oldenburg-de",
+      "check": "tools_executed[red_scan]",
+      "field_value": "curl_http_headers",
+      "class": "FABRICATED",
+      "detail": "kein Call zu 'curl_http_headers' im Trace (real: [])"
+    },
+    {
+      "target": "oldenburg-de",
+      "check": "tools_executed[red_scan]",
+      "field_value": "sslscan_tls",
+      "class": "FABRICATED",
+      "detail": "kein Call zu 'sslscan_tls' im Trace (real: [])"
+    },
+    {
+      "target": "oldenburg-de",
+      "check": "open_ports",
+      "field_value": 80,
+      "class": "CORRECT"
+    },
+    {
+      "target": "oldenburg-de",
+      "check": "open_ports",
+      "field_value": 443,
+      "class": "CORRECT"
+    },
+    {
+      "target": "oldenburg-de",
+      "check": "open_ports",
+      "field_value": 22,
+      "class": "CORRECT"
+    },
+    {
+      "target": "oldenburg-de",
+      "check": "cve_references",
+      "field_value": "CVE-2019-0190",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 7.5,
+        "severity": "HIGH"
+      }
+    },
+    {
+      "target": "oldenburg-de",
+      "check": "cve_references",
+      "field_value": "CVE-2023-38408",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "oldenburg-de",
+      "check": "cve_references",
+      "field_value": "CVE-2024-6119",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 7.5,
+        "severity": "HIGH"
+      }
+    },
+    {
+      "target": "oldenburg-de",
+      "check": "cve_references",
+      "field_value": "CVE-2025-69420",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 7.5,
+        "severity": "HIGH"
+      }
+    },
+    {
+      "target": "oldenburg-de",
+      "check": "cve_references",
+      "field_value": "CVE-2026-28387",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 8.1,
+        "severity": "HIGH"
+      }
+    },
+    {
+      "target": "oldenburg-de",
+      "check": "cve_references",
+      "field_value": "CVE-2026-31789",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "oldenburg-de",
+      "check": "cve_references",
+      "field_value": "CVE-2026-34182",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.1,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "oldenburg-de",
+      "check": "cve_references",
+      "field_value": "CVE-2026-45447",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 8.8,
+        "severity": "HIGH"
+      }
+    },
+    {
+      "target": "oldenburg-de",
+      "check": "cve_references",
+      "field_value": "CVE-2026-7383",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 8.1,
+        "severity": "HIGH"
+      }
+    },
+    {
+      "target": "oldenburg-de",
+      "check": "cve_references",
+      "field_value": "CVE-2026-75803",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.1,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "oldenburg-de",
+      "check": "subdomains",
+      "field_value": "test.oldenburg.de",
+      "class": "CORRECT",
+      "detail": {
+        "status": "RESOLVED",
+        "records": [
+          "212.227.12.19"
+        ],
+        "per_resolver": {
+          "1.1.1.1": [
+            "212.227.12.19"
+          ],
+          "8.8.8.8": [
+            "212.227.12.19"
+          ],
+          "9.9.9.9": [
+            "212.227.12.19"
+          ]
+        }
+      }
+    },
+    {
+      "target": "oldenburg-de",
+      "check": "subdomains",
+      "field_value": "mail.test.oldenburg.de",
+      "class": "CORRECT",
+      "detail": {
+        "status": "RESOLVED",
+        "records": [
+          "212.227.12.19"
+        ],
+        "per_resolver": {
+          "1.1.1.1": [
+            "212.227.12.19"
+          ],
+          "8.8.8.8": [
+            "212.227.12.19"
+          ],
+          "9.9.9.9": [
+            "212.227.12.19"
+          ]
+        }
+      }
+    },
+    {
+      "target": "rastede-de",
+      "check": "_confirmed_findings_tool_guardrail",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "rastede-de",
+      "check": "_value_grounding_guardrail",
+      "class": "FABRICATED",
+      "detail": "FEHLER: Die 'Confirmed Findings'-Tabelle enthält Beobachtungen, deren zitiertes Tool NIE diesen Wert geliefert hat: 'ActiveMQ < 5.14.0 - Web Shell Upload (Metasploit)' (Tool: nuclei_vulnerability_scanner, Anker ['5.14.0'] nicht im Raw-Output gefunden); 'Apache 0.8.x/1.0.x / NCSA HTTPd 1.x - 'test-cgi' Directory Listing' (Tool: nuclei_vulnerability_scanner, Anker ['0.8', '1.0'] nicht im Raw-Output "
+    },
+    {
+      "target": "rastede-de",
+      "check": "tools_executed[blue]",
+      "field_value": "nmap_scanner",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "rastede-de",
+      "check": "tools_executed[blue]",
+      "field_value": "nmap_scanner",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "rastede-de",
+      "check": "tools_executed[blue]",
+      "field_value": "httpx_prober",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "rastede-de",
+      "check": "tools_executed[blue]",
+      "field_value": "whatweb_fingerprint",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "rastede-de",
+      "check": "tools_executed[blue]",
+      "field_value": "sslscan_tls",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "rastede-de",
+      "check": "tools_executed[blue]",
+      "field_value": "nuclei_vulnerability_scanner",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "rastede-de",
+      "check": "tools_executed[red_scan]",
+      "field_value": "nmap_scanner",
+      "class": "FABRICATED",
+      "detail": "kein Call zu 'nmap_scanner' im Trace (real: [])"
+    },
+    {
+      "target": "rastede-de",
+      "check": "tools_executed[red_scan]",
+      "field_value": "nmap_scanner",
+      "class": "FABRICATED",
+      "detail": "kein Call zu 'nmap_scanner' im Trace (real: [])"
+    },
+    {
+      "target": "rastede-de",
+      "check": "tools_executed[red_scan]",
+      "field_value": "httpx_prober",
+      "class": "FABRICATED",
+      "detail": "kein Call zu 'httpx_prober' im Trace (real: [])"
+    },
+    {
+      "target": "rastede-de",
+      "check": "tools_executed[red_scan]",
+      "field_value": "whatweb_fingerprint",
+      "class": "FABRICATED",
+      "detail": "kein Call zu 'whatweb_fingerprint' im Trace (real: [])"
+    },
+    {
+      "target": "rastede-de",
+      "check": "tools_executed[red_scan]",
+      "field_value": "sslscan_tls",
+      "class": "FABRICATED",
+      "detail": "kein Call zu 'sslscan_tls' im Trace (real: [])"
+    },
+    {
+      "target": "rastede-de",
+      "check": "tools_executed[red_scan]",
+      "field_value": "nuclei_vulnerability_scanner",
+      "class": "FABRICATED",
+      "detail": "kein Call zu 'nuclei_vulnerability_scanner' im Trace (real: [])"
+    },
+    {
+      "target": "rastede-de",
+      "check": "open_ports",
+      "field_value": 993,
+      "class": "CORRECT"
+    },
+    {
+      "target": "rastede-de",
+      "check": "open_ports",
+      "field_value": 5665,
+      "class": "CORRECT"
+    },
+    {
+      "target": "rastede-de",
+      "check": "open_ports",
+      "field_value": 995,
+      "class": "CORRECT"
+    },
+    {
+      "target": "rastede-de",
+      "check": "open_ports",
+      "field_value": 106,
+      "class": "CORRECT"
+    },
+    {
+      "target": "rastede-de",
+      "check": "open_ports",
+      "field_value": 110,
+      "class": "CORRECT"
+    },
+    {
+      "target": "rastede-de",
+      "check": "open_ports",
+      "field_value": 143,
+      "class": "CORRECT"
+    },
+    {
+      "target": "rastede-de",
+      "check": "open_ports",
+      "field_value": 80,
+      "class": "CORRECT"
+    },
+    {
+      "target": "rastede-de",
+      "check": "open_ports",
+      "field_value": 465,
+      "class": "CORRECT"
+    },
+    {
+      "target": "rastede-de",
+      "check": "open_ports",
+      "field_value": 8443,
+      "class": "CORRECT"
+    },
+    {
+      "target": "rastede-de",
+      "check": "open_ports",
+      "field_value": 8880,
+      "class": "CORRECT"
+    },
+    {
+      "target": "rastede-de",
+      "check": "open_ports",
+      "field_value": 53,
+      "class": "CORRECT"
+    },
+    {
+      "target": "rastede-de",
+      "check": "open_ports",
+      "field_value": 21,
+      "class": "CORRECT"
+    },
+    {
+      "target": "rastede-de",
+      "check": "open_ports",
+      "field_value": 22,
+      "class": "CORRECT"
+    },
+    {
+      "target": "rastede-de",
+      "check": "open_ports",
+      "field_value": 25,
+      "class": "CORRECT"
+    },
+    {
+      "target": "rastede-de",
+      "check": "open_ports",
+      "field_value": 443,
+      "class": "CORRECT"
+    },
+    {
+      "target": "rastede-de",
+      "check": "open_ports",
+      "field_value": 4190,
+      "class": "CORRECT"
+    },
+    {
+      "target": "rastede-de",
+      "check": "cve_references",
+      "field_value": "CVE-1999-0045",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 7.5,
+        "severity": "HIGH"
+      }
+    },
+    {
+      "target": "rastede-de",
+      "check": "cve_references",
+      "field_value": "CVE-1999-0070",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 5.0,
+        "severity": "MEDIUM"
+      }
+    },
+    {
+      "target": "rastede-de",
+      "check": "cve_references",
+      "field_value": "CVE-1999-0107",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 5.0,
+        "severity": "MEDIUM"
+      }
+    },
+    {
+      "target": "rastede-de",
+      "check": "cve_references",
+      "field_value": "CVE-1999-0925",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 5.0,
+        "severity": "MEDIUM"
+      }
+    },
+    {
+      "target": "rastede-de",
+      "check": "cve_references",
+      "field_value": "CVE-1999-0926",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 10.0,
+        "severity": "HIGH"
+      }
+    },
+    {
+      "target": "rastede-de",
+      "check": "cve_references",
+      "field_value": "CVE-2016-3088",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "rastede-de",
+      "check": "cve_references",
+      "field_value": "CVE-2017-14723",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "rastede-de",
+      "check": "cve_references",
+      "field_value": "CVE-2017-16510",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "rastede-de",
+      "check": "cve_references",
+      "field_value": "CVE-2018-20148",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "rastede-de",
+      "check": "cve_references",
+      "field_value": "CVE-2019-17669",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "rastede-de",
+      "check": "cve_references",
+      "field_value": "CVE-2019-17670",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "rastede-de",
+      "check": "cve_references",
+      "field_value": "CVE-2019-20041",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "rastede-de",
+      "check": "cve_references",
+      "field_value": "CVE-2020-11984",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "rastede-de",
+      "check": "cve_references",
+      "field_value": "CVE-2021-26691",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "rastede-de",
+      "check": "cve_references",
+      "field_value": "CVE-2021-39275",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "rastede-de",
+      "check": "cve_references",
+      "field_value": "CVE-2021-41773",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "rastede-de",
+      "check": "cve_references",
+      "field_value": "CVE-2021-42013",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "rastede-de",
+      "check": "cve_references",
+      "field_value": "CVE-2023-38408",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "rastede-de",
+      "check": "cve_references",
+      "field_value": "CVE-2025-15467",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 8.8,
+        "severity": "HIGH"
+      }
+    },
+    {
+      "target": "rastede-de",
+      "check": "cve_references",
+      "field_value": "CVE-2026-28387",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 8.1,
+        "severity": "HIGH"
+      }
+    },
+    {
+      "target": "rastede-de",
+      "check": "cve_references",
+      "field_value": "CVE-2026-31789",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "rastede-de",
+      "check": "cve_references",
+      "field_value": "CVE-2026-34182",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.1,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "rastede-de",
+      "check": "cve_references",
+      "field_value": "CVE-2026-45447",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 8.8,
+        "severity": "HIGH"
+      }
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "_confirmed_findings_tool_guardrail",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "_value_grounding_guardrail",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "tools_executed[blue]",
+      "field_value": "nmap -p 1-65535 -T4 scanme.nmap.org",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "tools_executed[blue]",
+      "field_value": "nmap -p 22,80,9929,31337 -sV -T4 scanme.nmap.org",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "tools_executed[blue]",
+      "field_value": "whatweb http://scanme.nmap.org",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "tools_executed[blue]",
+      "field_value": "httpx -targets scanme.nmap.org -options -api_probe=false",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "tools_executed[blue]",
+      "field_value": "wafw00f https://scanme.nmap.org",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "tools_executed[blue]",
+      "field_value": "nikto -target http://scanme.nmap.org -port 80 -tuning 4",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "tools_executed[blue]",
+      "field_value": "curl_http_headers -url https://scanme.nmap.org -follow_redirects true",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "tools_executed[red_scan]",
+      "field_value": "nmap -p 1-65535 -T4 scanme.nmap.org",
+      "class": "FABRICATED",
+      "detail": "kein Call zu 'nmap -p 1-65535 -T4 scanme.nmap.org' im Trace (real: [])"
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "tools_executed[red_scan]",
+      "field_value": "nmap -p 22,80,9929,31337 -sV -T4 scanme.nmap.org",
+      "class": "FABRICATED",
+      "detail": "kein Call zu 'nmap -p 22,80,9929,31337 -sV -T4 scanme.nmap.org' im Trace (real: [])"
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "tools_executed[red_scan]",
+      "field_value": "whatweb http://scanme.nmap.org",
+      "class": "FABRICATED",
+      "detail": "kein Call zu 'whatweb http://scanme.nmap.org' im Trace (real: [])"
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "tools_executed[red_scan]",
+      "field_value": "httpx -targets scanme.nmap.org -options -api_probe=false",
+      "class": "FABRICATED",
+      "detail": "kein Call zu 'httpx -targets scanme.nmap.org -options -api_probe=false' im Trace (real: [])"
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "tools_executed[red_scan]",
+      "field_value": "wafw00f https://scanme.nmap.org",
+      "class": "FABRICATED",
+      "detail": "kein Call zu 'wafw00f https://scanme.nmap.org' im Trace (real: [])"
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "tools_executed[red_scan]",
+      "field_value": "nikto -target http://scanme.nmap.org -port 80 -tuning 4",
+      "class": "FABRICATED",
+      "detail": "kein Call zu 'nikto -target http://scanme.nmap.org -port 80 -tuning 4' im Trace (real: [])"
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "tools_executed[red_scan]",
+      "field_value": "curl_http_headers -url https://scanme.nmap.org -follow_redirects true",
+      "class": "FABRICATED",
+      "detail": "kein Call zu 'curl_http_headers -url https://scanme.nmap.org -follow_redirects true' im Trace (real: [])"
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "open_ports",
+      "field_value": 80,
+      "class": "CORRECT"
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "open_ports",
+      "field_value": 9929,
+      "class": "CORRECT"
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "open_ports",
+      "field_value": 31337,
+      "class": "CORRECT"
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "open_ports",
+      "field_value": 22,
+      "class": "CORRECT"
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "cve_references",
+      "field_value": "CVE-2002-0082",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 7.5,
+        "severity": "HIGH"
+      }
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "cve_references",
+      "field_value": "CVE-2013-2160",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 5.0,
+        "severity": "MEDIUM"
+      }
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "cve_references",
+      "field_value": "CVE-2014-0226",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 6.8,
+        "severity": "MEDIUM"
+      }
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "cve_references",
+      "field_value": "CVE-2017-3167",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "cve_references",
+      "field_value": "CVE-2017-7679",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "cve_references",
+      "field_value": "CVE-2017-9798",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 7.5,
+        "severity": "HIGH"
+      }
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "cve_references",
+      "field_value": "CVE-2018-1312",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "cve_references",
+      "field_value": "CVE-2021-26691",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "cve_references",
+      "field_value": "CVE-2021-39275",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "cve_references",
+      "field_value": "CVE-2021-41773",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "cve_references",
+      "field_value": "CVE-2021-42013",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "scanme-nmap-org",
+      "check": "cve_references",
+      "field_value": "CVE-2023-38408",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "westerstede-de",
+      "check": "_confirmed_findings_tool_guardrail",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "westerstede-de",
+      "check": "_value_grounding_guardrail",
+      "class": "FABRICATED",
+      "detail": "FEHLER: Die 'Confirmed Findings'-Tabelle enthält Beobachtungen, deren zitiertes Tool NIE diesen Wert geliefert hat: 'Apache httpd 2.4.52 (Ubuntu)' (Tool: whatweb, Anker ['2.4.52'] nicht im Raw-Output gefunden); 'hMailServer 5.4.4' (Tool: whatweb, Anker ['5.4.4'] nicht im Raw-Output gefunden). Jede Beobachtung muss WÖRTLICH aus dem Tool-Kontext dieser Session stammen — keine Produktnamen/Versionen/"
+    },
+    {
+      "target": "westerstede-de",
+      "check": "tools_executed[blue]",
+      "field_value": "nmap_scanner",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "westerstede-de",
+      "check": "tools_executed[blue]",
+      "field_value": "httpx_prober",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "westerstede-de",
+      "check": "tools_executed[blue]",
+      "field_value": "whatweb_fingerprint",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "westerstede-de",
+      "check": "tools_executed[blue]",
+      "field_value": "sslscan_tls",
+      "class": "CORRECT",
+      "detail": null
+    },
+    {
+      "target": "westerstede-de",
+      "check": "tools_executed[red_scan]",
+      "field_value": "nmap_scanner",
+      "class": "FABRICATED",
+      "detail": "kein Call zu 'nmap_scanner' im Trace (real: [])"
+    },
+    {
+      "target": "westerstede-de",
+      "check": "tools_executed[red_scan]",
+      "field_value": "httpx_prober",
+      "class": "FABRICATED",
+      "detail": "kein Call zu 'httpx_prober' im Trace (real: [])"
+    },
+    {
+      "target": "westerstede-de",
+      "check": "tools_executed[red_scan]",
+      "field_value": "whatweb_fingerprint",
+      "class": "FABRICATED",
+      "detail": "kein Call zu 'whatweb_fingerprint' im Trace (real: [])"
+    },
+    {
+      "target": "westerstede-de",
+      "check": "tools_executed[red_scan]",
+      "field_value": "sslscan_tls",
+      "class": "FABRICATED",
+      "detail": "kein Call zu 'sslscan_tls' im Trace (real: [])"
+    },
+    {
+      "target": "westerstede-de",
+      "check": "open_ports",
+      "field_value": 993,
+      "class": "CORRECT"
+    },
+    {
+      "target": "westerstede-de",
+      "check": "open_ports",
+      "field_value": 3400,
+      "class": "CORRECT"
+    },
+    {
+      "target": "westerstede-de",
+      "check": "open_ports",
+      "field_value": 587,
+      "class": "CORRECT"
+    },
+    {
+      "target": "westerstede-de",
+      "check": "open_ports",
+      "field_value": 8443,
+      "class": "CORRECT"
+    },
+    {
+      "target": "westerstede-de",
+      "check": "open_ports",
+      "field_value": 80,
+      "class": "CORRECT"
+    },
+    {
+      "target": "westerstede-de",
+      "check": "open_ports",
+      "field_value": 25,
+      "class": "CORRECT"
+    },
+    {
+      "target": "westerstede-de",
+      "check": "open_ports",
+      "field_value": 443,
+      "class": "CORRECT"
+    },
+    {
+      "target": "westerstede-de",
+      "check": "cve_references",
+      "field_value": "CVE-2020-11984",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "westerstede-de",
+      "check": "cve_references",
+      "field_value": "CVE-2021-26691",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "westerstede-de",
+      "check": "cve_references",
+      "field_value": "CVE-2021-39275",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "westerstede-de",
+      "check": "cve_references",
+      "field_value": "CVE-2021-41773",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "westerstede-de",
+      "check": "cve_references",
+      "field_value": "CVE-2021-42013",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "westerstede-de",
+      "check": "cve_references",
+      "field_value": "CVE-2021-44790",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "westerstede-de",
+      "check": "cve_references",
+      "field_value": "CVE-2022-22720",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "westerstede-de",
+      "check": "cve_references",
+      "field_value": "CVE-2022-23943",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "westerstede-de",
+      "check": "cve_references",
+      "field_value": "CVE-2022-31813",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "westerstede-de",
+      "check": "cve_references",
+      "field_value": "CVE-2023-25690",
+      "class": "CORRECT",
+      "detail": {
+        "cvss": 9.8,
+        "severity": "CRITICAL"
+      }
+    },
+    {
+      "target": "westerstede-de",
+      "check": "subdomains",
+      "field_value": "mail2.westerstede.de",
+      "class": "CORRECT",
+      "detail": {
+        "status": "RESOLVED",
+        "records": [
+          "80.228.77.170"
+        ],
+        "per_resolver": {
+          "1.1.1.1": [
+            "80.228.77.170"
+          ],
+          "8.8.8.8": [
+            "80.228.77.170"
+          ],
+          "9.9.9.9": [
+            "80.228.77.170"
+          ]
+        }
+      }
+    },
+    {
+      "target": "westerstede-de",
+      "check": "subdomains",
+      "field_value": "mail3.westerstede.de",
+      "class": "CORRECT",
+      "detail": {
+        "status": "RESOLVED",
+        "records": [
+          "80.228.77.170"
+        ],
+        "per_resolver": {
+          "1.1.1.1": [
+            "80.228.77.170"
+          ],
+          "8.8.8.8": [
+            "80.228.77.170"
+          ],
+          "9.9.9.9": [
+            "80.228.77.170"
+          ]
+        }
+      }
+    },
+    {
+      "target": "westerstede-de",
+      "check": "subdomains",
+      "field_value": "mail4.westerstede.de",
+      "class": "CORRECT",
+      "detail": {
+        "status": "RESOLVED",
+        "records": [
+          "80.228.77.172"
+        ],
+        "per_resolver": {
+          "1.1.1.1": [
+            "80.228.77.172"
+          ],
+          "8.8.8.8": [
+            "80.228.77.172"
+          ],
+          "9.9.9.9": [
+            "80.228.77.172"
+          ]
+        }
+      }
+    },
+    {
+      "target": "westerstede-de",
+      "check": "subdomains",
+      "field_value": "mail5.westerstede.de",
+      "class": "CORRECT",
+      "detail": {
+        "status": "RESOLVED",
+        "records": [
+          "80.228.77.170"
+        ],
+        "per_resolver": {
+          "1.1.1.1": [
+            "80.228.77.170"
+          ],
+          "8.8.8.8": [
+            "80.228.77.170"
+          ],
+          "9.9.9.9": [
+            "80.228.77.170"
+          ]
+        }
+      }
+    }
+  ]
+}
