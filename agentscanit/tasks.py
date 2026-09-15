@@ -484,6 +484,72 @@ def _waf_detection_guardrail(output: Any) -> tuple[bool, Any]:
     return True, output
 
 
+# Matcht 'PORT/tcp open  service' bzw. 'PORT/udp open ...', schließt bewusst
+# 'open|filtered' aus (kein '|' direkt nach 'open' erlaubt — negative lookahead).
+_NMAP_OPEN_PORT_RE = _re.compile(r"^(\d+)/(?:tcp|udp)\s+open(?!\|)", _re.MULTILINE)
+
+
+def _open_ports_completeness_guardrail(output: Any) -> tuple[bool, Any]:
+    """Guardrail (blue): ergänzt 'open_ports' deterministisch um Ports, die im
+    nmap-Rohoutput DIESER Task als offen gemeldet wurden, aber im
+    strukturierten Feld fehlen.
+
+    Befund (Validierungs-Corpus 2026-09-12/13, reports/FINAL_REPORT.md §5.3):
+    example.com — der nmap-Vollportscan ('-p 1-65535') meldete 13 offene Ports
+    inkl. 8880/tcp ('cddbp-alt'), BlueOutput.open_ports übernahm nur 12 davon.
+    Einzelfall im Corpus (1/44 Ports über alle Targets, 2.3%), aber strukturell
+    dasselbe Muster wie die anderen Value-Grounding-Guardrails: das Modell
+    lässt beim Freitext→JSON-Transfer gelegentlich einzelne Werte aus.
+    Deterministische Nachbesserung statt Prompt-Bitte (BUG-20/23/25-Lehre) —
+    hier bewusst KEIN Reject/Retry (ein fehlender Wert ist kein Fabrikations-
+    fall, der Agent müsste raten was fehlt; einfaches Ergänzen ist zuverlässiger
+    und braucht keinen zusätzlichen LLM-Call).
+
+    Ergänzt nur (entfernt/verändert nie etwas) — Ports die das Modell zusätzlich
+    zum nmap-Rohoutput nennt (z.B. aus httpx/whatweb-Kontext) bleiben unangetastet.
+    Nutzt 'tool_bin' (aus dem echten Subprocess-Kommando abgeleitet) statt
+    'tool_name' (vom Modell befüllt) — robuster gegen LLM-Namensvarianten.
+
+    WICHTIG — Rückgabe bei Mutation: siehe Kommentar in _tools_executed_
+    guardrail (gleiche Datei). Ein String-Return lässt CrewAI output.pydantic
+    aus dem ZURÜCKGEGEBENEN String neu aufbauen — bei Mutation muss deshalb
+    output.raw synchronisiert und das TaskOutput-Objekt selbst zurückgegeben
+    werden, sonst geht die Ergänzung beim echten Crew-Run verloren.
+    """
+    pydantic_out = getattr(output, "pydantic", None)
+    raw = getattr(output, "raw", output) if not isinstance(output, str) else output
+    if not pydantic_out or not hasattr(pydantic_out, "open_ports"):
+        return True, raw
+
+    try:
+        from tools.trace import run_trace
+        if not run_trace.is_active:
+            return True, raw
+
+        found_ports: set = set()
+        for c in run_trace._pending:
+            if c.get("tool_bin") != "nmap":
+                continue
+            for m in _NMAP_OPEN_PORT_RE.finditer(c.get("raw_output", "") or ""):
+                found_ports.add(int(m.group(1)))
+
+        if not found_ports:
+            return True, raw
+
+        declared = set(getattr(pydantic_out, "open_ports", None) or [])
+        missing = found_ports - declared
+        if missing:
+            pydantic_out.open_ports = sorted(declared | missing)
+            try:
+                output.raw = pydantic_out.model_dump_json()
+            except Exception:
+                pass
+            return True, output
+    except Exception:
+        pass
+    return True, raw
+
+
 def _tools_executed_guardrail(output: Any) -> tuple[bool, Any]:
     """Guardrail (blue/red_scan): 'tools_executed'-Feld gegen echte Tool-Calls
     DIESER Task validieren.
@@ -518,6 +584,20 @@ def _tools_executed_guardrail(output: Any) -> tuple[bool, Any]:
     auf Selbstkorrektur zu hoffen. Kein Datenverlust — blue's Originalwerte
     bleiben über den sequenziellen Task-Context ohnehin für red/report
     erreichbar, nur die irreführende Zuschreibung an red_scan entfällt.
+
+    WICHTIG — Rückgabe bei Mutation (Korrektur 2026-09-15, gefunden beim Bau
+    von _open_ports_completeness_guardrail): CrewAI's _invoke_guardrail_function
+    behandelt einen String-Rückgabewert als 'neu exportieren' — es baut
+    output.pydantic AUS DEM ZURÜCKGEGEBENEN STRING NEU AUF (convert_to_model),
+    UNABHÄNGIG davon ob das pydantic-Objekt vorher in-place mutiert wurde. Wird
+    hier weiterhin der ALTE (unveränderte) raw-String zurückgegeben, geht die
+    Mutation beim echten Crew-Run VERLOREN (Unit-Tests mit FakeTaskOutput sehen
+    das nicht, da sie das Objekt direkt prüfen statt CrewAI's Reexport-Pfad zu
+    durchlaufen). Fix: bei Mutation output.raw explizit auf den neuen JSON-Stand
+    synchronisieren UND das ganze TaskOutput-Objekt zurückgeben (nicht raw) —
+    CrewAI nimmt dann den 'isinstance(result, TaskOutput)'-Zweig und behält
+    pydantic+raw unverändert bei (kein Reexport). Gleiches Muster wie
+    _waf_detection_guardrail (gibt ebenfalls 'output' statt 'raw' zurück).
     """
     pydantic_out = getattr(output, "pydantic", None)
     raw = getattr(output, "raw", output) if not isinstance(output, str) else output
@@ -532,9 +612,17 @@ def _tools_executed_guardrail(output: Any) -> tuple[bool, Any]:
 
         is_red_scan = hasattr(pydantic_out, "targeted_findings")
         if is_red_scan and not real_used:
+            changed = False
             for field in ("open_ports", "vulnerabilities", "targeted_findings", "tools_executed"):
                 if getattr(pydantic_out, field, None):
                     setattr(pydantic_out, field, [])
+                    changed = True
+            if changed:
+                try:
+                    output.raw = pydantic_out.model_dump_json()
+                except Exception:
+                    pass
+                return True, output
             return True, raw
 
         if not real_used:
@@ -1228,7 +1316,7 @@ def make_tasks() -> dict:
         ),
         output_pydantic=BlueOutput,
         guardrails=[_tool_call_guardrail, _scope_coverage_guardrail, _waf_detection_guardrail,
-                    _tools_executed_guardrail],
+                    _tools_executed_guardrail, _open_ports_completeness_guardrail],
         guardrail_max_retries=2,
         agent=blue_agent,
         context=[research],
