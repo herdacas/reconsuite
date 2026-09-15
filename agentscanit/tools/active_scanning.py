@@ -43,9 +43,20 @@ class NmapTool(BaseTool):
     args_schema: Type[BaseModel] = NmapInput
 
     def _run(self, target: str, ports: str = "top1000", aggressive: bool = False) -> str:
-        if ports in ("top1000", ""):
+        # BUG (2026-09-15, gmx.de-Live-Fund): nur der exakte String "top1000" wurde
+        # als Preset erkannt — jeder andere plausibel aussehende Wert (z.B. "top100",
+        # "top-100", vom Agenten vermutlich mit NaabuTools "top-100"-Default
+        # verwechselt) fiel ungeprüft in den -p-Zweig durch. nmap kennt "top100"
+        # nicht als Portname/-preset und bricht mit "QUITTING!" ab, OHNE einen
+        # einzigen Port zu scannen — der Fehler blieb bisher unsichtbar (siehe
+        # zweiter Fix in _base.py._run) und wurde im Report fälschlich als
+        # "gescannt, keine offenen Ports (CDN/LB-Filterung)" dargestellt.
+        # Fix: jedes "top<N>"/"top-<N>" (case-insensitive, optionaler Bindestrich)
+        # wird jetzt als --top-ports N erkannt, nicht nur "top1000" exakt.
+        _top_n = re.match(r"^top-?(\d+)$", (ports or "").strip(), re.IGNORECASE)
+        if ports in ("top1000", "") or _top_n:
             port_arg = "--top-ports"
-            port_val = "1000"
+            port_val = _top_n.group(1) if _top_n else "1000"
         else:
             port_arg = "-p"
             port_val = ports

@@ -60,6 +60,7 @@ _CLI_ERROR_PATTERNS = (
     "Error: unknown flag",
     "Error: unknown shorthand flag",
     "Usage:\n  ",         # most CLI tools start their help with this prefix
+    "QUITTING!",          # nmap's fatal-error marker (bad port spec, bad target, etc.)
 )
 
 
@@ -94,10 +95,23 @@ def _run(cmd: list[str], timeout: int = TIMEOUT_DEFAULT, cwd: str = None,
             proc.communicate()
             raise
         out = stdout.strip()
-        if not out and stderr.strip():
-            out = stderr.strip()
-        if any(p in out for p in _CLI_ERROR_PATTERNS):
-            out = f"[TOOL_ERROR] {tool}: invalid flags or arguments — {out[:120]}"
+        stderr_s = stderr.strip()
+        # BUG (2026-09-15, gmx.de-Live-Fund): stderr wurde bisher NUR benutzt wenn
+        # stdout komplett leer war — ein Tool, das zuerst eine harmlose Banner-Zeile
+        # nach stdout schreibt und DANACH mit einer Fehlermeldung auf stderr abbricht
+        # (z.B. nmap: Startbanner auf stdout, dann "QUITTING!" auf stderr bei
+        # ungültigem Port-Argument), rutschte durch — stdout war nicht leer, stderr
+        # wurde komplett verworfen, kein [TOOL_ERROR] erkannt. Fix: die
+        # Fehlermuster-Prüfung läuft jetzt immer gegen stdout+stderr kombiniert;
+        # das bisherige "stdout leer -> stderr als Ergebnis nutzen"-Verhalten
+        # (für Tools die normale Ausgaben auf stderr schreiben) bleibt unverändert.
+        if not out and stderr_s:
+            out = stderr_s
+            check_text = out
+        else:
+            check_text = f"{out}\n{stderr_s}" if stderr_s else out
+        if any(p in check_text for p in _CLI_ERROR_PATTERNS):
+            out = f"[TOOL_ERROR] {tool}: invalid flags or arguments — {check_text[:200]}"
         run_trace.record_execution(cmd, out, time.time() - t0)
         return out
     except subprocess.TimeoutExpired:
