@@ -5,7 +5,6 @@ Orchestriert alle Teams sequentiell:
     1. agentscanit       → Active Recon & Enumeration
     2. interpret-agent   → CVE Enrichment (NVD API v2)
     3. threatintel_agent → Threat Intelligence (OTX, Shodan, VT)
-    -  scope_gate        → Phase 9.0 Safety-Gate (Team 7 Vorstufe, kein Tool-Call)
     4. compliance_agent  → Compliance Mapping (OWASP, CIS)
     5. risk_scorer       → Asset Risk Scoring
     6. reporting         → Final Report (Merge)
@@ -36,7 +35,6 @@ import reporting as _reporting             # Team 3: Final Report
 import threatintel_agent as _threatintel   # Team 4: Threat Intelligence
 import compliance_agent as _compliance     # Team 5: Compliance Mapper
 import risk_scorer as _risk                # Team 6: Risk Scorer
-import scope_gate as _scope_gate           # Phase 9.0: Safety-Gate (Team 7 Vorstufe)
 
 from pydantic import BaseModel, Field
 from crewai.flow.flow import Flow, start, listen, router, or_
@@ -70,13 +68,6 @@ class ScanState(BaseModel):
     threat_intel_output:  str        = ""
     compliance_output:    str        = ""
     risk_score_output:    str        = ""
-    # Phase 9.0 — Safety-Gate-Flags für Team 7 (Exploitation & Validation).
-    # Default OFF — nur via CLI-Flags --enable-injection / --enable-exploit aktivierbar.
-    # Siehe scope_gate.py: check_scope() setzt scope_authorized + scope_gate_reason.
-    enable_injection:     bool       = False   # Tier 2 (sqlmap, dalfox, wpscan)
-    enable_exploit:       bool       = False   # Tier 3 (Metasploit-check, hydra/medusa)
-    scope_authorized:     bool       = False   # scope_gate.GateDecision.allowed (Tier 1)
-    scope_gate_reason:    str        = ""       # scope_gate.GateDecision.summary
     # Resume-Tracking (Phase 7, Stufe 3 Vorstufe): abgeschlossene Flow-Schritte.
     # Wird via @persist mitserialisiert; bei --resume (restore_from_state_id)
     # hydratisiert → erledigte Schritte werden übersprungen statt neu ausgeführt.
@@ -205,37 +196,6 @@ class ReconSuiteFlow(Flow[ScanState]):
         self._mark_step("run_threat_intel")
 
     @listen(run_threat_intel)
-    def run_validation_gate(self):
-        """Phase 9.0 — Safety-Gate. Läuft an der Stelle, an der ab Phase 9.2 Team 7
-        (Exploitation & Validation) in die Pipeline eingehängt wird — vor dem
-        eigentlichen Team 7 gibt es noch keine aktiven Tool-Wrapper, aber die
-        Autorisierungsprüfung + Audit-Trail müssen schon jetzt stehen (siehe
-        roadmap.md, "9.0 — Safety-Gate zuerst, vor jedem aktiven Tool")."""
-        if self._step_done("run_validation_gate"):
-            return
-        if not self.state.has_exploitable:
-            self._mark_step("run_validation_gate")
-            return
-        console.print()
-        console.print("  [bold red]→ scope-gate[/]  Prüfe Autorisierung für Phase 9 (Validation)...")
-        decision = _scope_gate.check_scope(
-            target=self.state.target,
-            enable_injection=self.state.enable_injection,
-            enable_exploit=self.state.enable_exploit,
-            flow_id=self.state.id,
-        )
-        self.state.scope_authorized  = decision.allowed
-        self.state.scope_gate_reason = decision.summary
-        if decision.allowed:
-            console.print(f"  [green]✓[/]  Scope-Gate bestanden ({decision.summary}) "
-                           f"— Team 7 bereit (Tool-Ausführung folgt ab Phase 9.2)")
-        else:
-            console.print(f"  [yellow]⚠[/]  Scope-Gate NICHT bestanden ({decision.summary}) "
-                           f"— aktive Validierung wird übersprungen. "
-                           f"Grund: {decision.reasons.get('tier1', '?')}")
-        self._mark_step("run_validation_gate")
-
-    @listen(run_validation_gate)
     def run_compliance(self):
         if self._step_done("run_compliance"):
             return
@@ -308,16 +268,12 @@ def run_flow(
     objective: str = "",
     scope: str = "full",
     log_llm: bool = False,
-    enable_injection: bool = False,
-    enable_exploit: bool = False,
 ) -> ReconSuiteFlow:
     flow = ReconSuiteFlow()
     flow.state.target           = target
     flow.state.objective        = objective
     flow.state.scope            = scope
     flow.state.log_llm          = log_llm
-    flow.state.enable_injection = enable_injection
-    flow.state.enable_exploit   = enable_exploit
     console.print(f"\n  [dim]Flow ID:[/]  [cyan]{flow.state.id}[/]  [dim](--resume to resume)[/]")
     flow.kickoff()
     console.print(f"\n  [dim]Flow ID:[/]  [cyan]{flow.state.id}[/]")

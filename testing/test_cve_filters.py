@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Deterministische Tests für cve_filters.is_kev() — Negations-Fix (2026-09-12).
 
-Kein CrewAI/Ollama nötig. Positiv- + Negativkontrolle, analog test_scope_gate.py.
+Kein CrewAI/Ollama nötig. Positiv- + Negativkontrolle.
 """
 import sys
 from pathlib import Path

@@ -11,12 +11,6 @@ Usage:
     python3 main.py --list
     python3 main.py --score [trace_file]  → Scan Quality Scorecard
     python3 main.py              → interaktiver Modus
-
-Phase 9 (Exploitation & Validation) — Safety-Gate-Flags, Default OFF:
-    python3 main.py example.com full --enable-injection   → Tier 2 (sqlmap, dalfox, wpscan)
-    python3 main.py example.com full --enable-exploit     → Tier 3 (Metasploit-check, hydra/medusa)
-    Siehe scope_gate.py — ohne Eintrag in authorized_scopes.json (+ Live-Bestätigung
-    für Tier 3) bleiben diese Tiers blockiert, unabhängig von den Flags.
 """
 
 import sys
@@ -135,11 +129,8 @@ def _cmd_score(trace_arg: str = "") -> None:
 if __name__ == "__main__":
     signal.signal(signal.SIGINT, _sigint_handler)
 
-    _log_llm          = "--log-llm" in sys.argv
-    _enable_injection = "--enable-injection" in sys.argv   # Phase 9, Tier 2 (Opt-in)
-    _enable_exploit   = "--enable-exploit" in sys.argv     # Phase 9, Tier 3 (Opt-in)
-    _phase9_flags     = {"--log-llm", "--enable-injection", "--enable-exploit"}
-    args = [a for a in sys.argv[1:] if a not in _phase9_flags]
+    _log_llm = "--log-llm" in sys.argv
+    args = [a for a in sys.argv[1:] if a != "--log-llm"]
 
     if args and args[0] == "--list":
         _cmd_list()
@@ -209,7 +200,4 @@ if __name__ == "__main__":
         )
         _scope = Prompt.ask("[bold]Scope[/]", default="full")
 
-    run_flow(
-        _target, _objective, _scope, log_llm=_log_llm,
-        enable_injection=_enable_injection, enable_exploit=_enable_exploit,
-    )
+    run_flow(_target, _objective, _scope, log_llm=_log_llm)
