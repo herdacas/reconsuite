@@ -312,6 +312,27 @@ def _searchsploit_version_guardrail(output: Any) -> tuple[bool, Any]:
     Muster wie beim findings-Task, wo _cve_tool_used_guardrail + _cve_trace_guardrail
     ebenfalls einen gemeinsamen Counter nutzen) — ein Retry-Budget pro Task-Versuch,
     nicht pro Guardrail-Typ.
+
+    Erweiterung (2026-09-15, Backlog-Punkt 4/Validierungs-Corpus): das
+    rastede-de-Fixture (corpus/fixtures/rastede-de/scanner_trace.json, red-
+    Phase) beweist, dass der Reject+Retry-Pfad allein NICHT zuverlässig ist —
+    genau die im Docstring beschriebenen 7 versionslosen Funde (ActiveMQ,
+    uralte Apache-CVEs) stehen dort weiterhin im finalen structured_output,
+    obwohl dieser Guardrail bereits aktiv war. Gleiches Muster wie bei
+    _tools_executed_guardrail (Commit bab38f2/ae3f08e, Corpus-Beweis:
+    0/28 tools_executed korrekt trotz aktivem Reject-Pfad) — der bisherige
+    Fallback (reject_count>=1 → stillschweigend akzeptieren) lässt die
+    fabrizierten Funde beim zweiten Versuch unverändert durch. Fix: der
+    Fallback leert 'confirmed_attack_surface'/'exploitable_findings'
+    deterministisch statt weiter auf Selbstkorrektur zu hoffen (inkl.
+    manuellem Sync von 'exploitable_findings_count' — der model_validator
+    'derive_count' läuft nur bei Konstruktion/Validierung, nicht bei
+    nachträglicher Attribut-Zuweisung ohne validate_assignment). Rückgabe
+    bei Mutation: TaskOutput-Objekt mit synchronisiertem raw statt String
+    (siehe _tools_executed_guardrail/_open_ports_completeness_guardrail,
+    2026-09-15 — sonst verwirft CrewAI's Reexport-Mechanismus die Mutation).
+    'cve_references' bleibt unangetastet — bereits separat durch
+    _cve_trace_guardrail geschützt (andere Prüflogik, hier nicht dupliziert).
     """
     pydantic_out = getattr(output, "pydantic", None)
     raw = getattr(output, "raw", output) if not isinstance(output, str) else output
@@ -337,19 +358,37 @@ def _searchsploit_version_guardrail(output: Any) -> tuple[bool, Any]:
             if not _VERSION_TOKEN_RE.search(query):
                 versionless_calls.append(query)
 
-        if versionless_calls and run_trace._guardrail_reject_count < 1:
-            run_trace._guardrail_reject_count += 1
-            return False, (
-                f"FEHLER: searchsploit wurde ohne Versionsangabe aufgerufen "
-                f"({versionless_calls}) — das liefert einen ungefilterten Keyword-Dump "
-                f"der gesamten lokalen ExploitDB (ggf. hunderte Treffer seit 1996), "
-                f"KEINE tool-bestätigte Aussage über das aktuelle Ziel. "
-                f"'confirmed_attack_surface'/'exploitable_findings' sind aber nicht leer. "
-                f"Entweder: rufe searchsploit erneut mit '<service> <version>' auf "
-                f"(Version aus blue-/findings-Context entnehmen), oder — falls keine "
-                f"konkrete Version bekannt ist — leere 'confirmed_attack_surface' und "
-                f"'exploitable_findings' (keine Version = kein bestätigter Treffer)."
-            )
+        if versionless_calls:
+            if run_trace._guardrail_reject_count < 1:
+                run_trace._guardrail_reject_count += 1
+                return False, (
+                    f"FEHLER: searchsploit wurde ohne Versionsangabe aufgerufen "
+                    f"({versionless_calls}) — das liefert einen ungefilterten Keyword-Dump "
+                    f"der gesamten lokalen ExploitDB (ggf. hunderte Treffer seit 1996), "
+                    f"KEINE tool-bestätigte Aussage über das aktuelle Ziel. "
+                    f"'confirmed_attack_surface'/'exploitable_findings' sind aber nicht leer. "
+                    f"Entweder: rufe searchsploit erneut mit '<service> <version>' auf "
+                    f"(Version aus blue-/findings-Context entnehmen), oder — falls keine "
+                    f"konkrete Version bekannt ist — leere 'confirmed_attack_surface' und "
+                    f"'exploitable_findings' (keine Version = kein bestätigter Treffer)."
+                )
+            # Fallback (2026-09-15): Reject+Retry hat die versionslosen Funde nicht
+            # entfernt (Corpus-Beweis, s. Docstring) — deterministisch leeren statt
+            # ein zweites Mal stillschweigend zu akzeptieren.
+            changed = False
+            if surface:
+                pydantic_out.confirmed_attack_surface = []
+                changed = True
+            if exploitable:
+                pydantic_out.exploitable_findings = []
+                pydantic_out.exploitable_findings_count = 0
+                changed = True
+            if changed:
+                try:
+                    output.raw = pydantic_out.model_dump_json()
+                except Exception:
+                    pass
+                return True, output
     except Exception:
         pass
 
