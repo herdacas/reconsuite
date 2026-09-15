@@ -996,6 +996,119 @@ def _strip_sslscan_self_banner(raw: str) -> str:
     return _SSLSCAN_SELF_BANNER_RE.sub('', cleaned, count=1)
 
 
+def _sslscan_banner_only_versions(raw: str) -> set:
+    """Versionsnummern die NUR im sslscan-Eigenbanner vorkommen, nicht auch im
+    restlichen Rohoutput dieses Calls (= mutmaßlich echte, gegen das Ziel
+    gescannte Daten). Genutzt von _blue_findings_sslscan_grounding_guardrail
+    (Backlog-Punkt 3, 2026-09-15) um zu erkennen wann 'OpenSSL x.y.z' NUR aus
+    dem Banner stammen kann, nie aus einem echten Scan-Ergebnis."""
+    cleaned = _ANSI_ESCAPE_RE.sub('', raw or '')
+    m = _SSLSCAN_SELF_BANNER_RE.match(cleaned)
+    if not m:
+        return set()
+    banner_versions = set(_VERSION_ANCHOR_RE.findall(m.group(0)))
+    remainder_versions = set(_VERSION_ANCHOR_RE.findall(cleaned[m.end():]))
+    return banner_versions - remainder_versions
+
+
+def _blue_findings_sslscan_grounding_guardrail(output: Any) -> tuple[bool, Any]:
+    """Guardrail (blue/findings): entfernt sslscan-Eigenbanner-Versionen
+    deterministisch aus den STRUKTURIERTEN Feldern, bevor sie downstream
+    (Team 5 Compliance, Team 6 Risk Scorer) als bestätigte Ziel-Version
+    konsumiert werden.
+
+    Backlog-Punkt 3 (CLAUDE.md, 2026-09-12, bisher nicht gefixt): Der BUG-25-
+    Nachtrag-Fix (_strip_sslscan_self_banner + _value_grounding_guardrail)
+    schützt nur die 'Confirmed Findings'/'Detected Technologies'-Sektionen des
+    finalen report-Task-Markdowns. Team 5 (compliance_agent) liest aber KEINE
+    gefilterte Version davon — ComplianceFlow.load_findings() aggregiert die
+    rohen 'preview'-Texte ALLER Tasks (inkl. blue/findings) direkt aus
+    workflow_last.json und füttert sie ungefiltert in den Compliance-LLM-Prompt.
+    Live beobachtet: compliance_example.com_20260912_040914.md übernahm
+    'OpenSSL 3.0.13' (sslscans kompilierte Library-Version aus dem Banner,
+    NICHT die Ziel-TLS-Version) unter 'A03:2025 – Software Supply Chain
+    Failures' mit Bezug auf CVE-2011-1468 — die Kontamination sitzt bereits
+    in blue/findings' EIGENEM strukturiertem Output, eine Stufe vor dem
+    finalen Report.
+
+    Prüft NUR Listenfelder (BlueOutput.vulnerabilities + .services-Werte,
+    FindingsOutput.service_versions) — bewusst NICHT die freien Textfelder
+    (analysis/risk_summary), da dort ein Teilstring-Entfernen Grammatik/
+    Kontext zerstören könnte (gleiches Abgrenzungsprinzip wie
+    _extract_value_anchors: nur was sicher isoliert entfernbar ist).
+
+    Deterministisch entfernen statt Reject/Retry (gleiche Begründung wie
+    _open_ports_completeness_guardrail: das Modell müsste erraten welcher
+    Wert falsch ist — Entfernen ist zuverlässiger).
+    """
+    pydantic_out = getattr(output, "pydantic", None)
+    raw = getattr(output, "raw", output) if not isinstance(output, str) else output
+    if not pydantic_out:
+        return True, raw
+
+    is_blue = hasattr(pydantic_out, "services") and hasattr(pydantic_out, "vulnerabilities")
+    is_findings = hasattr(pydantic_out, "service_versions")
+    if not is_blue and not is_findings:
+        return True, raw
+
+    try:
+        from tools.trace import run_trace
+        if not run_trace.is_active:
+            return True, raw
+
+        real_tools = run_trace.get_all_tool_names()
+        sslscan_names = [t for t in real_tools if t.lower().startswith("sslscan")]
+        if not sslscan_names:
+            return True, raw
+
+        banner_only: set = set()
+        for name in sslscan_names:
+            for out_text in run_trace.get_raw_outputs_for_tool(name):
+                banner_only |= _sslscan_banner_only_versions(out_text)
+        if not banner_only:
+            return True, raw
+
+        def _contaminated(text: str) -> bool:
+            if "openssl" not in (text or "").lower():
+                return False
+            return any(v in text for v in banner_only)
+
+        changed = False
+
+        if is_blue:
+            vulns = list(getattr(pydantic_out, "vulnerabilities", None) or [])
+            kept = [v for v in vulns if not _contaminated(v)]
+            if len(kept) != len(vulns):
+                pydantic_out.vulnerabilities = kept
+                changed = True
+
+            services = dict(getattr(pydantic_out, "services", None) or {})
+            for k in list(services.keys()):
+                v = services[k]
+                if isinstance(v, str) and _contaminated(v):
+                    del services[k]
+                    changed = True
+            if changed:
+                pydantic_out.services = services
+
+        if is_findings:
+            svs = list(getattr(pydantic_out, "service_versions", None) or [])
+            kept = [v for v in svs if not _contaminated(v)]
+            if len(kept) != len(svs):
+                pydantic_out.service_versions = kept
+                changed = True
+
+        if changed:
+            try:
+                output.raw = pydantic_out.model_dump_json()
+            except Exception:
+                pass
+            return True, output
+    except Exception:
+        pass
+    return True, raw
+
+
 def _extract_value_anchors(text: str) -> list:
     """Faktische Anker aus einer Beobachtungs-Zeichenkette extrahieren (BUG-25).
 
@@ -1316,7 +1429,8 @@ def make_tasks() -> dict:
         ),
         output_pydantic=BlueOutput,
         guardrails=[_tool_call_guardrail, _scope_coverage_guardrail, _waf_detection_guardrail,
-                    _tools_executed_guardrail, _open_ports_completeness_guardrail],
+                    _tools_executed_guardrail, _open_ports_completeness_guardrail,
+                    _blue_findings_sslscan_grounding_guardrail],
         guardrail_max_retries=2,
         agent=blue_agent,
         context=[research],
@@ -1396,7 +1510,8 @@ def make_tasks() -> dict:
             "zurückgegeben haben (vollständig in cve_references), faktische Zusammenfassung."
         ),
         output_pydantic=FindingsOutput,
-        guardrails=[_cve_tool_used_guardrail, _cve_trace_guardrail],
+        guardrails=[_cve_tool_used_guardrail, _cve_trace_guardrail,
+                    _blue_findings_sslscan_grounding_guardrail],
         guardrail_max_retries=2,
         agent=research_agent,
         context=[research, blue],
