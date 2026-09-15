@@ -501,13 +501,27 @@ def _tools_executed_guardrail(output: Any) -> tuple[bool, Any]:
 
     Prüft run_trace._pending (Calls DIESER Task — close_phase() läuft erst im
     task_callback NACH bestandenem Guardrail, wie bei _tool_call_guardrail).
+
+    Erweiterung (2026-09-15, Validierungs-Corpus-Backlog §5.1/5.2): red_scan
+    darf legitim 0 echte Tool-Calls machen ("nichts Neues zu scannen" — anders
+    als blue hat red_scan KEIN _tool_call_guardrail). Corpus-Befund (7/7
+    Targets): in diesem Fall kopiert das Modell trotzdem open_ports/
+    vulnerabilities/targeted_findings 1:1 von blue UND behauptet in
+    tools_executed dieselben Tools wie blue — der reporter-Task (kein
+    explizites context=, sieht ALLE Vorgänger-Outputs automatisch) übernimmt
+    das dann als "durch red_scan zusätzlich bestätigt", obwohl keine neue
+    Verifikation stattfand. Reject+Retry allein behebt das nachweislich NICHT
+    zuverlässig (derselbe Corpus zeigt 0/28 tools_executed korrekt trotz
+    bereits aktivem Guardrail) — deshalb hier deterministisch: wenn red_scan
+    (erkannt an 'targeted_findings', ein Feld das nur RedScanOutput hat) ohne
+    echten Tool-Call abschließt, werden alle vier Felder hart geleert statt
+    auf Selbstkorrektur zu hoffen. Kein Datenverlust — blue's Originalwerte
+    bleiben über den sequenziellen Task-Context ohnehin für red/report
+    erreichbar, nur die irreführende Zuschreibung an red_scan entfällt.
     """
     pydantic_out = getattr(output, "pydantic", None)
     raw = getattr(output, "raw", output) if not isinstance(output, str) else output
     if not pydantic_out:
-        return True, raw
-    claimed = [t for t in (getattr(pydantic_out, "tools_executed", None) or []) if t]
-    if not claimed:
         return True, raw
 
     try:
@@ -515,7 +529,19 @@ def _tools_executed_guardrail(output: Any) -> tuple[bool, Any]:
         if not run_trace.is_active:
             return True, raw
         real_used = {c.get("tool_name", "") for c in run_trace._pending if c.get("tool_name")}
+
+        is_red_scan = hasattr(pydantic_out, "targeted_findings")
+        if is_red_scan and not real_used:
+            for field in ("open_ports", "vulnerabilities", "targeted_findings", "tools_executed"):
+                if getattr(pydantic_out, field, None):
+                    setattr(pydantic_out, field, [])
+            return True, raw
+
         if not real_used:
+            return True, raw
+
+        claimed = [t for t in (getattr(pydantic_out, "tools_executed", None) or []) if t]
+        if not claimed:
             return True, raw
 
         fabricated = [t for t in claimed if not _tool_name_grounded(t, real_used)]
