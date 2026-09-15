@@ -9,6 +9,33 @@ Wir arbeiten die Roadmap (`roadmap.md`) phasenweise ab. Im Ablauf wird entschied
 
 **WICHTIG — Keine pauschalen Antworten. Faktenbasierte Responses auf jede Frage.**
 
+### Scope-Entscheidung (2026-09-15) — Keine Exploitation-Phase in dieser Suite
+
+**User-Entscheidung:** Es ist keine weitere Phase (insbesondere keine Exploitation-Phase/„Team 7") mehr
+innerhalb von recon-suite geplant — das würde die erwartete Qualitäts-/Performance-Messlatte dieses
+Programms sprengen. Der frühere Plan dazu (`roadmap.md`, ehemals „Phase 9: Exploitation & Validation",
+Safety-Gate-Vorbau `d6b4ae5`) ist damit **verworfen**, nicht nur verschoben.
+
+**Neue Anforderung stattdessen:** die Output-Dateien der Suite müssen so qualifiziert sein, dass sie als
+Input für eine Exploitation-Phase in einem **separaten, eigenständigen Programm** nutzbar sind (Kandidat:
+Schwesterprojekt `pentest-agent/`). Konkret: `RedOutput.confirmed_attack_surface`/`exploitable_findings`,
+`risk_score_*.json` bleiben die vorgesehene Schnittstelle — strukturiert, tool-bestätigt, ohne
+Fabrikation (das ist bereits der Kern der bisherigen Guardrail-Arbeit, jetzt explizit als Anspruch an
+diese Schnittstelle festgehalten statt nur als internes Qualitätsziel).
+
+**Umgesetzt:** `roadmap.md` („Status" + neuer Abschnitt „Scope-Grenze: Exploitation bleibt außerhalb
+dieser Suite" ersetzt den alten „Geplant: Phase 9"-Abschnitt) und `README.md` (PTES-Tabelle Zeile 5
++ zugehöriger Absatz) entsprechend angepasst. Zusätzlich auf Anweisung „was das Programm nicht kann
+gehört nicht ins README" die gesamte Sektion „Scope-Grenzen & Laufzeiten" aus dem README entfernt
+(ersatzlos — keine Limitations-Auflistung im README, das gehört ins Entwicklungsdokument).
+
+**Offener Punkt, NICHT in dieser Änderung entschieden:** Der bereits implementierte, committete Vorbau
+für das jetzt verworfene Team 7 (`scope_gate.py`, `authorized_scopes.json.example`,
+`--enable-injection`/`--enable-exploit`-CLI-Flags, `ScanState.enable_injection/enable_exploit/
+scope_authorized`) ist seither ohne Zweck — bewusst nicht angefasst (Code-Entscheidung mit eigenem
+Blast-Radius, nicht Teil des reinen Doku-Auftrags). Muss noch entschieden werden: entfernen oder als
+generischer Baustein für ein künftiges externes Programm umwidmen.
+
 ### Aktueller Stand (2026-09-15 — Backlog aus der 9/12-Validierungsrunde abgearbeitet, 5 Fixes + Push, alle committet + gepusht auf `origin/main`)
 
 **Vorgeschichte:** Die Sitzung vom 2026-09-12/13 wurde nicht sauber beendet — der User hatte keine explizite Anweisung gegeben, den damaligen Stand (18 Commits: CLAUDE.md-Fixes + komplette `debugging/VALIDATION_SPEC.md`-Durchführung Phase 0–6) zu speichern oder zu pushen. Am 2026-09-15 nachträglich freigegeben und gepusht (`origin/main` jetzt bei `06b24ad`) — inkl. eines bewussten Konventionsbruchs: `debugging/VALIDATION_SPEC.md` + die `validation/`/`corpus/`/`reports/`-Infrastruktur bleibt jetzt dauerhaft im Repo/Remote, anders als `testing/` (historisch lokal-only).

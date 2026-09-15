@@ -14,11 +14,11 @@ Diese Suite ist kein eigenständiges Pentest-Tool, sondern deckt einen definiert
 | 2. Intelligence Gathering | ✅ | Team 1 — passive Recon/OSINT (`research_agent`) |
 | 3. Threat Modeling | ✅ | Team 4 — Threat Intelligence (OTX/Shodan/VirusTotal) |
 | 4. Vulnerability Analysis | ✅ | Team 1 (Active Scan + CVE-Analyse) · Team 2 (NVD-Enrichment) · Team 6 (Risk Scoring) |
-| 5. Exploitation | 🔜 geplant, noch nicht implementiert | eigenes Team 7 — siehe `roadmap.md`, Phase 9 |
+| 5. Exploitation | ↗️ separates Programm | bewusst außerhalb dieser Suite — siehe unten |
 | 6. Post-Exploitation | — | bewusst außerhalb des Scopes |
 | 7. Reporting | ✅ | Team 3 — Final Report · Team 5 — OWASP-Mapping |
 
-Die Reports sind entsprechend als **Übergabeartefakt an Phase 5** konzipiert: `final_report_*.md`, `risk_score_*.json` und `RedOutput.confirmed_attack_surface`/`exploitable_findings` liefern die Kandidaten, gegen die eine spätere Exploitation-Phase verifiziert — nicht als Endergebnis eines vollständigen Pentests.
+Die Reports sind entsprechend als **Übergabeartefakt an Phase 5** konzipiert: `final_report_*.md`, `risk_score_*.json` und `RedOutput.confirmed_attack_surface`/`exploitable_findings` liefern die Kandidaten für eine Exploitation-Phase — bewusst als Aufgabe eines separaten, eigenständigen Programms, nicht dieser Suite (siehe `roadmap.md`, „Scope-Grenze“). recon-suite endet bei strukturierten, tool-bestätigten Findings, nicht beim Endergebnis eines vollständigen Pentests.
 
 ---
 
@@ -269,21 +269,10 @@ Modell-Auswahl über `models.json` (von `models.json.example` ableiten).
 
 ---
 
-## Scope-Grenzen & Laufzeiten
-
-Was dieses Framework bewusst NICHT tut (Design-Entscheidung, kein Bug):
-
-- **Passiv-banner-basierte CVE-Erkennung** — kein aktives Ausnutzen, keine Authentifizierung gegen das Ziel. Ausnutzbarkeit (PTES-Phase 5) ist als eigenes Team geplant, siehe `roadmap.md`.
-- **Targets hinter Cloudflare/CDN/WAF** liefern erwartungsgemäß keine (oder nur generische) CVEs — die Banner-Informationen gehören dann dem CDN/der WAF, nicht dem Origin-Server. `wafw00f` markiert diesen Fall im Report explizit.
-
-**Grobe Laufzeit-Richtwerte** (variieren stark mit Modell/Ziel): `quick` 20–60 Min, `full` 90–180 Min, Teams 4+6 (kein LLM) +2–5 Min, Team 5 (LLM) +5–15 Min.
-
----
-
 ## Weiterführende Dokumentation
 
 | Datei | Inhalt |
 |---|---|
 | [`agentscanit/toolinfo.md`](agentscanit/toolinfo.md) | Detaillierte Tool-Referenz (Binary, Version, Parameter je Tool) |
-| `roadmap.md` | Entwicklungs-Roadmap, technische Eigenheiten (CrewAI-Fallstricke), Bug-Historie, geplante Phasen (nicht Teil des Repos — lokal) |
+| `roadmap.md` | Entwicklungsverlauf, Architektur-Entscheidungen, technische Schulden (nicht Teil des Repos — lokal) |
 | `CLAUDE.md` | Laufende Session-Doku für KI-gestützte Weiterentwicklung: Architektur-Patterns, gelöste Bugs mit Root-Cause, offene Punkte |
