@@ -672,14 +672,44 @@ def _tools_executed_guardrail(output: Any) -> tuple[bool, Any]:
             return True, raw
 
         fabricated = [t for t in claimed if not _tool_name_grounded(t, real_used)]
-        if fabricated and run_trace._guardrail_reject_count < 1:
-            run_trace._guardrail_reject_count += 1
-            return False, (
-                f"FEHLER: 'tools_executed' nennt {fabricated}, für die es in "
-                f"dieser Task KEINEN echten Tool-Call gibt (echte Calls: "
-                f"{sorted(real_used)}). Entferne nicht wirklich aufgerufene "
-                f"Tools aus 'tools_executed'."
-            )
+        if fabricated:
+            if run_trace._guardrail_reject_count < 1:
+                run_trace._guardrail_reject_count += 1
+                return False, (
+                    f"FEHLER: 'tools_executed' nennt {fabricated}, für die es in "
+                    f"dieser Task KEINEN echten Tool-Call gibt (echte Calls: "
+                    f"{sorted(real_used)}). Entferne nicht wirklich aufgerufene "
+                    f"Tools aus 'tools_executed'."
+                )
+            # Fallback (2026-09-15, Live-Fund rastede.de full): RedScanOutput.
+            # tools_executed nannte 2x 'curl_http_headers (...)', obwohl curl
+            # in dieser Task NICHT lief (die 2 echten Calls waren nuclei+nikto —
+            # curl lief tatsächlich in der VORHERIGEN blue-Phase). Reject+Retry
+            # ließ die fabrizierte Zuschreibung unverändert durch — derselbe
+            # Fallback-Fehler wie beim red_scan-0-Calls-Fall (oben) und
+            # _searchsploit_version_guardrail (Backlog-Punkt 4) — deterministisch
+            # entfernen statt ein zweites Mal stillschweigend zu akzeptieren.
+            # Kein Report-seitiger Schaden bisher (_confirmed_findings_tool_
+            # guardrail/_value_grounding_guardrail prüfen session-weit, nicht
+            # pro Task — die WERTE waren wahr, nur die Task-Zuschreibung nicht),
+            # aber verletzt die eigene OUTPUT-REGEL ("nur was DIESE Task
+            # bestätigt hat").
+            pydantic_out.tools_executed = [t for t in claimed if t not in fabricated]
+            if is_red_scan:
+                tf = list(getattr(pydantic_out, "targeted_findings", None) or [])
+                # targeted_findings-Einträge folgen dem Format
+                # '<tool_label> (...) → ...' — derselbe Label-String wie in
+                # tools_executed, per Präfix-Match zuordenbar (best effort:
+                # weicht das Label geringfügig ab, bleibt der Eintrag stehen —
+                # kein Datenverlust-Risiko, nur ein möglicher Restfall).
+                kept_tf = [e for e in tf if not any(e.startswith(f) for f in fabricated)]
+                if len(kept_tf) != len(tf):
+                    pydantic_out.targeted_findings = kept_tf
+            try:
+                output.raw = pydantic_out.model_dump_json()
+            except Exception:
+                pass
+            return True, output
     except Exception:
         pass
     return True, raw
