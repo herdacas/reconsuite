@@ -9,7 +9,7 @@ Wir arbeiten die Roadmap (`roadmap.md`) phasenweise ab. Im Ablauf wird entschied
 
 **WICHTIG — Keine pauschalen Antworten. Faktenbasierte Responses auf jede Frage.**
 
-### ARBEITSPLAN (2026-09-15, dokumentiert VOR Umsetzung — Notfall-Referenz falls Session abbricht) — `red`-Task: `exploitable_findings` ohne PoC-Beleg
+### `red`-Task: `exploitable_findings` ohne PoC-Beleg — UMGESETZT + verifiziert (2026-09-15, Commit `b4d3cd0`)
 
 **User-Freigabe erteilt** für den unten beschriebenen Plan. Umsetzung folgt NACH dieser Doku.
 
@@ -48,11 +48,31 @@ Kopier-Verbot von `red_scan` gilt hier nicht 1:1.
 bestätigt", Einträge hier legitim über `blue`s nmap/httpx belegt, kein Fabrikationsbeweis gefunden) und
 `cve_references` (bereits durch `_cve_trace_guardrail` geschützt).
 
-**Verifikationsplan:** 1:1-Reproduktion gegen die echte `scanme-nmap-org`-Fixture (OpenSSH-Eintrag muss
-raus, Apache/CVE-2017-9798-Eintrag muss bleiben), Negativkontrolle gegen die echten `rastede.de`-DDG-
-Funde von heute (Icinga/WildFly/OpenSSH/Exchange — alle real PoC-recherchiert, müssen erhalten
-bleiben), Regression über die volle Testsuite + Konstruktionstest, **danach automatisierter
-Verifikationsscan** (echter Live-Scan gegen ein Ziel mit bekanntem Exploit-Kandidaten).
+**Umsetzung:** `_red_exploitable_poc_guardrail` in `tasks.py`, an `red` gehängt (Guardrail-Liste jetzt
+`[_cve_trace_guardrail, _searchsploit_version_guardrail, _red_exploitable_poc_guardrail]`).
+
+**Verifiziert — Unit/Fixture-Ebene (`testing/test_red_exploitable_poc_guardrail.py`, 11/11):**
+1:1-Reproduktion der echten `scanme-nmap-org`-Fixture (OpenSSH-Eintrag korrekt entfernt, Apache/
+CVE-2017-9798-Eintrag korrekt erhalten, Count 2→1 synchron), Negativkontrolle gegen die echten
+`rastede.de`-DDG-Funde von heute (Icinga/WildFly/OpenSSH/Exchange, real PoC-recherchiert — alle 5
+bleiben erhalten), Regression (kein PoC-Tool gelaufen → Guardrail greift gar nicht ein), Negativkontrolle
+(Eintrag ohne extrahierbares Produkt-Token bleibt unangetastet). Alle 11 Testdateien der Suite (105
+Assertions) grün, Konstruktionstest: `red`-Task hat jetzt 3 Guardrails.
+
+**Verifiziert — automatisierter Live-Scan (`scanme.nmap.org network`, `RECON_LLM_DEBUG=1`,
+2026-09-15, ~1h45 Laufzeit, `trace_scanme.nmap.org_20260915_181937.json`):** Kompletter 6-Team-Durchlauf
+ohne Crash, Grade A 88.0/100 (Effizienz-Dimension niedrig wegen Remote-LLM-Latenz, kein Fehlverhalten).
+CVE-Funde exakt wie im historischen Ground-Truth-Profil (CVE-2018-15473, CVE-2016-10009/10010) plus
+zusätzlich CVE-2017-9798/CVE-2014-0226 für Apache — alle legitim. Critical/High-Konsistenz zwischen
+`final_report` (14/11) und `risk_score` (14/11) weiterhin korrekt (BACKLOG-FIX vom 9/12 hält). `red`
+rief diesmal selbst 4× `ddg_search` auf (kein 0-Calls-Fall — der ursprüngliche Bug-Trigger trat in
+diesem Lauf nicht erneut auf, LLM-Verhalten ist nicht deterministisch erzwingbar) — alle 5
+`exploitable_findings`-Einträge waren bereits echt PoC-belegt. **Positivkontrolle direkt gegen die
+echten Live-Daten nachgestellt:** derselbe reale `red`-Output erneut durch den Guardrail geschickt →
+0 Änderungen (`unveraendert? True`) — bestätigt keinen Fehlalarm auf echtem, vollständig belegtem
+Live-Output. Die Korrektur-Wirkung selbst ist damit ausschließlich durch die Fixture-Reproduktion belegt
+(dort lag der reale Bug-Zustand vor), der Live-Scan bestätigt zusätzlich Regressionsfreiheit im echten
+Betrieb.
 
 ---
 
