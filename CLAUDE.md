@@ -29,12 +29,14 @@ dieser Suite" ersetzt den alten „Geplant: Phase 9"-Abschnitt) und `README.md` 
 gehört nicht ins README" die gesamte Sektion „Scope-Grenzen & Laufzeiten" aus dem README entfernt
 (ersatzlos — keine Limitations-Auflistung im README, das gehört ins Entwicklungsdokument).
 
-**Offener Punkt, NICHT in dieser Änderung entschieden:** Der bereits implementierte, committete Vorbau
-für das jetzt verworfene Team 7 (`scope_gate.py`, `authorized_scopes.json.example`,
+**Nachtrag, selber Tag: erledigt (Commit `1f7e88e`).** User-Entscheidung: entfernen statt umwidmen. Der
+komplette Vorbau (`scope_gate.py`, `authorized_scopes.json.example`, `testing/test_scope_gate.py`, die
 `--enable-injection`/`--enable-exploit`-CLI-Flags, `ScanState.enable_injection/enable_exploit/
-scope_authorized`) ist seither ohne Zweck — bewusst nicht angefasst (Code-Entscheidung mit eigenem
-Blast-Radius, nicht Teil des reinen Doku-Auftrags). Muss noch entschieden werden: entfernen oder als
-generischer Baustein für ein künftiges externes Programm umwidmen.
+scope_authorized/scope_gate_reason`, die `run_validation_gate`-Flow-Methode) ist raus.
+`run_compliance` hängt wieder direkt an `run_threat_intel` (Zustand vor dem Safety-Gate-Einbau).
+Verifiziert: `py_compile` + realer Import von `flow.py`/`main.py` (ScanState ohne die 4 Felder,
+`run_validation_gate` existiert nicht mehr, `run_flow()`-Signatur ohne die beiden Parameter),
+`main.py --list` läuft fehlerfrei, alle 10 verbleibenden Testdateien (94 Assertions) grün.
 
 ### Aktueller Stand (2026-09-15 — Backlog aus der 9/12-Validierungsrunde abgearbeitet, 5 Fixes + Push, alle committet + gepusht auf `origin/main`)
 
