@@ -9,6 +9,53 @@ Wir arbeiten die Roadmap (`roadmap.md`) phasenweise ab. Im Ablauf wird entschied
 
 **WICHTIG — Keine pauschalen Antworten. Faktenbasierte Responses auf jede Frage.**
 
+### ARBEITSPLAN (2026-09-15, dokumentiert VOR Umsetzung — Notfall-Referenz falls Session abbricht) — `red`-Task: `exploitable_findings` ohne PoC-Beleg
+
+**User-Freigabe erteilt** für den unten beschriebenen Plan. Umsetzung folgt NACH dieser Doku.
+
+**Befund, verifiziert gegen echte Trace-Daten (`corpus/fixtures/scanme-nmap-org/scanner_trace.json`,
+`red`-Phase, 0 eigene Tool-Calls):** `RedOutput.exploitable_findings` enthielt `"ssh:22 — OpenSSH
+6.6.1p1 version disclosed"` — reine Banner-Beobachtung aus `blue`, aber als "exploitable" deklariert,
+obwohl KEIN einziger `searchsploit`/`ddg_search`-Call in der GESAMTEN Session je nach OpenSSH gesucht
+hat (per Volltextsuche über alle Phasen bestätigt). Verstößt gegen `red`s eigene OUTPUT-REGEL: "Nur
+Findings für die searchsploit einen Exploit-Eintrag oder DDG einen publizierten PoC zurückgegeben hat."
+
+**Wichtig — warum NICHT das `red_scan`-Muster von heute Morgen (0-Calls → alles leeren):** derselbe
+Fund enthielt auch `"http:80 — Apache 2.4.7 version disclosed..."`, was ECHT PoC-belegt ist (`findings`-
+Phase rief `searchsploit Apache 2.4.7` auf, realer Treffer EDB-42745/CVE-2017-9798). Ein blindes
+"0-Calls → alles leeren" würde diesen echten Fund mitlöschen. `red` darf laut eigenem Prompt legitim auf
+bereits von `findings`/`blue` bestätigte Funde zurückgreifen, ohne selbst neu zu scannen — das
+Kopier-Verbot von `red_scan` gilt hier nicht 1:1.
+
+**Fix-Design (target-/produktunabhängig, keine hartcodierten Namen):**
+1. Neuer Guardrail auf dem `red`-Task, analog `_blue_findings_sslscan_grounding_guardrail`/
+   `_value_grounding_guardrail` (heute gebaut).
+2. Pro `exploitable_findings`-Eintrag ein Produkt-Token extrahieren: erstes großgeschriebenes Wort
+   (Regex `\b[A-Z][a-zA-Z0-9]{2,}\b`) — kein Wörterbuch, funktioniert an allen bisher beobachteten
+   echten Fällen (OpenSSH, Apache, WordPress, Icinga, WildFly, Exchange).
+3. Suchtext = alle `searchsploit`/`ddg_search`-Rohoutputs der GESAMTEN Session (`get_all_tool_names()` +
+   `get_raw_outputs_for_tool()`, nicht nur diese Task — `red` darf sich legitim auf `findings` stützen).
+4. Kein Treffer für das Token im Suchtext → Eintrag entfernen. Kein extrahierbares Token → Eintrag
+   unangetastet lassen (kein Anker = nichts zu prüfen, keine Fehlalarm-Gefahr).
+5. `exploitable_findings_count` manuell synchronisieren (der `derive_count`-Validator läuft nicht bei
+   nachträglicher Attribut-Zuweisung — heute an anderer Stelle bereits gelernt).
+6. Deterministisches Entfernen, KEIN Reject+Retry (heute dreimal bewiesen: der Fallback korrigiert
+   dieses Muster nicht zuverlässig).
+7. Mutation korrekt zurückgeben (`TaskOutput`-Objekt + synchronisiertes `.raw`) — sonst geht die
+   Korrektur beim echten CrewAI-Run verloren (heute an anderer Stelle gefunden und gefixt).
+
+**Bewusst NICHT angefasst:** `confirmed_attack_surface` (breitere Regel — "irgendein Tool hat es
+bestätigt", Einträge hier legitim über `blue`s nmap/httpx belegt, kein Fabrikationsbeweis gefunden) und
+`cve_references` (bereits durch `_cve_trace_guardrail` geschützt).
+
+**Verifikationsplan:** 1:1-Reproduktion gegen die echte `scanme-nmap-org`-Fixture (OpenSSH-Eintrag muss
+raus, Apache/CVE-2017-9798-Eintrag muss bleiben), Negativkontrolle gegen die echten `rastede.de`-DDG-
+Funde von heute (Icinga/WildFly/OpenSSH/Exchange — alle real PoC-recherchiert, müssen erhalten
+bleiben), Regression über die volle Testsuite + Konstruktionstest, **danach automatisierter
+Verifikationsscan** (echter Live-Scan gegen ein Ziel mit bekanntem Exploit-Kandidaten).
+
+---
+
 ### Scope-Entscheidung (2026-09-15) — Keine Exploitation-Phase in dieser Suite
 
 **User-Entscheidung:** Es ist keine weitere Phase (insbesondere keine Exploitation-Phase/„Team 7") mehr
