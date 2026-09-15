@@ -395,6 +395,97 @@ def _searchsploit_version_guardrail(output: Any) -> tuple[bool, Any]:
     return True, raw
 
 
+# Produkt-Token für den Grounding-Check unten: erstes großgeschriebenes Wort
+# im Finding-Text (z.B. "OpenSSH", "Apache", "WordPress", "Icinga") — bewusst
+# kein Produkt-Wörterbuch, funktioniert generisch/target-unabhängig.
+_PRODUCT_TOKEN_RE = _re.compile(r"\b[A-Z][a-zA-Z0-9]{2,}\b")
+
+
+def _red_exploitable_poc_guardrail(output: Any) -> tuple[bool, Any]:
+    """Guardrail (red): jeder 'exploitable_findings'-Eintrag muss einem echten
+    PoC-Recherche-Treffer (searchsploit/ddg_search, IRGENDWO in der Session)
+    zuzuordnen sein — nicht nur einer bloßen Versions-/Banner-Beobachtung.
+
+    Befund (2026-09-15, corpus/fixtures/scanme-nmap-org/scanner_trace.json,
+    red-Phase, 0 eigene Tool-Calls): 'ssh:22 — OpenSSH 6.6.1p1 version
+    disclosed' stand in exploitable_findings, obwohl KEIN einziger
+    searchsploit/ddg_search-Call in der GESAMTEN Session je nach OpenSSH
+    gesucht hat — reine Banner-Beobachtung aus blue, als "exploitable"
+    deklariert. Verstößt gegen red's eigene OUTPUT-REGEL ("Nur Findings für
+    die searchsploit einen Exploit-Eintrag oder DDG einen publizierten PoC
+    zurückgegeben hat").
+
+    WICHTIG — bewusst NICHT das red_scan-Muster ("0 Calls -> alles leeren",
+    Commit bab38f2): derselbe Fund enthielt auch 'http:80 — Apache 2.4.7
+    version disclosed...', ECHT PoC-belegt (findings-Phase rief
+    'searchsploit Apache 2.4.7' auf, realer Treffer EDB-42745/CVE-2017-9798).
+    red darf laut eigenem Prompt legitim auf bereits von findings/blue
+    bestätigte Funde zurückgreifen, ohne selbst neu zu scannen — ein
+    blindes 0-Calls-Leeren würde diesen echten Fund mitlöschen. Deshalb hier
+    pro EINTRAG geprüft, nicht pro Task/Call-Anzahl.
+
+    Produktunabhängig: extrahiert pro Eintrag das erste großgeschriebene Wort
+    (kein Wörterbuch) und sucht es im Rohoutput ALLER searchsploit/ddg_search-
+    Calls der gesamten Session (nicht nur dieser Task — get_all_tool_names()/
+    get_raw_outputs_for_tool(), dieselbe Infrastruktur wie die anderen
+    Grounding-Guardrails). Kein extrahierbares Token -> Eintrag unangetastet
+    (kein Anker = nichts zu prüfen, kein Fehlalarm-Risiko).
+
+    Deterministisches Entfernen, kein Reject+Retry — heute mehrfach bewiesen
+    (bab38f2/477ea1f/06b24ad), dass der Fallback dieses Muster nicht
+    zuverlässig korrigiert. Bewusst NUR exploitable_findings betroffen —
+    confirmed_attack_surface hat die breitere Regel "irgendein Tool hat es
+    bestätigt" (hier legitim über blues nmap/httpx belegt), cve_references
+    ist bereits durch _cve_trace_guardrail geschützt.
+    """
+    pydantic_out = getattr(output, "pydantic", None)
+    raw = getattr(output, "raw", output) if not isinstance(output, str) else output
+    if not pydantic_out or not hasattr(pydantic_out, "exploitable_findings"):
+        return True, raw
+
+    findings = list(getattr(pydantic_out, "exploitable_findings", None) or [])
+    if not findings:
+        return True, raw
+
+    try:
+        from tools.trace import run_trace
+        if not run_trace.is_active:
+            return True, raw
+
+        real_tools = run_trace.get_all_tool_names()
+        poc_tool_names = [
+            t for t in real_tools
+            if t.lower().startswith("searchsploit") or t.lower().startswith("ddg")
+        ]
+        if not poc_tool_names:
+            return True, raw
+        poc_text = "\n".join(
+            out
+            for name in poc_tool_names
+            for out in run_trace.get_raw_outputs_for_tool(name)
+        )
+
+        def _grounded(entry: str) -> bool:
+            tokens = _PRODUCT_TOKEN_RE.findall(entry)
+            if not tokens:
+                return True  # kein Anker -> nichts zu prüfen, nicht anfassen
+            return any(tok.lower() in poc_text.lower() for tok in tokens)
+
+        kept = [f for f in findings if _grounded(f)]
+        if len(kept) != len(findings):
+            pydantic_out.exploitable_findings = kept
+            pydantic_out.exploitable_findings_count = len(kept)
+            try:
+                output.raw = pydantic_out.model_dump_json()
+            except Exception:
+                pass
+            return True, output
+    except Exception:
+        pass
+
+    return True, raw
+
+
 # ─── Subdomain-Fanout (deterministisch) ───────────────────────────────────────
 # Problem: research entdeckt Subdomains (subfinder), aber blue scannte bisher nur
 # die Apex-Domain → die eigentliche Angriffsfläche (auth/api/backoffice/…) wurde nie
@@ -1645,7 +1736,7 @@ def make_tasks() -> dict:
             "welche PoCs DDG zurückgegeben hat — nichts darüber hinaus."
         ),
         output_pydantic=RedOutput,
-        guardrails=[_cve_trace_guardrail, _searchsploit_version_guardrail],
+        guardrails=[_cve_trace_guardrail, _searchsploit_version_guardrail, _red_exploitable_poc_guardrail],
         guardrail_max_retries=2,
         agent=red_agent,
         context=[blue, findings],
