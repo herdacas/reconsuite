@@ -9,6 +9,45 @@ Wir arbeiten die Roadmap (`roadmap.md`) phasenweise ab. Im Ablauf wird entschied
 
 **WICHTIG — Keine pauschalen Antworten. Faktenbasierte Responses auf jede Frage.**
 
+### Session-Abschluss (2026-09-15) — Zusammenfassung, alles gepusht
+
+Lange Sitzung, chronologisch (Details jeweils im eigenen Abschnitt weiter unten):
+
+1. **Vorsitzung 9/12–13 nachträglich freigegeben und gepusht** (16 Commits — war nicht sauber beendet
+   worden, keine explizite Speicher-Anweisung vorher).
+2. **5 Fixes aus dem `reports/FINAL_REPORT.md`-Backlog** (Validierungsrunde 9/12): `red_scan` kopierte
+   blue-Felder bei 0 Tool-Calls (`bab38f2`) · `open_ports`-Completeness + ein dabei gefundener
+   CrewAI-Guardrail-Mutation-Persistenz-Bug, der auch `bab38f2` selbst betraf (`ae3f08e`) ·
+   sslscan-Banner-Kontamination erreichte Team 5 (`30656d1`) · `_searchsploit_version_guardrail`-Fallback
+   akzeptierte fabrizierte Funde (`477ea1f`) · `_tools_executed_guardrail`-Fallback dito, live beim
+   Verifikationsscan gefunden (`06b24ad`).
+3. **README.md grundlegend überarbeitet:** PTES-Einordnung ergänzt, Tool-Liste ergänzt, mehrere
+   Bestandsfehler korrigiert (naabu/testssl-Reste, `checkpoints/`-Zeile, BUG-18-Falschaussage,
+   falscher `models.json.example`-Pfad), Bugs/Eigenheiten nach `roadmap.md` verschoben (`d173547`).
+4. **`gmx.de quick`-Scan geprüft → neuer Bug gefunden+gefixt:** `nmap`-Aufruf mit ungültigem
+   Port-Preset (`ports="top100"`) scheiterte lautlos (stdout hatte nur die Startbanner-Zeile, stderr mit
+   der eigentlichen Fehlermeldung wurde verworfen) — Report interpretierte das fälschlich als "gescannt,
+   keine offenen Ports" (`1828b62`).
+5. **CrewAI-Konformitäts-/Effizienz-Audit** durchgeführt (gegen crewai-skills + docs.crewai.com) — u. a.
+   gefunden: "Cache: on" im CLI-Banner ist ein hartcodierter String, kein echter Ziel-Cache;
+   `max_execution_time` fehlt überall; Team 2/Team 4 im Flow künstlich sequenziell. Zusammenfassung jetzt
+   in `roadmap.md` dokumentiert statt nur im Chat.
+6. **`roadmap.md` grundlegend neu strukturiert** (2098 → ~285 Zeilen) — Status/Entwicklungsverlauf/
+   Technische Schulden/Audit/Scope-Grenze statt Phasen-Bauanleitung mit Code-Schnipseln und veralteten
+   Verifikations-Checklisten.
+7. **Scope-Entscheidung: keine Exploitation-Phase mehr in dieser Suite geplant** — würde die erwartete
+   Qualitäts-/Performance-Messlatte sprengen. Output-Dateien stattdessen als Schnittstelle für ein
+   separates, eigenständiges Exploitation-Programm qualifiziert (Kandidat: `pentest-agent/`). README/
+   roadmap.md angepasst (`208ce44`), der dafür bereits committete Team-7-Vorbau (`scope_gate.py` u. a.)
+   auf User-Entscheidung hin entfernt statt umgewidmet (`1f7e88e`, `82dae7e`).
+8. **`red`-Task: `exploitable_findings` ohne PoC-Beleg gefixt** (Plan erst dokumentiert `a9fe6e3`, dann
+   Guardrail `b4d3cd0`, danach automatisierter Live-Verifikationsscan + Doku `af25118`) — Details siehe
+   Abschnitt direkt darunter.
+
+**Ergebnis:** 6 echte Bugfixes, 1 Scope-Entscheidung mit Code-Konsequenz, 2 grundlegend überarbeitete
+Dokumente (README.md, roadmap.md), 1 durchgeführter Framework-Audit. `main` == `origin/main`, alles
+gepusht, Arbeitsverzeichnis clean. Alle Testdateien (`testing/`, 11 Dateien/105 Assertions) grün.
+
 ### `red`-Task: `exploitable_findings` ohne PoC-Beleg — UMGESETZT + verifiziert (2026-09-15, Commit `b4d3cd0`)
 
 **User-Freigabe erteilt** für den unten beschriebenen Plan. Umsetzung folgt NACH dieser Doku.
