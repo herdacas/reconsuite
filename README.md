@@ -1,6 +1,24 @@
 # AgentScanIT — Agentic Vulnerability Assessment Framework
 
-Multi-Agent Security Assessment auf Basis von [CrewAI](https://crewai.com) und lokalen LLMs via [Ollama](https://ollama.com). Sechs spezialisierte Teams arbeiten sequenziell: vom passiven OSINT-Scan bis zum priorisierten Risk-Score mit OWASP-Compliance-Mapping.
+Multi-Agent Security Assessment auf Basis von [CrewAI](https://crewai.com) und LLMs via [Ollama](https://ollama.com) (lokal oder remote). Sechs spezialisierte Teams arbeiten sequenziell: vom passiven OSINT-Scan bis zum priorisierten Risk-Score mit OWASP-Compliance-Mapping.
+
+---
+
+## Einordnung im Pentest-Prozess
+
+Diese Suite ist kein eigenständiges Pentest-Tool, sondern deckt einen definierten Ausschnitt der [PTES](http://www.pentest-standard.org/)-Methodik ab — die Ausgabe ist der Input für die nachfolgenden Phasen eines echten Penetrationstests:
+
+| PTES-Phase | Abgedeckt | Wo |
+|---|---|---|
+| 1. Pre-Engagement (Scoping, Rules of Engagement) | — | manueller Prozess außerhalb der Suite |
+| 2. Intelligence Gathering | ✅ | Team 1 — passive Recon/OSINT (`research_agent`) |
+| 3. Threat Modeling | ✅ | Team 4 — Threat Intelligence (OTX/Shodan/VirusTotal) |
+| 4. Vulnerability Analysis | ✅ | Team 1 (Active Scan + CVE-Analyse) · Team 2 (NVD-Enrichment) · Team 6 (Risk Scoring) |
+| 5. Exploitation | 🔜 geplant, noch nicht implementiert | eigenes Team 7 — siehe `roadmap.md`, Phase 9 |
+| 6. Post-Exploitation | — | bewusst außerhalb des Scopes |
+| 7. Reporting | ✅ | Team 3 — Final Report · Team 5 — OWASP-Mapping |
+
+Die Reports sind entsprechend als **Übergabeartefakt an Phase 5** konzipiert: `final_report_*.md`, `risk_score_*.json` und `RedOutput.confirmed_attack_surface`/`exploitable_findings` liefern die Kandidaten, gegen die eine spätere Exploitation-Phase verifiziert — nicht als Endergebnis eines vollständigen Pentests.
 
 ---
 
@@ -30,7 +48,7 @@ Die Berichte sind auf einen **Penetrationstest** ausgerichtet, nicht auf ein def
 
 | Team | Package | Technologie | Aufgabe |
 |---|---|---|---|
-| 1 | `agentscanit/` | CrewAI Crew · 5 Agents · 26 Tools | Passive Recon + Active Scan + CVE-Analyse |
+| 1 | `agentscanit/` | CrewAI Crew · 5 Agents · 19 Tools | Passive Recon + Active Scan + CVE-Analyse |
 | 2 | `interpret_agent/` | CrewAI Flow | NVD API v2 — CVE-Details, CVSS, Severity |
 | 3 | `reporting/` | CrewAI Flow | Merge aller Reports → `final_report_*.md` |
 | 4 | `threatintel_agent/` | CrewAI Flow (kein LLM) | OTX · Shodan · VirusTotal — In-the-Wild-Status |
@@ -66,13 +84,49 @@ Innerhalb von Team 1 kommunizieren die 5 Agents über den CrewAI Task-Kontext (P
 
 | Agent | Aufgabe | Tools |
 |---|---|---|
-| `research_agent` | Passive OSINT: Subdomains, DNS, WHOIS, theHarvester | 15 |
-| `blue_agent` | Active Scanning: nmap, nikto, nuclei, sslscan, httpx | 12 |
-| `research_agent` | CVE-Analyse (findings_task) | searchsploit, DDG, nvd_tool |
-| `blue_agent` | Targeted Follow-up (red_scan_task) | nuclei, nikto |
-| `red_agent` | Exploitability-Analyse: PoC-Check, Attack-Surface | searchsploit, DDG, nvd_tool |
+| `research_agent` | Passive OSINT: Subdomains, DNS, WHOIS | 10 |
+| `blue_agent` | Active Scanning: nmap, nikto, nuclei, sslscan, httpx | 9 |
+| `research_agent` | CVE-Analyse (findings_task) | searchsploit, DDG, NVD |
+| `blue_agent` | Targeted Follow-up (red_scan_task, nur `full`-Scope) | nuclei, nikto |
+| `red_agent` | Exploitability-Analyse: PoC-Check, Attack-Surface | searchsploit, DDG, NVD |
 | `coding_agent` | Automatisierungs-Skript aus Scan-Schritten | — |
 | `reporter_agent` | Markdown-Report aus allen Phasen | — |
+
+---
+
+## Tools
+
+Team 1 setzt 19 externe Scan-Tools ein, aufgeteilt auf `research_agent` (passiv) und `blue_agent` (aktiv). Ausführliche technische Doku pro Tool (Binary, Version, Parameter): [`agentscanit/toolinfo.md`](agentscanit/toolinfo.md).
+
+### Active Scanning (`blue_agent`)
+
+| Tool | Zweck |
+|---|---|
+| `nmap` | Port-Scan + Service-/Versions-Erkennung (Discovery über alle 65535 Ports, dann `-sV` auf offene Ports) |
+| `httpx` | HTTP-Probing vieler Hosts gleichzeitig, Tech-Detect, optionale API-Pfad-Erkennung |
+| `whatweb` | Web-Technologie-Fingerprinting (CMS, Framework, Server-Software) |
+| `wafw00f` | WAF-/CDN-Erkennung (Cloudflare, Akamai, ModSecurity u. a.) — läuft bei `web`/`full` zuerst |
+| `nikto` | Web-Vulnerability-Scan: fehlende Security-Header, veraltete Software, Fehlkonfigurationen |
+| `nuclei` | Template-basierter Vulnerability-Scanner (CVEs, Exposures, Misconfigurations) |
+| `sslscan` | TLS/SSL-Konfigurationsanalyse: Protokolle, Cipher-Suites, Zertifikate |
+| `curl` | HTTP-Response-Header (Security-Header, Server-Banner, Cookies) |
+| `ping` | ICMP-Erreichbarkeitsprüfung vor aufwändigeren Scans |
+
+### Passive Recon / OSINT (`research_agent`)
+
+| Tool | Zweck |
+|---|---|
+| `subfinder` | Passive Subdomain-Enumeration (Certificate Transparency, DNS-Datenbanken) |
+| `dnsrecon` | DNS-Enumeration, Zone-Transfer-Check (AXFR) |
+| `dnsx` | DNS-Massen-Resolver, filtert nicht-existente Subdomains |
+| `dig` | Einzelne DNS-Abfragen (A/AAAA/MX/NS/TXT/…) |
+| `whois` | Registrar, Nameserver, Registrierungsdatum |
+| `katana` | Web-Crawler: URLs, API-Endpunkte, Formulare, JS-Links |
+| `ddgs` (DuckDuckGo) | OSINT- und CVE-PoC-Recherche |
+| `searchsploit` | Lokale ExploitDB-Suche nach Software + Version |
+| NVD API v2 (`nvd_cpe_lookup`, `nvd_cve_search`) | CVE-Lookup per CPE bzw. Keyword, CVSS/Severity |
+
+`red_agent`, `coding_agent` und `reporter_agent` erhalten keine eigenen Tools — sie arbeiten analytisch auf Basis der strukturierten Outputs vorangehender Tasks (`red_agent` nutzt `searchsploit`/DDG/NVD zur Verifikation, s. o.).
 
 ---
 
@@ -93,7 +147,7 @@ sudo bash setup_tools.sh
 bash setup_tools.sh --check        # nur prüfen welche Tools fehlen (installiert nichts)
 
 # 3. Modelle konfigurieren
-cp models.json.example models.json
+cp agentscanit/models.json.example agentscanit/models.json
 ```
 
 > **Hinweis:** Die Scan-Tools sind kompilierte Binaries (C/Go), keine Python-Pakete — sie
@@ -106,7 +160,7 @@ cp models.json.example models.json
 ## Modell-Anforderungen
 
 Das Framework treibt die Agents über **Ollama native Function-Calling**. Nicht jedes LLM ist geeignet —
-die Anforderungen sind empirisch ermittelt (mehrere Modelle gegen echte Scans getestet).
+die Anforderungen sind empirisch ermittelt (mehrere Modelle gegen echte Scans getestet, Details in `roadmap.md`).
 
 **Ein verwendbares Modell MUSS:**
 1. **Natives Tool-Calling / Function-Calling** beherrschen. Reine Chat-Modelle scheitern mit
@@ -114,24 +168,19 @@ die Anforderungen sind empirisch ermittelt (mehrere Modelle gegen echte Scans ge
 2. **Stabil bei tiefen Multi-Turn-Tool-Ketten** sein (≥10 Nachrichten). Das ist der eigentliche Test —
    ein einzelner Tool-Call sagt nichts aus. Manche Modelle bestehen Einzel-Calls, scheitern aber im
    echten Scan mit leeren Antworten.
-3. **Non-Reasoning sein ODER `think:False` respektieren.** Reasoning-Modelle (z. B. gpt-oss, Qwen3-thinking)
-   verlieren bei tiefen Ketten sporadisch ihre Antwort im verworfenen Reasoning-Kanal.
+3. **Non-Reasoning sein ODER `think:False` respektieren.** Reasoning-Modelle verlieren bei tiefen
+   Ketten sporadisch ihre Antwort im verworfenen Reasoning-Kanal.
 
-**Empfohlene Modelle (getestet):**
+**Empirisch als tauglich bestätigt (Stand variiert — aktuelle Auswahl über `models.json`):**
 
-| Rolle | Modell | Bewertung |
-|---|---|---|
-| **Remote-Worker** | `qwen3-coder:480b` (ollama.com) | ✅ aktiv — Non-Reasoning, agentic, 0 % Leerantworten |
-| **Lokal-Worker** | `qwen2.5:7b-instruct` | ✅ schnellster, solides Tool-Calling |
-| | `llama3-groq-tool-use:8b` | ✅ explizit für Tool-Use trainiert |
-| | `qwen3-coder:30b` | ✅ stärkste lokale Qualität (langsamer) |
-| **Planner** (immer lokal) | `qwen2.5:7b-instruct` | ✅ native Ollama-FC erforderlich |
+| Rolle | Modell-Kandidaten |
+|---|---|
+| **Remote-Worker** (analysis/research/code) | Non-Reasoning Tool-Use-Modelle, z. B. `qwen3-coder`, `nemotron-3`-Familie |
+| **Lokal-Worker** | `qwen2.5:7b-instruct`, `llama3-groq-tool-use:8b`, `qwen3-coder:30b` |
+| **Planner** (läuft immer lokal) | `qwen2.5:7b-instruct` — remote Modelle unterstützen Ollama's native FC-API nicht zuverlässig |
 
-**Nicht geeignet:** Gemma-Familie (`gemma*:e2b` etc. — schwaches agentic Function-Calling, scheitert im
-echten Scan trotz bestandener Einzel-Calls), reine Reasoning-Modelle ohne `think:False`-Konformität.
-
-**Mindest-Kontextfenster:** Worker ≥ 8k Tokens (reale Prompts ~2–5k), lokal genügen 8k. Der Planner
-ist ein Sonderfall (große Scopes), wird daher bei >5 Tasks automatisch deaktiviert (siehe BUG-18-Hinweis unten).
+**Nicht geeignet:** Gemma-Familie (schwaches agentic Function-Calling, scheitert im echten Scan trotz
+bestandener Einzel-Calls), reine Reasoning-Modelle ohne `think:False`-Konformität.
 
 > **Diagnose-Werkzeug:** `RECON_LLM_DEBUG=1 python3 main.py …` protokolliert jeden LLM-Call
 > (Prompt-Größe, Status, Leerantworten) nach `logs/llm_debug_<pid>.jsonl` — nützlich um ein neues
@@ -158,39 +207,40 @@ cd agentscanit && python3 main.py example.com
 
 ### Scopes
 
-| Scope | Was läuft | Teams aktiv |
-|---|---|---|
-| `osint` | Passive Recon (kein aktiver Scan) | 1 → 3 |
-| `ssl` | sslscan + testssl | 1 → 3 |
-| `quick` | nmap Top-100 + httpx + CVE-Analyse | 1 → routing → 3 |
-| `web` | httpx · whatweb · nikto · nuclei + CVE + Exploit | 1 → routing → 2–6 → 3 |
-| `network` | nmap · naabu · httpx + CVE + Exploit | 1 → routing → 2–6 → 3 |
-| `full` | Alle Tools + alle Phasen | 1 → routing → 2–6 → 3 |
+Der Scope bestimmt, welche Tasks innerhalb Team 1 laufen (`research_agent`/`blue_agent` nutzen dabei
+immer dieselben registrierten Tools — der Scope steuert Tiefe/Fokus über die Task-Prompts, z. B.
+Portbereich bei `nmap`):
 
-> **Hinweis zum `full`-Scope:** Der LLM-AgentPlanner (Ausführungs-Optimierung vor den Phasen) ist bei `full` **deaktiviert** — bei 7 Phasen wird der Planner-Prompt so groß (~32k Tokens), dass er das Kontextfenster des lokalen Planner-Modells (qwen2.5:7b, num_ctx 4096) überläuft. Die Pipeline läuft unverändert (alle Phasen/Tools), nur ohne diese Optimierung. `web`/`network`/`quick` nutzen den Planner weiterhin. (Tracking: BUG-18.)
->
-> **Empfohlenes Remote-Worker-Modell:** `qwen3-coder:480b` (Non-Reasoning, agentic Tool-Calling). Das frühere `gpt-oss:120b` (Reasoning-Modell) lieferte bei tiefen Tool-Call-Ketten sporadisch leere Antworten und ließ `full`-Scans abbrechen. Mit `qwen3-coder` läuft `full` stabil durch (verifiziert: alle 7 Phasen, 0 Retries). Konfiguration in `models.json` (`models.analysis/research/code`). (Tracking: BUG-19.)
+| Scope | Tasks (Team 1) | Team 1 folgt Routing zu |
+|---|---|---|
+| `osint` | research → report | Team 3 (direkt) |
+| `ssl` | research → blue → report | Team 3 (direkt) |
+| `quick` | research → blue → findings → report | Router (Teams 2–6 je nach Funden) |
+| `web` / `network` | research → blue → findings → red → report | Router (Teams 2–6 je nach Funden) |
+| `full` | research → blue → findings → red_scan → red → coding → report | Router (Teams 2–6 je nach Funden) |
+
+`web` und `network` nutzen aktuell dieselbe Task-Pipeline — der Unterschied liegt in der
+Scan-Tiefe/-Fokussierung, die den Agents über die Task-Beschreibung vorgegeben wird (z. B. Portbereich).
 
 ---
 
 ## Outputs
 
-Alle Outputs landen in `logs/`:
+Alle Outputs landen in `logs/` (Automatisierungs-Skript in `scans/`):
 
 | Datei | Erzeugt von | Inhalt |
 |---|---|---|
 | `recon_report_*.md` | Team 1 | Recon-Report mit Ports, Services, CVEs |
 | `crew_*.json` | Team 1 | Strukturierter JSON-Log (Tasks, CVE-Refs, Ports) |
 | `trace_*.json` | Team 1 | Tool-Calls mit Raw-Output + Timings |
+| `scans/scan_*.py` | Team 1 (`coding_agent`) | Ausführbares Python-Skript, automatisiert die Scan-Schritte |
 | `interpret_*.md` | Team 2 | NVD-Detaildaten pro CVE (CVSS, CWE, References) |
 | `final_report_*.md` | Team 3 | Merged Final Report |
 | `threatintel_*.md` | Team 4 | OTX/Shodan/VT — In-the-Wild-Status pro CVE + IP-Reputation |
-| `risk_score_*.md` | Team 6 | Risk Score + Level + Top-Findings + Next Steps |
-| `risk_score_*.json` | Team 6 | Maschinenlesbarer Risk-Score (für Weiterverarbeitung) |
 | `compliance_*.md` | Team 5 | OWASP Top 10 Mapping der Findings |
+| `risk_score_*.md` / `.json` | Team 6 | Risk Score + Level + Top-Findings + Next Steps (Markdown + maschinenlesbar) |
 | `workflow_last.json` | Team 1 | Letzter Scan (überschrieben) — Eingabe für Teams 2–6 |
 | `flow_state.db` | Flow | SQLite — Flow-State pro Run (für `--resume`) |
-| `checkpoints/*/` | Team 1 | Per-Task Checkpoint-Files (max 3 behalten) |
 
 ---
 
@@ -205,7 +255,7 @@ Alle Outputs landen in `logs/`:
 | `MODEL_ANALYSIS` | Modell für Analyse-Agents | aus `models.json` |
 | `MODEL_RESEARCH` | Modell für Research-Agent | aus `models.json` |
 | `MODEL_CODE` | Modell für Coding-Agent | aus `models.json` |
-| `EMBED_MODEL` | Embedding-Modell (LanceDB + ChromaDB) | aus `models.json` |
+| `EMBED_MODEL` | Embedding-Modell (Knowledge Sources) | aus `models.json` |
 | `NVD_API_KEY` | NVD API-Key (erhöht Rate-Limit 5→50 req/30s) | — |
 | `OTX_API_KEY` | AlienVault OTX (kostenlos) | — |
 | `SHODAN_API_KEY` | Shodan (paid-tier) | — |
@@ -219,29 +269,21 @@ Modell-Auswahl über `models.json` (von `models.json.example` ableiten).
 
 ---
 
-## Einschränkungen
+## Scope-Grenzen & Laufzeiten
 
-**Erkennungsrate:**
-- Targets hinter **Cloudflare / CDN / WAF** liefern keine CVEs — Banner-Informationen sind generisch. Kein Bug, korrektes Verhalten.
-- CVE-Erkennung ist **banner-basiert** (HTTP-Header, Service-Fingerprint) — keine aktive Exploitation, keine Authentifizierung.
+Was dieses Framework bewusst NICHT tut (Design-Entscheidung, kein Bug):
 
-**Laufzeiten:**
-- `quick`-Scan: 20–60 Minuten je nach Modell
-- `full`-Scan (FULL_ANALYSIS-Route): 90–180 Minuten
-- Teams 4+6 (ohne LLM): +2–5 Minuten pro CVA/FULL-Route
-- Team 5 (LLM): +5–15 Minuten
+- **Passiv-banner-basierte CVE-Erkennung** — kein aktives Ausnutzen, keine Authentifizierung gegen das Ziel. Ausnutzbarkeit (PTES-Phase 5) ist als eigenes Team geplant, siehe `roadmap.md`.
+- **Targets hinter Cloudflare/CDN/WAF** liefern erwartungsgemäß keine (oder nur generische) CVEs — die Banner-Informationen gehören dann dem CDN/der WAF, nicht dem Origin-Server. `wafw00f` markiert diesen Fall im Report explizit.
 
-**Modell-Abhängigkeiten:**
-- Planning-LLM läuft immer lokal via Ollama — remote Modelle unterstützen Ollama's native FC-API nicht
-- `allow_delegation=False` auf allen Agents — Delegation triggert native Function-Calling auf lokalen Modellen die das Schema nicht zuverlässig ausführen
-
-**Bekannte CrewAI-Eigenheiten (dokumentiert in CLAUDE.md):**
-- `@listen` Stacking überschreibt Trigger — `or_()` verwenden wenn eine Methode auf mehrere Quellen hören soll
-- `Knowledge.__init__` überschreibt immer `source.storage` — Embedder muss über `Crew(embedder=...)` gesetzt werden
-- Flow-State-DB-Einträge sind nach Breaking Changes am Flow-Graphen nicht mehr resumable
+**Grobe Laufzeit-Richtwerte** (variieren stark mit Modell/Ziel): `quick` 20–60 Min, `full` 90–180 Min, Teams 4+6 (kein LLM) +2–5 Min, Team 5 (LLM) +5–15 Min.
 
 ---
 
-## Tool-Dokumentation
+## Weiterführende Dokumentation
 
-Detaillierte Übersicht aller 26 Tools (Binaries, Versionen, Status): [`agentscanit/toolinfo.md`](agentscanit/toolinfo.md)
+| Datei | Inhalt |
+|---|---|
+| [`agentscanit/toolinfo.md`](agentscanit/toolinfo.md) | Detaillierte Tool-Referenz (Binary, Version, Parameter je Tool) |
+| `roadmap.md` | Entwicklungs-Roadmap, technische Eigenheiten (CrewAI-Fallstricke), Bug-Historie, geplante Phasen (nicht Teil des Repos — lokal) |
+| `CLAUDE.md` | Laufende Session-Doku für KI-gestützte Weiterentwicklung: Architektur-Patterns, gelöste Bugs mit Root-Cause, offene Punkte |
