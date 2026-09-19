@@ -16,6 +16,18 @@ keine Logikänderung).
 
 Reproduktion mit den ECHTEN pentest-ground.com-Rohdaten dieser Session (keine
 Synthetik) — genau der Fall, der den Fix motiviert hat.
+
+NACHTRAG (2026-09-19, Live-Verifikation scanme.nmap.org): der erste Fix-
+Entwurf hatte selbst einen Bug — er prüfte auf task_data.get('exploitable_
+findings') (die volle Liste), die agentscanit/main.py::_save_outputs() aber
+NIE nach workflow_last.json/crew_*.json schreibt (nur den abgeleiteten
+'exploitable_findings_count'). Der pentest-ground.com-Fall allein deckte das
+nicht auf, weil dort count=0 war — der Bug UND der korrekte Fix liefern
+zufällig dasselbe Ergebnis (False) für count=0. Erst der Live-Scan gegen
+scanme.nmap.org (5 echte exploitable_findings, count=5) zeigte den Fehler:
+poc_verified blieb fälschlich False. Gefixt: Prüfung auf
+exploitable_findings_count > 0. Zweiter Reproduktionsblock unten mit den
+echten scanme.nmap.org-Rohdaten deckt genau diesen Fall jetzt ab.
 """
 import sys
 from pathlib import Path
@@ -55,8 +67,33 @@ if _REAL_CREW_JSON.exists():
 else:
     print("[SKIP] pentest-ground.com-Session-Datei nicht gefunden — Reproduktion übersprungen")
 
+_REAL_CREW_JSON_2 = _SUITE_DIR / "logs" / "crew_scanme.nmap.org_20260919_062209.json"
 
-# --- Positivkontrolle: exploitable_findings NICHT leer -> poc_verified=True ---
+if _REAL_CREW_JSON_2.exists():
+    flow_sc = rf.RiskFlow()
+    flow_sc.state.scan_json_path = str(_REAL_CREW_JSON_2)
+    flow_sc.state.nvd_results = []
+    flow_sc.state.has_exploitable = True
+    flow_sc.load_data()
+
+    check("Reproduktion (scanme.nmap.org, deckt den echten Bug auf): "
+          "poc_verified ist True (red-Task hatte 5 echte exploitable_findings)",
+          flow_sc.state.poc_verified is True)
+else:
+    print("[SKIP] scanme.nmap.org-Session-Datei nicht gefunden — zweite Reproduktion übersprungen")
+
+
+# --- Positivkontrolle: exploitable_findings_count > 0 -> poc_verified=True ---
+# WICHTIG: die reale Persistenz-Schicht (agentscanit/main.py::_save_outputs())
+# schreibt NIE die volle 'exploitable_findings'-Liste nach workflow_last.json/
+# crew_*.json — nur 'exploitable_findings_count' (Integer, aus len(pd.
+# exploitable_findings) abgeleitet). Ein erster Testentwurf nutzte fälschlich
+# einen literalen 'exploitable_findings'-Listen-Key (unrealistische Mock-Form)
+# und hätte damit einen echten Bug verdeckt — bei der Live-Verifikation
+# (2026-09-19, scanme.nmap.org, 5 echte exploitable_findings) zeigte
+# poc_verified fälschlich "Nein", weil der Code auf genau diesen nie
+# existierenden Listen-Key prüfte. Gefixt: Prüfung auf exploitable_findings_
+# count > 0. Dieser Test bildet jetzt die ECHTE Datenform nach.
 import json
 import tempfile
 
@@ -66,7 +103,7 @@ _fake_summary = {
     "tasks": {
         "red": {
             "cve_references": ["CVE-2099-00001"],
-            "exploitable_findings": ["CVE-2099-00001 — verifizierter Exploit gefunden (searchsploit EDB-1: Test)"],
+            "exploitable_findings_count": 1,
         },
     },
 }
@@ -79,7 +116,8 @@ flow2.state.scan_json_path = tmp_path
 flow2.state.nvd_results = []
 flow2.state.has_exploitable = True
 flow2.load_data()
-check("Positivkontrolle: nicht-leere exploitable_findings -> poc_verified=True",
+check("Positivkontrolle: exploitable_findings_count > 0 -> poc_verified=True "
+      "(reale Datenform, kein nie existierender Listen-Key)",
       flow2.state.poc_verified is True)
 
 # --- Negativkontrolle: has_exploitable=False UND keine exploitable_findings -> beides False ---
@@ -87,7 +125,7 @@ _fake_summary_clean = {
     "target": "test-clean.internal",
     "report": "",
     "tasks": {
-        "findings": {"cve_references": [], "exploitable_findings": []},
+        "findings": {"cve_references": [], "exploitable_findings_count": 0},
     },
 }
 with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:

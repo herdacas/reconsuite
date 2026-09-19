@@ -97,7 +97,14 @@ class RiskFlow(Flow[RiskState]):
             for cve_id in task_data.get("cve_references", []):
                 if not any(c["id"] == cve_id for c in cves):
                     cves.append({"id": cve_id, "cvss": None, "severity": "UNKNOWN"})
-            if task_data.get("exploitable_findings"):
+            # BUG gefunden bei der Live-Verifikation (2026-09-19, scanme.nmap.org):
+            # workflow_last.json/crew_*.json speichert laut agentscanit/main.py
+            # NIE die volle 'exploitable_findings'-Liste, nur 'exploitable_findings_
+            # count' (Integer) — der ursprüngliche Check auf den nie vorhandenen
+            # Listen-Key war für has_exploitable schon immer toter Code (maskiert,
+            # da has_exploitable meist schon über den extern übergebenen Parameter
+            # gesetzt war) und hätte poc_verified NIE True werden lassen.
+            if task_data.get("exploitable_findings_count", 0) > 0:
                 self.state.has_exploitable = True
                 self.state.poc_verified = True
 
