@@ -239,6 +239,13 @@ research_agent = Agent(
     memory=False,
     allow_delegation=False,
     max_iter=20,
+    # Sollbruchstelle gegen hängende Remote-LLM-Calls (Audit-Empfehlung 3,
+    # 2026-09-15, roadmap.md — vorher kein Agent hatte ein Zeitlimit).
+    # 1800s: ~1.9x der höchsten real beobachteten Einzel-Task-Laufzeit dieses
+    # Agents (research/findings), gemessen über alle vorhandenen
+    # logs/llm_debug_*.jsonl (max 960.6s, research_agent). Wird von main.py
+    # als LLM-Fehlerklasse behandelt (Vollneustart statt Absturz, s. main.py).
+    max_execution_time=1800,
     step_callback=_step_callback,
     respect_context_window=True,
 )
@@ -275,6 +282,10 @@ blue_agent = Agent(
     memory=False,
     allow_delegation=False,
     max_iter=20,   # erhöht von 10: mehrere Live-Subdomains × Tools (Fanout) brauchen Budget
+    # 3600s: ~1.7x der höchsten real beobachteten Einzel-Task-Laufzeit (blue/
+    # red_scan, max 2075.9s bei Subdomain-Fanout — der aufwändigste Agent der
+    # Suite). Siehe research_agent oben für Herleitung/Quelle.
+    max_execution_time=3600,
     step_callback=_step_callback,
     respect_context_window=True,
 )
@@ -311,6 +322,9 @@ red_agent = Agent(
     memory=False,
     allow_delegation=False,
     max_iter=8,
+    # 2400s: ~2.1x der höchsten real beobachteten Laufzeit (max 1158.4s).
+    # Siehe research_agent oben für Herleitung/Quelle.
+    max_execution_time=2400,
     step_callback=_step_callback,
     respect_context_window=True,
 )
@@ -337,6 +351,9 @@ coding_agent = Agent(
     memory=False,
     allow_delegation=False,
     max_iter=5,
+    # 900s: ~6x der höchsten real beobachteten Laufzeit (max 149.3s) — dieser
+    # Agent hat keine Tools und generiert nur Code, entsprechend niedriges Risiko.
+    max_execution_time=900,
     step_callback=_step_callback,
     respect_context_window=True,
 )
@@ -363,6 +380,10 @@ reporter_agent = Agent(
     memory=False,
     allow_delegation=False,
     max_iter=3,
+    # 2700s: ~1.9x der höchsten real beobachteten Laufzeit (max 1432.4s) —
+    # reine Backstop gegen einen hängenden Single-Shot-Report-Call, max_iter=3
+    # deckt bereits Iterations-Schleifen ab, nicht die reine Generierungszeit.
+    max_execution_time=2700,
     step_callback=_step_callback,
     respect_context_window=True,
 )

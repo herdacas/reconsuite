@@ -197,7 +197,14 @@ def run(target: str, objective: str = "", scope: str = "full", log_llm: bool = F
     # Strukturelle Fehler (ValidationError, ConverterError) bleiben bei 3 Versuchen.
     _LLM_ERRORS   = {"Invalid response from LLM call", "None or empty",
                      "Internal Server Error", "InternalServerError",
-                     "Error code: 500", "status_code=500"}
+                     "Error code: 500", "status_code=500",
+                     # max_execution_time-Sollbruchstelle (Audit-Empfehlung 3,
+                     # 2026-09-15, roadmap.md): ein ausgelöster Timeout ist wie
+                     # ein transienter LLM-Fehler zu behandeln (Vollneustart +
+                     # Backoff), nicht wie ein struktureller Bug — der Agent
+                     # könnte durch einen kurzfristig überlasteten Remote-Server
+                     # gehangen haben.
+                     "execution timed out"}
     _MAX_RETRIES_LLM        = 5
     _MAX_RETRIES_STRUCTURAL = 3
 
@@ -210,7 +217,7 @@ def run(target: str, objective: str = "", scope: str = "full", log_llm: bool = F
             exc_type     = type(_exc).__name__
             _is_llm_error = (
                 any(kw in exc_str  for kw in _LLM_ERRORS) or
-                any(kw in exc_type for kw in ("InternalServerError", "APIStatusError", "APIError"))
+                any(kw in exc_type for kw in ("InternalServerError", "APIStatusError", "APIError", "TimeoutError"))
             )
             _is_retryable = (
                 _is_llm_error or

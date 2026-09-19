@@ -193,6 +193,10 @@ class ComplianceFlow(Flow[ComplianceState]):
             memory=False,
             verbose=False,
             max_iter=3,
+            # Sollbruchstelle gegen hängende Remote-LLM-Calls (Audit-Empfehlung 3,
+            # 2026-09-15, roadmap.md). 1200s: ~3.6x der höchsten real beobachteten
+            # Laufzeit (max 335.1s, logs/llm_debug_*.jsonl).
+            max_execution_time=1200,
             respect_context_window=True,
         )
 
