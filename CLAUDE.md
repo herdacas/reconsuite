@@ -9,10 +9,63 @@ Wir arbeiten die Roadmap (`roadmap.md`) phasenweise ab. Im Ablauf wird entschied
 
 **WICHTIG — Keine pauschalen Antworten. Faktenbasierte Responses auf jede Frage.**
 
-### Arbeitsplan (dokumentiert 2026-09-19 vor Umsetzung) — Output-Qualität, 5 generelle Fixes
+### Session-Abschluss (2026-09-19, Fortsetzung) — Output-Qualitäts-Review + 5 Fixes, live-verifiziert, alles gepusht
 
-**Status: NOCH NICHT UMGESETZT.** Notfall-Referenz falls Session abbricht — Baseline-Commit `ea6ee5a`
-(Arbeitsverzeichnis zu diesem Zeitpunkt clean, nichts von diesem Plan ist committet). Freigabe erteilt
+**Auslöser:** User bat um eine Qualitätsbewertung des letzten `pentest-ground.com full`-Scans
+(Rohdaten-vs-Report-Abgleich + externe Recherche zu pentest-ground.com als Ground Truth). Ergebnis
++ Arbeitsplan siehe Abschnitt direkt darunter — hier nur der Umsetzungs-/Verifikationsstand.
+
+**Umgesetzt: alle 5 geplanten Fixes, Reihenfolge 1→2→3→5→4 wie vom User freigegeben, pro Punkt
+Fix → Verifikation mit echten pentest-ground.com-Rohdaten → eigener Commit:**
+1. `0da3d96` — Versions-Gate: 3 statt 2 Sichtbarkeitsstufen (`cve_filters.py`/`reporting_flow.py`).
+   CVE-2023-21839 (WebLogic/"ShadowLogic" — laut externer Recherche die tatsächliche Plattform-
+   Schwachstelle) war zuvor komplett unsichtbar, jetzt in eigener Sektion sichtbar, zählt aber
+   weiterhin nicht in Critical/High (kein BUG-20-Rückfall).
+2. `ff1e332` — `red`-Task ergänzt `exploitable_findings` deterministisch bei einem `"Verified":"1"`-
+   searchsploit-Treffer für eine bereits bestätigte CVE, statt die selbst gesammelte Evidenz
+   ungenutzt zu lassen.
+3. `026d37c` — Neuer CVE-Grounding-Guardrail für Team 5 (compliance_agent) — hatte als einziges Team
+   bisher keinen. Fängt sowohl freie Erfindung als auch Zahlendreher/Produkt-Verwechslung.
+4. `f329928` — Team 4 (threatintel): leere CVE-Sektionen gebündelt statt einzeln leer gerendert;
+   dabei einen zusätzlichen, vorher unentdeckten Bug gefixt (ein echter API-Fehlerstring wurde bisher
+   komplett verschluckt statt angezeigt).
+5. `c898623` + Folgefix `7b68a58` — Risk-Score-Label "Exploitable" in "CVE-Treffer"/"PoC-verifiziert"
+   entzweideutigt.
+
+**Live-Verifikationsscan (User-Freigabe, `scanme.nmap.org full`, anderes Target als pentest-ground.com,
+alle 6 Teams, Grade A 98.7/100, 0 Fehler, 27 CVEs) — deckte dabei einen echten Bug im gerade
+committeten Punkt 5 auf:** `RiskFlow.load_data()` prüfte `task_data.get("exploitable_findings")`
+(die volle Liste) — `agentscanit/main.py::_save_outputs()` schreibt in `workflow_last.json`/
+`crew_*.json` aber NIE diese Liste, nur den abgeleiteten `exploitable_findings_count`. `poc_verified`
+konnte dadurch in echten Scans nie `True` werden. Der ursprüngliche Unit-Test hatte eine unrealistische
+Mock-Form und deckte das nicht auf; der pentest-ground.com-Fall allein auch nicht (dort war der Zähler
+zufällig 0 — Bug und Fix liefern für 0 dasselbe Ergebnis). Erst der zweite, andere Live-Fall (5 echte
+`exploitable_findings`) zeigte den Unterschied — **genau der Grund, warum die Live-Verifikation gegen
+ein zweites Target angesetzt war.** Gefixt in `7b68a58` (Prüfung jetzt auf `exploitable_findings_count
+> 0`), Test korrigiert + um den echten scanme.nmap.org-Fall ergänzt, Risk-Score für den echten Scan mit
+gefixtem Code neu berechnet (zeigt jetzt korrekt "PoC-verifiziert: Ja").
+
+**Übrige 4 Fixes im Live-Scan bestätigt, keine weiteren Bugs gefunden:** Punkt 1 (Regression sauber —
+beide Services hier vollständig versions-bestätigt, neue Sektion nicht getriggert, aber auch nicht
+nötig), Punkt 2 (red-Agent füllte `exploitable_findings` diesmal selbst korrekt, Guardrail griff nicht
+ein — keine Fehlinterferenz/Duplikate), Punkt 3 (alle CVEs im echten `compliance.md` zu 100% in der
+trusted-Menge — kein Fehlalarm auf einem komplett anderen Target), Punkt 4 (27 CVEs korrekt zu 2
+Sammelzeilen gebündelt, dabei einen echten OTX-Read-Timeout sichtbar gemacht, der vorher verschluckt
+wurde).
+
+**Ergebnis:** 6 Commits (5 Fixes + 1 Folgefix), 5 neue dedizierte Testdateien, gesamte Suite 18
+Dateien/182 Assertions grün. Kern-Lehre bestätigt sich ein weiteres Mal: ein Live-Scan gegen ein
+UNABHÄNGIGES zweites Target ist kein optionaler Formalschritt — er hat hier einen Bug gefunden, den
+Unit-Tests mit (unrealistischen) Mock-Daten und ein einzelner historischer Regressionsfall beide
+übersehen hätten. `main` == `origin/main`, alles gepusht, Arbeitsverzeichnis clean.
+
+### Arbeitsplan (dokumentiert 2026-09-19 vor Umsetzung, seither vollständig umgesetzt + live-verifiziert — siehe Abschnitt direkt darüber) — Output-Qualität, 5 generelle Fixes
+
+**Status: UMGESETZT + LIVE-VERIFIZIERT** (siehe Session-Abschluss-Abschnitt direkt darüber für den
+vollständigen Umsetzungs-/Verifikationsstand). Der folgende Plan bleibt unverändert als historische
+Referenz stehen (Rollback-Angaben etc. — die genannten Dateien/Zeilen können sich seither leicht
+verschoben haben, siehe `git log` für den exakten Stand). Baseline-Commit `ea6ee5a`
+(Arbeitsverzeichnis zu diesem Zeitpunkt clean, nichts von diesem Plan war committet). Freigabe erteilt
 (2026-09-19), Reihenfolge 1→2→3→5→4, pro Punkt Fix → Verifikation → eigener Commit (gleiches Muster wie
 der vorherige Audit-Durchlauf).
 
