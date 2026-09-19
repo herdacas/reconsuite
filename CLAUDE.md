@@ -9,6 +9,67 @@ Wir arbeiten die Roadmap (`roadmap.md`) phasenweise ab. Im Ablauf wird entschied
 
 **WICHTIG — Keine pauschalen Antworten. Faktenbasierte Responses auf jede Frage.**
 
+### Session-Abschluss (2026-09-19) — CrewAI-Audit (2026-09-15) abgearbeitet, 3 Commits
+
+**User-Freigabe:** alle 5 Empfehlungen aus dem CrewAI-Konformitäts-/Effizienz-Audit (2026-09-15,
+`roadmap.md`) systematisch abarbeiten — pro Punkt Fix → Verifikation → eigener Commit.
+
+1. **"Cache: on"-Anzeige korrigiert** (`cd14543`). Der hartcodierte String im Start-Banner suggerierte
+   fälschlich einen persistenten Ziel-Cache über mehrere Scans hinweg — `Crew(cache=True)` cached laut
+   CrewAI-Doku nur identische Tool-Aufrufe innerhalb eines einzelnen Laufs. Ersetzt durch "Tool-Cache: pro
+   Lauf".
+2. **Team 2 (interpret/NVD) und Team 4 (Threat-Intel) parallelisiert** (`5f2400e`). `run_threat_intel`
+   hing im Flow-Graph künstlich an `run_interpret`, obwohl beide unabhängig nur `scan_json_path`
+   brauchen. Beide hören jetzt auf denselben Router-Trigger (`or_(...)`), `run_compliance` wartet über
+   `and_(run_interpret, run_threat_intel)` auf beide. Verifiziert im installierten CrewAI 1.15.21
+   (`crewai/flow/runtime/__init__.py`): gleichzeitig getriggerte synchrone Listener laufen via
+   `asyncio.to_thread` in echten Threads parallel (`asyncio.gather`) — echter Wall-Clock-Gewinn, kein
+   Kosmetik-Fix. Neuer Test `testing/test_flow_team2_team4_parallel.py` (11/11) belegt reale zeitliche
+   Überlappung anhand eines echten `ReconSuiteFlow.kickoff()`-Laufs mit gemockten Team-Funktionen.
+3. **`max_execution_time` auf allen 6 LLM-Agents gesetzt** (`6b25457`, 5 Kern-Agents in
+   `agentscanit/agents.py` + `compliance_agent`). Kein Agent hatte bisher ein Zeitlimit — bei einem
+   hängenden Remote-LLM-Call gab es keine Sollbruchstelle außer manuellem Abbruch. Werte empirisch aus
+   allen vorhandenen `logs/llm_debug_*.jsonl` hergeleitet (1.7x–6x der höchsten real beobachteten
+   Einzel-Task-Laufzeit pro Agent-Rolle), keine Schätzung: research_agent 1800s, blue_agent 3600s
+   (höchste real beobachtete Laufzeit 2075.9s, Subdomain-Fanout), red_agent 2400s, coding_agent 900s,
+   reporter_agent 2700s, compliance_agent 1200s. **Nebenfund:** ein durch `max_execution_time`
+   ausgelöster `TimeoutError` wäre in `main.py`s Retry-Klassifikation vorher unklassifiziert
+   durchgeschlagen (Absturz statt Vollneustart) — mitgefixt, wird jetzt wie ein transienter LLM-Fehler
+   behandelt (5 Versuche + Backoff). Neuer Test `testing/test_max_execution_time.py` (15/15).
+4. **`PlanningConfig` — Pilot versucht, auf User-Anweisung verworfen.** Vor Umsetzung Rückfrage gestellt
+   (substanzielle Verhaltensänderung, ≈2x LLM-Calls, Audit selbst nannte es "ungetestet") — User wählte
+   "pilotweise auf einem Agent + Live-Scan verifizieren". Umgesetzt: `planning_config=
+   PlanningConfig(reasoning_effort="low")` nur auf `blue_agent` (meiste Tool-Aufrufe/höchstes
+   Fanout-Risiko). Live-Verifikationsscan (`scanme.nmap.org quick`) gestartet — **User brach den
+   laufenden Scan ab und wies an, die Code-Änderung vollständig zurückzunehmen**, bevor die Verifikation
+   abgeschlossen war. Umgesetzt: `git checkout -- agentscanit/agents.py`, Arbeitsverzeichnis wieder clean,
+   `max_execution_time=3600` aus Punkt 3 blieb korrekt erhalten, volle Testsuite weiterhin grün.
+   **Teilbeobachtung aus dem abgebrochenen Scan (nicht abschließend verifiziert, nur als Warnsignal
+   dokumentiert):** Research-Phase lief sauber durch (220s), direkt danach in der Blue-Phase (dem Agent
+   mit dem Pilot) zweimal `Invalid JSON: expected value at line 1 column 1` — Modell lieferte
+   Markdown-Fließtext statt des erwarteten `BlueOutput`-JSON. Nicht kausal auf `PlanningConfig`
+   zurückgeführt (Scan vor Klärung abgebrochen), aber ein konkreter Datenpunkt der zur Vorsicht mahnt.
+   Bleibt offene technische Schuld (`roadmap.md`), analog zu `scope=hierarchical` — kein Code-Rest im Repo.
+5. **Ungenutzte Bausteine (`async_execution`, `human_input=True`, `markdown=True`) — geprüft, bewusst
+   NICHT umgesetzt.** Alle drei erwiesen sich bei genauerer Analyse (vor jeder Umsetzung) als
+   gegenstandslos oder aktiv gegenindiziert: `async_execution` hätte einen echten Kandidaten
+   (`red_scan`/`red`, identische Abhängigkeiten, laufen aber seriell) — **aktiv abgelehnt**, weil
+   `tools/trace.py::RunTrace` ein ungeschützter globaler Singleton mit genau einer `_pending`-Liste ist
+   (kein Lock, kein `threading.local()`, im Quelltext verifiziert) — parallele Task-Ausführung würde
+   Tool-Calls verschiedener Tasks vermischen und damit die komplette Guardrail-/
+   Anti-Fabrikations-Architektur des Projekts unterlaufen. `human_input=True` bezog sich im Audit auf den
+   Phase-9.0-Safety-Gate-Code, der seit der Scope-Entscheidung vom 2026-09-15 vollständig entfernt ist —
+   gegenstandslos. `markdown=True` hängt laut installiertem CrewAI 1.15.21 (`task.py:1051-1060`) wörtlich
+   "Your final answer MUST be formatted in Markdown syntax" an den Prompt — widerspricht
+   `output_pydantic=ReportOutput` (finale Antwort muss JSON sein, nur ein Feld darin Markdown), echter
+   Konflikt statt übersehenem Redundanz-Detail. Alle drei Befunde mit Quellcode-Beleg in `roadmap.md`
+   dokumentiert statt in der Schulden-Tabelle als offen geführt.
+
+**Ergebnis:** 3 echte Fixes (Commits `cd14543`, `5f2400e`, `6b25457`), 2 Punkte mit begründeter
+Nicht-Umsetzung statt blindem Abarbeiten. 2 neue Testdateien, gesamte Suite 13 Dateien/125 Assertions
+grün. **Nicht gepusht** — 3 lokale Commits, `origin/main` hat parallel einen eigenen User-Commit
+(README-Überarbeitung, `8592b5f`) erhalten; Branches divergiert, Merge/Push noch mit User zu klären.
+
 ### Session-Abschluss (2026-09-15) — Zusammenfassung, alles gepusht
 
 Lange Sitzung, chronologisch (Details jeweils im eigenen Abschnitt weiter unten):
