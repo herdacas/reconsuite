@@ -52,6 +52,15 @@ class RiskState(BaseModel):
     threat_intel_output: str        = ""   # aus ScanState
     compliance_output:   str        = ""   # aus ScanState
     has_exploitable:     bool       = False
+    # PoC-verifiziert (2026-09-19, Output-Qualitäts-Fix Punkt 5): getrennt von
+    # has_exploitable, das lediglich "irgendeine CVE beim red-Task gefunden"
+    # bedeutet (has_exploitable=True kann schon durch nicht-leere red_cves
+    # gesetzt sein, siehe flow.py route_results()). poc_verified misst dagegen
+    # ob RedOutput.exploitable_findings selbst nicht leer ist — das strengere,
+    # PoC-belegte Feld. Live gefunden (pentest-ground.com-Scan): "Exploitable:
+    # ✓ Ja" stand im Report obwohl exploitable_findings komplett leer war —
+    # zweideutiges Label, suggerierte PoC-Bestätigung die es nicht gab.
+    poc_verified:        bool       = False
     risk_score:          float      = 0.0
     risk_level:          str        = "NONE"
     critical_count:      int        = 0
@@ -90,6 +99,7 @@ class RiskFlow(Flow[RiskState]):
                     cves.append({"id": cve_id, "cvss": None, "severity": "UNKNOWN"})
             if task_data.get("exploitable_findings"):
                 self.state.has_exploitable = True
+                self.state.poc_verified = True
 
         # CVSS aus NVD-Ergebnissen anreichern (falls vorhanden)
         for nvd in self.state.nvd_results:
@@ -106,7 +116,8 @@ class RiskFlow(Flow[RiskState]):
             f"[bold blue]risk-scorer[/]  ·  Asset Risk Scoring\n\n"
             f"  [dim]Target:[/]     [bold white]{self.state.scan_target}[/]\n"
             f"  [dim]CVEs:[/]       {len(cves)}\n"
-            f"  [dim]Exploitable:[/] {'ja' if self.state.has_exploitable else 'nein'}",
+            f"  [dim]CVE-Treffer:[/] {'ja' if self.state.has_exploitable else 'nein'}   "
+            f"[dim]PoC-verifiziert:[/] {'ja' if self.state.poc_verified else 'nein'}",
             border_style="blue", expand=False, padding=(0, 2),
         ))
 
@@ -174,7 +185,8 @@ class RiskFlow(Flow[RiskState]):
             f"| Risk Level | **{level}** |",
             f"| Critical CVEs | {self.state.critical_count} |",
             f"| High CVEs | {self.state.high_count} |",
-            f"| Exploitable | {'✓ Ja' if self.state.has_exploitable else '✗ Nein'} |",
+            f"| CVE-Treffer (red-Task) | {'✓ Ja' if self.state.has_exploitable else '✗ Nein'} |",
+            f"| PoC-verifiziert | {'✓ Ja' if self.state.poc_verified else '✗ Nein'} |",
             f"| In-the-Wild | {'✓ Ja' if _has_in_the_wild(self.state.threat_intel_output) else '✗ Nein / unbekannt'} |\n",
         ]
 
@@ -226,6 +238,7 @@ class RiskFlow(Flow[RiskState]):
             "critical_count":  self.state.critical_count,
             "high_count":      self.state.high_count,
             "exploitable":     self.state.has_exploitable,
+            "poc_verified":    self.state.poc_verified,
             "in_the_wild":     _has_in_the_wild(self.state.threat_intel_output),
             "top_findings":    top_findings_json,
         }
