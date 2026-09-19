@@ -486,6 +486,113 @@ def _red_exploitable_poc_guardrail(output: Any) -> tuple[bool, Any]:
     return True, raw
 
 
+_CVE_ID_RE = _re.compile(r"CVE-\d{4}-\d{4,7}", _re.IGNORECASE)
+
+
+def _exploitable_evidence_completeness_guardrail(output: Any) -> tuple[bool, Any]:
+    """Guardrail (red): ergänzt 'exploitable_findings' wenn ein verifizierter
+    searchsploit-Exploit für eine bereits bestätigte CVE existiert, aber im
+    Output fehlt.
+
+    Live gefunden (2026-09-19, Output-Qualitäts-Review pentest-ground.com):
+    der red-Task rief 'searchsploit --json Oracle WebLogic' auf und bekam u.a.
+    EDB-46814 zurück ("Verified":"1", ein Metasploit-Modul für CVE-2019-2725) —
+    trotzdem blieben 'exploitable_findings'/'confirmed_attack_surface' komplett
+    leer. Kein Guardrail-Bug (das Gegenstück _red_exploitable_poc_guardrail
+    ENTFERNT nur unbelegte Einträge, es ergänzt nichts) — das Modell hat die
+    selbst gesammelte Evidenz schlicht nicht übernommen. Da genau dieses Feld
+    laut Scope-Entscheidung (2026-09-15, roadmap.md) die "qualifizierte
+    Schnittstelle für ein Exploitation-Programm" sein soll, ist das ein
+    praktisch relevanter Ausfall — nicht nur Kosmetik.
+
+    Prüft NUR das strengste, deterministisch auswertbare Signal: einen
+    searchsploit-Treffer mit "Verified":"1" (kuratiertes ExploitDB-Metadatum,
+    kein LLM-Ermessen) dessen 'Codes'-Feld eine CVE-ID nennt, die bereits in
+    RedOutput.cve_references steht (also von red selbst als bestätigt
+    gemeldet wurde — kein neues CVE wird hier erfunden). Session-weite Suche
+    (get_raw_outputs_for_tool(), gleiche Infrastruktur wie
+    _red_exploitable_poc_guardrail) — red darf legitim auf bereits von
+    findings/blue bestätigte Funde zurückgreifen.
+
+    1. Versuch: Reject mit Feedback welches EDB-ID/CVE fehlt (Agent lernt).
+    2. Versuch (Fallback — laut dieser Session 3x bestätigt: Reject+Retry
+    korrigiert beim 2. Versuch nicht zuverlässig): deterministisch anhängen,
+    rein aus bereits strukturierten searchsploit-JSON-Feldern zusammengesetzt
+    (Title + EDB-ID + CVE-ID) — keine Freitext-Erfindung nötig.
+
+    Target-unabhängig: kein Produkt-Wörterbuch, reine JSON-Feld-Auswertung.
+    """
+    pydantic_out = getattr(output, "pydantic", None)
+    raw = getattr(output, "raw", output) if not isinstance(output, str) else output
+    if not pydantic_out or not hasattr(pydantic_out, "exploitable_findings"):
+        return True, raw
+
+    cve_refs = set(getattr(pydantic_out, "cve_references", None) or [])
+    if not cve_refs:
+        return True, raw
+
+    try:
+        import json as _json
+        from tools.trace import run_trace
+        if not run_trace.is_active:
+            return True, raw
+
+        verified_hits: dict[str, tuple] = {}  # cve_id -> (edb_id, title), dedupliziert
+        for raw_out in run_trace.get_raw_outputs_for_tool("searchsploit"):
+            try:
+                data = _json.loads(raw_out)
+            except Exception:
+                # Trace-Rohoutput kann bei sehr breiten Suchen (z.B. bloßer Produktname
+                # ohne Version) auf 4000 Zeichen gekappt und damit kein valides JSON mehr
+                # sein — überspringen statt zu crashen, andere (gezieltere) Calls reichen.
+                continue
+            for entry in data.get("RESULTS_EXPLOIT", []) or []:
+                if str(entry.get("Verified", "")) != "1":
+                    continue
+                codes = entry.get("Codes", "") or ""
+                for cve_id in _CVE_ID_RE.findall(codes):
+                    cve_id = cve_id.upper()
+                    if cve_id in cve_refs and cve_id not in verified_hits:
+                        verified_hits[cve_id] = (entry.get("EDB-ID", "?"), entry.get("Title", ""))
+
+        if not verified_hits:
+            return True, raw
+
+        findings = list(getattr(pydantic_out, "exploitable_findings", None) or [])
+        findings_text = "\n".join(findings).upper()
+        missing = {cve_id: v for cve_id, v in verified_hits.items() if cve_id not in findings_text}
+        if not missing:
+            return True, raw
+
+        if run_trace._guardrail_reject_count < 1:
+            run_trace._guardrail_reject_count += 1
+            listing = "; ".join(f"{c} (EDB-{e}: {t})" for c, (e, t) in missing.items())
+            return False, (
+                f"FEHLER: Du hast selbst ein VERIFIZIERTES ExploitDB-Modul gefunden, aber "
+                f"nicht in 'exploitable_findings' eingetragen: {listing}. Das ist genau die "
+                f"Art von Beleg, die 'exploitable_findings' laut deiner eigenen OUTPUT-REGEL "
+                f"verlangt ('searchsploit einen Exploit-Eintrag zurückgegeben'). Trage diese "
+                f"Einträge jetzt nach."
+            )
+
+        # Fallback (2. Versuch): deterministisch ergänzen statt ein drittes Mal
+        # auf Selbstkorrektur zu hoffen — alle Bestandteile stehen bereits
+        # strukturiert im searchsploit-JSON, keine Erfindung nötig.
+        for cve_id, (edb_id, title) in missing.items():
+            findings.append(f"{cve_id} — verifizierter Exploit gefunden (searchsploit EDB-{edb_id}: {title})")
+        pydantic_out.exploitable_findings = findings
+        pydantic_out.exploitable_findings_count = len(findings)
+        try:
+            output.raw = pydantic_out.model_dump_json()
+        except Exception:
+            pass
+        return True, output
+    except Exception:
+        pass
+
+    return True, raw
+
+
 # ─── Subdomain-Fanout (deterministisch) ───────────────────────────────────────
 # Problem: research entdeckt Subdomains (subfinder), aber blue scannte bisher nur
 # die Apex-Domain → die eigentliche Angriffsfläche (auth/api/backoffice/…) wurde nie
@@ -1736,7 +1843,8 @@ def make_tasks() -> dict:
             "welche PoCs DDG zurückgegeben hat — nichts darüber hinaus."
         ),
         output_pydantic=RedOutput,
-        guardrails=[_cve_trace_guardrail, _searchsploit_version_guardrail, _red_exploitable_poc_guardrail],
+        guardrails=[_cve_trace_guardrail, _searchsploit_version_guardrail,
+                    _red_exploitable_poc_guardrail, _exploitable_evidence_completeness_guardrail],
         guardrail_max_retries=2,
         agent=red_agent,
         context=[blue, findings],
