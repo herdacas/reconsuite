@@ -157,30 +157,57 @@ class ThreatIntelFlow(Flow[ThreatIntelState]):
         ]
 
         # ── CVE Threat Intel ──
+        # Output-Qualitäts-Fix Punkt 4 (2026-09-19): live gefunden — bei 40 CVEs ohne
+        # jede OTX/VT-Nutzdaten (z.B. Rate-Limit, "not found" für sehr neue/fiktive
+        # CVE-IDs, oder fehlender API-Key) rendert der alte Code 40 leere "### CVE-X"-
+        # Abschnitte ohne eine einzige Detailzeile darunter — reines Rauschen. Zusätzlich
+        # hatte der alte if/elif-Zweig KEIN else für einen echten API-Fehlerstring
+        # (data["error"] aus otx_tool.py/virustotal_tool.py) — der wurde bisher komplett
+        # verschluckt, statt dem Leser zu zeigen DASS/WARUM ein Lookup fehlschlug. Fix:
+        # nur CVEs mit echten Nutzdaten bekommen einen vollen Abschnitt; alle anderen
+        # werden nach ihrem (jetzt sichtbaren) Grund gruppiert in Sammelzeilen zusammengefasst.
         if self.state.cve_ids:
             lines += ["## CVE Threat Intelligence\n"]
             cve_otx = {r["id"]: r for r in self.state.otx_cve_data if "id" in r}
             cve_vt  = {r["id"]: r for r in self.state.vt_cve_data  if "id" in r}
 
+            no_data: dict[str, list[str]] = {}  # Grund -> [CVE-IDs]
             for cve_id in self.state.cve_ids:
                 otx = cve_otx.get(cve_id, {})
                 vt  = cve_vt.get(cve_id, {})
-                in_wild = otx.get("in_the_wild", False) or vt.get("has_exploit", False)
-                icon = "🔴" if in_wild else "⚪"
 
-                lines.append(f"### {icon} {cve_id}")
+                otx_line = None
                 if otx.get("status") == "ok":
-                    lines.append(f"- **OTX Pulses:** {otx.get('pulse_count', 0)} "
-                                 f"({'aktiv in-the-wild' if otx.get('in_the_wild') else 'keine aktiven Pulse'})")
-                elif otx.get("status") == "no_key":
-                    lines.append("- **OTX:** kein API-Key konfiguriert")
+                    otx_line = (f"**OTX Pulses:** {otx.get('pulse_count', 0)} "
+                                f"({'aktiv in-the-wild' if otx.get('in_the_wild') else 'keine aktiven Pulse'})")
+                vt_lines: list[str] = []
                 if vt.get("status") == "ok":
                     exploits = vt.get("exploit_urls", [])
-                    lines.append(f"- **VT Exploits:** {len(exploits)} URL(s) bekannt")
-                    for url in exploits:
-                        lines.append(f"  - {url}")
-                elif vt.get("status") == "no_key":
-                    lines.append("- **VT:** kein API-Key konfiguriert")
+                    vt_lines.append(f"**VT Exploits:** {len(exploits)} URL(s) bekannt")
+                    vt_lines += [f"  - {url}" for url in exploits]
+
+                if otx_line or vt_lines:
+                    in_wild = otx.get("in_the_wild", False) or vt.get("has_exploit", False)
+                    icon = "🔴" if in_wild else "⚪"
+                    lines.append(f"### {icon} {cve_id}")
+                    if otx_line:
+                        lines.append(f"- {otx_line}")
+                    lines += [f"- {ln}" if not ln.startswith("  ") else ln for ln in vt_lines]
+                    lines.append("")
+                else:
+                    # Kein Treffer bei OTX UND VT — Grund für die Sammelzeile ermitteln
+                    # (sichtbar statt verschluckt: "no_key" ODER der rohe Fehlerstring).
+                    otx_status = otx.get("status") or "keine Antwort"
+                    vt_status  = vt.get("status") or "keine Antwort"
+                    reason = f"OTX: {otx_status} · VT: {vt_status}"
+                    no_data.setdefault(reason, []).append(cve_id)
+
+            if no_data:
+                total_no_data = sum(len(v) for v in no_data.values())
+                lines.append(f"*{total_no_data}/{len(self.state.cve_ids)} CVE(s) ohne "
+                             f"Threat-Intel-Treffer (weder OTX-Pulse noch VT-Exploit-URLs):*")
+                for reason, ids in no_data.items():
+                    lines.append(f"  - {reason}: {', '.join(ids)}")
                 lines.append("")
 
         # ── IP Threat Intel ──
