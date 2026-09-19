@@ -1,278 +1,286 @@
-# AgentScanIT — Agentic Vulnerability Assessment Framework
+# RecconSuite — Agentic Reconnaissance & Vulnerability Assessment
 
-Multi-Agent Security Assessment auf Basis von [CrewAI](https://crewai.com) und LLMs via [Ollama](https://ollama.com) (lokal oder remote). Sechs spezialisierte Teams arbeiten sequenziell: vom passiven OSINT-Scan bis zum priorisierten Risk-Score mit OWASP-Compliance-Mapping.
+Multi-agent security assessment framework using [CrewAI](https://crewai.com) and local LLMs via [Ollama](https://ollama.com). Automates reconnaissance, active scanning, CVE analysis, and risk scoring across six specialized teams.
+
+**Purpose:** Information gathering and vulnerability identification for penetration testing engagements. Provides structured, evidence-grounded findings for exploit development.
 
 ---
 
-## Einordnung im Pentest-Prozess
+## Overview
 
-Diese Suite ist kein eigenständiges Pentest-Tool, sondern deckt einen definierten Ausschnitt der [PTES](http://www.pentest-standard.org/)-Methodik ab — die Ausgabe ist der Input für die nachfolgenden Phasen eines echten Penetrationstests:
+RecconSuite orchestrates six teams sequentially to perform reconnaissance through vulnerability assessment:
 
-| PTES-Phase | Abgedeckt | Wo |
+```
+Passive Recon  →  Active Scan  →  CVE Analysis  →  NVD Enrichment
+     ↓
+Threat Intel  →  Compliance Mapping  →  Risk Scoring  →  Final Report
+```
+
+Each phase operates as an independent CrewAI Flow or deterministic process. An LLM planner selects relevant phases based on scope and objectives. Post-scan routing determines which enrichment teams execute.
+
+---
+
+## Architecture
+
+### Six-Team System
+
+| Team | Package | Role | Technology |
+|------|---------|------|-----------|
+| 1 | `agentscanit/` | Passive OSINT + Active Scan + CVE Finding | CrewAI Crew (5 Agents, 19 Tools) |
+| 2 | `interpret_agent/` | CVE enrichment (CVSS, severity, references) | CrewAI Flow + NVD API v2 |
+| 3 | `reporting/` | Report synthesis and formatting | CrewAI Flow |
+| 4 | `threatintel_agent/` | In-the-wild status (OTX, Shodan, VirusTotal) | CrewAI Flow (deterministic) |
+| 5 | `compliance_agent/` | OWASP/CIS framework mapping | CrewAI Crew + LLM |
+| 6 | `risk_scorer/` | Deterministic risk scoring | CrewAI Flow (deterministic) |
+
+### Team 1: Active Scanning & Reconnaissance
+
+**Passive Reconnaissance (`research_agent`):**
+- `subfinder` — Subdomain enumeration (Certificate Transparency, passive DNS)
+- `dnsrecon` — Full DNS analysis, zone transfer attempts
+- `katana` — Web crawling (URLs, API endpoints, forms, JavaScript links)
+- `dnsx`, `dig`, `whois` — DNS queries and domain registration data
+- `searchsploit`, `ddgs`, NVD API — Exploit and CVE search
+
+**Active Scanning (`blue_agent`):**
+- `nmap` — Port discovery and service version detection
+- `httpx` — HTTP probing, technology detection, API path discovery
+- `whatweb` — Web technology fingerprinting (CMS, frameworks, servers)
+- `wafw00f` — WAF/CDN detection (Cloudflare, Akamai, AWS WAF, ModSecurity)
+- `nikto` — Web server vulnerability scanning (7000+ checks)
+- `nuclei` — Template-based vulnerability scanning (CVEs, misconfigurations)
+- `sslscan` — TLS/SSL configuration analysis
+- `curl` — HTTP header examination
+
+**Analysis (`red_agent`):**
+- PoC validation via searchsploit, nuclei matches, NVD correlation
+- Attack surface extraction from confirmed findings
+
+### Flow Routing
+
+Post-scan routing determines the enrichment pipeline:
+
+```
+No CVEs found       → CLEAN route        → Team 3 only
+CVEs, unexploitable → CVE_ANALYSIS route → Teams 2 → 5 → 6 → 3
+CVEs + exploitable  → FULL_ANALYSIS route → Teams 2 → 4 → 5 → 6 → 3
+```
+
+### Inter-Team Communication
+
+Teams communicate through `ScanState` (Pydantic model):
+
+```
+Team 1  → scan_json_path, has_cve_findings, has_exploitable
+Team 2  → nvd_results (CVSS, severity, CWE)
+Team 4  → threat_intel_output (in-the-wild summary)
+Team 5  → compliance_output (OWASP mapping)
+Team 6  → risk_score_output (score + level)
+Team 3  → final_report_path
+```
+
+Within Team 1, agents communicate via CrewAI task context (Pydantic output as context for the next task).
+
+---
+
+## Scoping Strategy
+
+Reconnaissance follows [PTES](http://www.pentest-standard.org/) phases 2–7:
+
+| PTES Phase | Covered | Implementation |
 |---|---|---|
-| 1. Pre-Engagement (Scoping, Rules of Engagement) | — | manueller Prozess außerhalb der Suite |
-| 2. Intelligence Gathering | ✅ | Team 1 — passive Recon/OSINT (`research_agent`) |
-| 3. Threat Modeling | ✅ | Team 4 — Threat Intelligence (OTX/Shodan/VirusTotal) |
-| 4. Vulnerability Analysis | ✅ | Team 1 (Active Scan + CVE-Analyse) · Team 2 (NVD-Enrichment) · Team 6 (Risk Scoring) |
-| 5. Exploitation | ↗️ separates Programm | bewusst außerhalb dieser Suite — siehe unten |
-| 6. Post-Exploitation | — | bewusst außerhalb des Scopes |
-| 7. Reporting | ✅ | Team 3 — Final Report · Team 5 — OWASP-Mapping |
+| 2. Intelligence Gathering | ✅ | Team 1 passive reconnaissance |
+| 3. Threat Modeling | ✅ | Team 4 threat intelligence |
+| 4. Vulnerability Analysis | ✅ | Team 1 active scanning + CVE analysis + Team 6 risk scoring |
+| 5. Exploitation | ⚠️ Out of scope | Findings prepared for external exploit tools |
+| 6. Post-Exploitation | — | Out of scope |
+| 7. Reporting | ✅ | Team 3 synthesis + Team 5 mapping |
 
-Die Reports sind entsprechend als **Übergabeartefakt an Phase 5** konzipiert: `final_report_*.md`, `risk_score_*.json` und `RedOutput.confirmed_attack_surface`/`exploitable_findings` liefern die Kandidaten für eine Exploitation-Phase — bewusst als Aufgabe eines separaten, eigenständigen Programms, nicht dieser Suite (siehe `roadmap.md`, „Scope-Grenze“). recon-suite endet bei strukturierten, tool-bestätigten Findings, nicht beim Endergebnis eines vollständigen Pentests.
+Reports are designed as handoff artifacts for exploitation:
 
----
+- `final_report_*.md` — Executive summary and technical findings
+- `risk_score_*.json` — Structured risk data for triage
+- `scan_*.py` — Executable automation script from scanning steps
+- Trace logs — Evidence trail for each finding
 
-## Was es macht
+### Report Philosophy
 
-```
-Passive Recon  →  Active Scan  →  CVE-Analyse  →  NVD-Enrichment
-      ↓
-Threat Intel  →  Compliance-Mapping  →  Risk-Scoring  →  Final Report
-```
-
-Jede Phase ist ein eigenständiger CrewAI-Flow oder deterministischer Prozess. Ein LLM-Planner wählt anhand von Scope und Objective die relevanten Phasen aus. Das Routing nach dem Scan entscheidet dynamisch welche Teams aktiv werden.
-
-### Report-Scope: Pentest, nicht Audit
-
-Die Berichte sind auf einen **Penetrationstest** ausgerichtet, nicht auf ein defensives Audit:
-
-- **Fokus auf Ausnutzung** — die Reports bereiten die Tool-Daten so auf, dass sie zur Exploit-Entwicklung weiterverwendet werden können (exakte Versionen inkl. Patch-Level, Angriffsvektoren, exponierte Endpunkte, Payloads).
-- **Security-/Remediation-Empfehlungen NUR bei nachgewiesener Ausnutzbarkeit (PoC).** „Nachgewiesen" heißt deterministisch: ein aktiver `nuclei`-Treffer gegen das Ziel — nicht „ein PoC existiert irgendwo". Ohne PoC beschreiben die Reports ausschließlich die Angriffsfläche und potenzielle Ausnutzungs-Pfade.
-- **Versionslose generische CVEs** (Banner ohne Version) werden NICHT als Findings gelistet — eine Liste „alle CVEs für Apache" ohne Versions-Match ist wertloses Rauschen. Ausnahme: aktiv ausgenutzte (CISA-KEV).
+- **Exploit-oriented:** Data is structured for exploit development, including exact versions, attack vectors, and accessible services.
+- **Evidence-based findings only:** Versionless generic CVEs are excluded unless an active scan confirms the finding against the target.
+- **No hallucinated findings:** Assertions are grounded in actual tool output through validation guardrails.
 
 ---
 
-## Architektur
-
-### 6-Team-System
-
-| Team | Package | Technologie | Aufgabe |
-|---|---|---|---|
-| 1 | `agentscanit/` | CrewAI Crew · 5 Agents · 19 Tools | Passive Recon + Active Scan + CVE-Analyse |
-| 2 | `interpret_agent/` | CrewAI Flow | NVD API v2 — CVE-Details, CVSS, Severity |
-| 3 | `reporting/` | CrewAI Flow | Merge aller Reports → `final_report_*.md` |
-| 4 | `threatintel_agent/` | CrewAI Flow (kein LLM) | OTX · Shodan · VirusTotal — In-the-Wild-Status |
-| 5 | `compliance_agent/` | CrewAI Crew · LLM · OWASP Knowledge | OWASP Top 10 Mapping |
-| 6 | `risk_scorer/` | CrewAI Flow (kein LLM) | Deterministisches Risk-Scoring |
-
-### Flow-Routing
-
-Nach dem Scan entscheidet der Router welche Teams laufen:
-
-```
-Kein CVE gefunden   →  CLEAN         →  Team 3 (direkt)
-CVEs, kein Exploit  →  CVA_ANALYSIS  →  Teams 2 → 5 → 6 → 3
-CVEs + Exploit      →  FULL_ANALYSIS →  Teams 2 → 4 → 5 → 6 → 3
-```
-
-### Kommunikation zwischen Teams
-
-Teams kommunizieren **nicht direkt**. Alle Übergaben laufen über `ScanState` — ein Pydantic-Modell im CrewAI Flow:
-
-```
-Team 1  →  scan_json_path, has_cve_findings, has_exploitable
-Team 2  →  nvd_results (CVSS, Severity pro CVE)
-Team 4  →  threat_intel_output (In-the-Wild-Summary)
-Team 5  →  compliance_output (OWASP-Mapping-Text)
-Team 6  →  risk_score_output ("Score: 7.8 / 10 — HIGH")
-Team 3  →  final_report_path
-```
-
-Innerhalb von Team 1 kommunizieren die 5 Agents über den CrewAI Task-Kontext (Pydantic-Output einer Task als Kontext der nächsten).
-
-### Agents in Team 1
-
-| Agent | Aufgabe | Tools |
-|---|---|---|
-| `research_agent` | Passive OSINT: Subdomains, DNS, WHOIS | 10 |
-| `blue_agent` | Active Scanning: nmap, nikto, nuclei, sslscan, httpx | 9 |
-| `research_agent` | CVE-Analyse (findings_task) | searchsploit, DDG, NVD |
-| `blue_agent` | Targeted Follow-up (red_scan_task, nur `full`-Scope) | nuclei, nikto |
-| `red_agent` | Exploitability-Analyse: PoC-Check, Attack-Surface | searchsploit, DDG, NVD |
-| `coding_agent` | Automatisierungs-Skript aus Scan-Schritten | — |
-| `reporter_agent` | Markdown-Report aus allen Phasen | — |
-
----
-
-## Tools
-
-Team 1 setzt 19 externe Scan-Tools ein, aufgeteilt auf `research_agent` (passiv) und `blue_agent` (aktiv). Ausführliche technische Doku pro Tool (Binary, Version, Parameter): [`agentscanit/toolinfo.md`](agentscanit/toolinfo.md).
-
-### Active Scanning (`blue_agent`)
-
-| Tool | Zweck |
-|---|---|
-| `nmap` | Port-Scan + Service-/Versions-Erkennung (Discovery über alle 65535 Ports, dann `-sV` auf offene Ports) |
-| `httpx` | HTTP-Probing vieler Hosts gleichzeitig, Tech-Detect, optionale API-Pfad-Erkennung |
-| `whatweb` | Web-Technologie-Fingerprinting (CMS, Framework, Server-Software) |
-| `wafw00f` | WAF-/CDN-Erkennung (Cloudflare, Akamai, ModSecurity u. a.) — läuft bei `web`/`full` zuerst |
-| `nikto` | Web-Vulnerability-Scan: fehlende Security-Header, veraltete Software, Fehlkonfigurationen |
-| `nuclei` | Template-basierter Vulnerability-Scanner (CVEs, Exposures, Misconfigurations) |
-| `sslscan` | TLS/SSL-Konfigurationsanalyse: Protokolle, Cipher-Suites, Zertifikate |
-| `curl` | HTTP-Response-Header (Security-Header, Server-Banner, Cookies) |
-| `ping` | ICMP-Erreichbarkeitsprüfung vor aufwändigeren Scans |
-
-### Passive Recon / OSINT (`research_agent`)
-
-| Tool | Zweck |
-|---|---|
-| `subfinder` | Passive Subdomain-Enumeration (Certificate Transparency, DNS-Datenbanken) |
-| `dnsrecon` | DNS-Enumeration, Zone-Transfer-Check (AXFR) |
-| `dnsx` | DNS-Massen-Resolver, filtert nicht-existente Subdomains |
-| `dig` | Einzelne DNS-Abfragen (A/AAAA/MX/NS/TXT/…) |
-| `whois` | Registrar, Nameserver, Registrierungsdatum |
-| `katana` | Web-Crawler: URLs, API-Endpunkte, Formulare, JS-Links |
-| `ddgs` (DuckDuckGo) | OSINT- und CVE-PoC-Recherche |
-| `searchsploit` | Lokale ExploitDB-Suche nach Software + Version |
-| NVD API v2 (`nvd_cpe_lookup`, `nvd_cve_search`) | CVE-Lookup per CPE bzw. Keyword, CVSS/Severity |
-
-`red_agent`, `coding_agent` und `reporter_agent` erhalten keine eigenen Tools — sie arbeiten analytisch auf Basis der strukturierten Outputs vorangehender Tasks (`red_agent` nutzt `searchsploit`/DDG/NVD zur Verifikation, s. o.).
-
----
-
-## Voraussetzungen
+## Prerequisites
 
 - Python 3.11+
-- Ollama lokal oder remote (API-kompatibler Endpunkt)
-- **Externe Scan-Tools** (System-Binaries, KEINE Python-Pakete): `nmap`, `nikto`, `whatweb`,
-  `sslscan`, `dnsrecon`, `whois`, `dig`, `curl`, `ping` (apt) · `nuclei`, `httpx`, `dnsx`,
-  `katana`, `subfinder` (ProjectDiscovery, Go) · `searchsploit` (exploitdb, Git)
+- Ollama with a local or remote API-compatible endpoint
+- **External scan tools** (system binaries, not Python packages):
+  - **Debian/Ubuntu/Kali:** `nmap`, `nikto`, `whatweb`, `sslscan`, `dnsrecon`, `whois`, `dig`, `curl`, `ping`
+  - **ProjectDiscovery tools:** `nuclei`, `httpx`, `dnsx`, `katana`, `subfinder`
+  - **ExploitDB:** `searchsploit`
+
+## Installation
 
 ```bash
-# 1. Python-Abhängigkeiten
+# 1. Python dependencies
 pip install -r requirements.txt
 
-# 2. Externe Scan-Tools (Kali/Debian/Ubuntu) — idempotent, installiert nur Fehlendes
+# 2. Install external tools (idempotent; only missing tools are installed)
 sudo bash setup_tools.sh
-bash setup_tools.sh --check        # nur prüfen welche Tools fehlen (installiert nichts)
 
-# 3. Modelle konfigurieren
+# Check what's missing without installing:
+bash setup_tools.sh --check
+
+# 3. Configure models
 cp agentscanit/models.json.example agentscanit/models.json
 ```
 
-> **Hinweis:** Die Scan-Tools sind kompilierte Binaries (C/Go), keine Python-Pakete — sie
-> gehören daher NICHT in `requirements.txt`. `setup_tools.sh` installiert sie aus den
-> korrekten Quellen (apt / `go install` / Git). Wichtig: `httpx` ist die **ProjectDiscovery**-
-> Variante (Go), nicht das gleichnamige apt-/Python-Paket.
+Scan tools are compiled/system binaries, not Python packages. `setup_tools.sh` installs them from the appropriate sources. `httpx` refers to the ProjectDiscovery Go binary, not the Python package with the same name.
 
 ---
 
-## Modell-Anforderungen
+## LLM Requirements
 
-Das Framework treibt die Agents über **Ollama native Function-Calling**. Nicht jedes LLM ist geeignet —
-die Anforderungen sind empirisch ermittelt (mehrere Modelle gegen echte Scans getestet, Details in `roadmap.md`).
+The framework uses Ollama native function calling. Suitable models must:
 
-**Ein verwendbares Modell MUSS:**
-1. **Natives Tool-Calling / Function-Calling** beherrschen. Reine Chat-Modelle scheitern mit
-   „Invalid response from LLM call". Geeignet sind Coder-/Tool-Use-trainierte Modelle.
-2. **Stabil bei tiefen Multi-Turn-Tool-Ketten** sein (≥10 Nachrichten). Das ist der eigentliche Test —
-   ein einzelner Tool-Call sagt nichts aus. Manche Modelle bestehen Einzel-Calls, scheitern aber im
-   echten Scan mit leeren Antworten.
-3. **Non-Reasoning sein ODER `think:False` respektieren.** Reasoning-Modelle verlieren bei tiefen
-   Ketten sporadisch ihre Antwort im verworfenen Reasoning-Kanal.
+1. Support native tool/function calling.
+2. Remain stable through deep multi-turn chains (at least 10 messages).
+3. Be non-reasoning models or support `think:False` reliably.
 
-**Empirisch als tauglich bestätigt (Stand variiert — aktuelle Auswahl über `models.json`):**
+| Role | Tested candidates |
+|------|-------------------|
+| Remote workers | `qwen3-coder`, `nemotron-3` family |
+| Local workers | `qwen2.5:7b-instruct`, `llama3-groq-tool-use:8b` |
+| Planner | `qwen2.5:7b-instruct` |
 
-| Rolle | Modell-Kandidaten |
-|---|---|
-| **Remote-Worker** (analysis/research/code) | Non-Reasoning Tool-Use-Modelle, z. B. `qwen3-coder`, `nemotron-3`-Familie |
-| **Lokal-Worker** | `qwen2.5:7b-instruct`, `llama3-groq-tool-use:8b`, `qwen3-coder:30b` |
-| **Planner** (läuft immer lokal) | `qwen2.5:7b-instruct` — remote Modelle unterstützen Ollama's native FC-API nicht zuverlässig |
-
-**Nicht geeignet:** Gemma-Familie (schwaches agentic Function-Calling, scheitert im echten Scan trotz
-bestandener Einzel-Calls), reine Reasoning-Modelle ohne `think:False`-Konformität.
-
-> **Diagnose-Werkzeug:** `RECON_LLM_DEBUG=1 python3 main.py …` protokolliert jeden LLM-Call
-> (Prompt-Größe, Status, Leerantworten) nach `logs/llm_debug_<pid>.jsonl` — nützlich um ein neues
-> Modell auf Tauglichkeit zu prüfen.
-
----
-
-## Schnellstart
+The Gemma family and reasoning models without reliable `think:False` support are not suitable for the current workflow.
 
 ```bash
-# Top-Level-Flow (empfohlen — alle 6 Teams)
-python3 main.py example.com
-python3 main.py example.com web                  # Scope als Argument
-python3 main.py example.com "CVE-Suche" web      # Objective + Scope
-python3 main.py                                  # interaktiv
+RECON_LLM_DEBUG=1 python3 main.py <target> osint
+# Logs: logs/llm_debug_<pid>.jsonl
+```
 
-# Flow-Resume nach Unterbrechung
-python3 main.py --list                           # gespeicherte Runs anzeigen
-python3 main.py --resume <flow-id>               # fortsetzen
+---
 
-# Nur Team 1 (Scanner ohne NVD + Reporting)
+## Quick Start
+
+```bash
+# Interactive mode
+python3 main.py
+
+# Direct execution
+python3 main.py example.com web
+
+# With objective and scope
+python3 main.py example.com "Web application assessment" web
+
+# List and resume saved runs
+python3 main.py --list
+python3 main.py --resume <flow-id>
+
+# Team 1 only, without enrichment
 cd agentscanit && python3 main.py example.com
 ```
 
 ### Scopes
 
-Der Scope bestimmt, welche Tasks innerhalb Team 1 laufen (`research_agent`/`blue_agent` nutzen dabei
-immer dieselben registrierten Tools — der Scope steuert Tiefe/Fokus über die Task-Prompts, z. B.
-Portbereich bei `nmap`):
+Scope controls the depth and focus of Team 1 tasks:
 
-| Scope | Tasks (Team 1) | Team 1 folgt Routing zu |
-|---|---|---|
-| `osint` | research → report | Team 3 (direkt) |
-| `ssl` | research → blue → report | Team 3 (direkt) |
-| `quick` | research → blue → findings → report | Router (Teams 2–6 je nach Funden) |
-| `web` / `network` | research → blue → findings → red → report | Router (Teams 2–6 je nach Funden) |
-| `full` | research → blue → findings → red_scan → red → coding → report | Router (Teams 2–6 je nach Funden) |
-
-`web` und `network` nutzen aktuell dieselbe Task-Pipeline — der Unterschied liegt in der
-Scan-Tiefe/-Fokussierung, die den Agents über die Task-Beschreibung vorgegeben wird (z. B. Portbereich).
+| Scope | Tasks | Route |
+|-------|-------|-------|
+| `osint` | research → report | Team 3 directly |
+| `ssl` | research → blue(ssl) → report | Team 3 directly |
+| `quick` | research → blue(top-ports) → findings → report | Router |
+| `web` | research → blue(web) → findings → red → report | Router |
+| `network` | research → blue(all-ports) → findings → red → report | Router |
+| `full` | research → blue → findings → red_scan → red → coding → report | Router |
 
 ---
 
 ## Outputs
 
-Alle Outputs landen in `logs/` (Automatisierungs-Skript in `scans/`):
+All outputs are saved to `logs/`:
 
-| Datei | Erzeugt von | Inhalt |
-|---|---|---|
-| `recon_report_*.md` | Team 1 | Recon-Report mit Ports, Services, CVEs |
-| `crew_*.json` | Team 1 | Strukturierter JSON-Log (Tasks, CVE-Refs, Ports) |
-| `trace_*.json` | Team 1 | Tool-Calls mit Raw-Output + Timings |
-| `scans/scan_*.py` | Team 1 (`coding_agent`) | Ausführbares Python-Skript, automatisiert die Scan-Schritte |
-| `interpret_*.md` | Team 2 | NVD-Detaildaten pro CVE (CVSS, CWE, References) |
-| `final_report_*.md` | Team 3 | Merged Final Report |
-| `threatintel_*.md` | Team 4 | OTX/Shodan/VT — In-the-Wild-Status pro CVE + IP-Reputation |
-| `compliance_*.md` | Team 5 | OWASP Top 10 Mapping der Findings |
-| `risk_score_*.md` / `.json` | Team 6 | Risk Score + Level + Top-Findings + Next Steps (Markdown + maschinenlesbar) |
-| `workflow_last.json` | Team 1 | Letzter Scan (überschrieben) — Eingabe für Teams 2–6 |
-| `flow_state.db` | Flow | SQLite — Flow-State pro Run (für `--resume`) |
-
----
-
-## Konfiguration
-
-`.env` oder Umgebungsvariablen:
-
-| Variable | Bedeutung | Default |
-|---|---|---|
-| `OLLAMA_BASE_URL` | Ollama-Endpunkt | `http://localhost:11434` |
-| `OLLAMA_API_KEY` | API-Key für remote Ollama | — |
-| `MODEL_ANALYSIS` | Modell für Analyse-Agents | aus `models.json` |
-| `MODEL_RESEARCH` | Modell für Research-Agent | aus `models.json` |
-| `MODEL_CODE` | Modell für Coding-Agent | aus `models.json` |
-| `EMBED_MODEL` | Embedding-Modell (Knowledge Sources) | aus `models.json` |
-| `NVD_API_KEY` | NVD API-Key (erhöht Rate-Limit 5→50 req/30s) | — |
-| `OTX_API_KEY` | AlienVault OTX (kostenlos) | — |
-| `SHODAN_API_KEY` | Shodan (paid-tier) | — |
-| `VT_API_KEY` | VirusTotal (free-tier verfügbar) | — |
-
-Teams 4–6 degradieren **graceful** ohne API-Keys — kein Crash, kein Timeout, nur `"no_key"`-Status im Output.
-
-Modell-Auswahl über `models.json` (von `models.json.example` ableiten).
-
-**Threat-Intel-Keys (Team 4)** lassen sich alternativ an einer Stelle eintragen statt als Env-Vars: [threatintel_agent/api_keys.md](threatintel_agent/api_keys.md.example) (von `api_keys.md.example` ableiten, gitignored — gleiches Prinzip wie `models.json`). Eine gesetzte Umgebungsvariable hat immer Vorrang.
+| File | Contents |
+|------|----------|
+| `recon_report_*.md` | Reconnaissance findings, open ports, services, and CVEs |
+| `crew_*.json` | Structured task output, CVE references, and ports |
+| `trace_*.json` | Tool calls with raw output and timings |
+| `scan_*.py` | Executable script generated from scan steps |
+| `interpret_*.md` | NVD enrichment data: CVSS, CWE, and references |
+| `final_report_*.md` | Merged final report |
+| `threatintel_*.md` | OTX, Shodan, and VirusTotal results |
+| `compliance_*.md` | OWASP Top 10 mapping |
+| `risk_score_*.md` / `.json` | Risk score, level, top findings, and next steps |
+| `workflow_last.json` | Latest scan metadata used by Teams 2–6 |
+| `flow_state.db` | SQLite persistence for resuming runs |
 
 ---
 
-## Weiterführende Dokumentation
+## Configuration
 
-| Datei | Inhalt |
-|---|---|
-| [`agentscanit/toolinfo.md`](agentscanit/toolinfo.md) | Detaillierte Tool-Referenz (Binary, Version, Parameter je Tool) |
-| `roadmap.md` | Entwicklungsverlauf, Architektur-Entscheidungen, technische Schulden (nicht Teil des Repos — lokal) |
-| `CLAUDE.md` | Laufende Session-Doku für KI-gestützte Weiterentwicklung: Architektur-Patterns, gelöste Bugs mit Root-Cause, offene Punkte |
+Environment variables can be set in `.env` or in the system environment:
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `OLLAMA_BASE_URL` | Ollama endpoint | `http://localhost:11434` |
+| `OLLAMA_API_KEY` | API key for remote Ollama | — |
+| `MODEL_ANALYSIS` | Model for analysis agents | `models.json` |
+| `MODEL_RESEARCH` | Model for research agent | `models.json` |
+| `MODEL_CODE` | Model for coding agent | `models.json` |
+| `EMBED_MODEL` | Embedding model | `models.json` |
+| `NVD_API_KEY` | NVD API key | — |
+| `OTX_API_KEY` | AlienVault OTX API key | — |
+| `SHODAN_API_KEY` | Shodan API key | — |
+| `VT_API_KEY` | VirusTotal API key | — |
+
+Teams 4–6 degrade gracefully without API keys and report a `no_key` status instead of failing.
+
+---
+
+## Guardrails & Validation
+
+RecconSuite includes evidence-grounding controls intended to reduce unsupported LLM output:
+
+- **Value grounding:** Findings must be supported by raw tool output.
+- **Tool validation:** Reported tools must have executed during the scan.
+- **CVE validation:** CVEs are checked against detected service versions.
+- **Source attribution:** Findings retain their tool source and scan context.
+
+Validation errors trigger task rejection and diagnostic feedback.
+
+---
+
+## Documentation
+
+| File | Contents |
+|------|----------|
+| [`agentscanit/toolinfo.md`](./agentscanit/toolinfo.md) | Tool reference: binaries, versions, and parameters |
+| [`debugging/README.md`](./debugging/README.md) | Diagnostic workflow for models, tools, and agents |
+| `CLAUDE.md` | Development notes and architecture decisions |
+
+---
+
+## Operational Notes
+
+- Use the framework only against targets for which you have explicit authorization.
+- Passive reconnaissance is used where possible; active scans can generate traffic and alerts.
+- The framework performs no exploitation or post-exploitation activity.
+- Findings are intended to support subsequent manual analysis and exploit development.
+- A scan result is not a substitute for manual verification by a security professional.
+
+---
+
+## License
+
+MIT
+
+---
+
+## Acknowledgments
+
+- [CrewAI](https://crewai.com) — Multi-agent orchestration
+- [Ollama](https://ollama.com) — Local LLM inference
+- [ProjectDiscovery](https://projectdiscovery.io) — Security tools including nuclei, httpx, katana, subfinder, and dnsx
+- [PTES](http://www.pentest-standard.org/) — Penetration testing standard
