@@ -9,6 +9,108 @@ Wir arbeiten die Roadmap (`roadmap.md`) phasenweise ab. Im Ablauf wird entschied
 
 **WICHTIG — Keine pauschalen Antworten. Faktenbasierte Responses auf jede Frage.**
 
+### Arbeitsplan (dokumentiert 2026-09-19 vor Umsetzung) — Output-Qualität, 5 generelle Fixes
+
+**Status: NOCH NICHT UMGESETZT.** Notfall-Referenz falls Session abbricht — Baseline-Commit `ea6ee5a`
+(Arbeitsverzeichnis zu diesem Zeitpunkt clean, nichts von diesem Plan ist committet). Freigabe erteilt
+(2026-09-19), Reihenfolge 1→2→3→5→4, pro Punkt Fix → Verifikation → eigener Commit (gleiches Muster wie
+der vorherige Audit-Durchlauf).
+
+**Auslöser:** User bat um Qualitätsbewertung des letzten `pentest-ground.com full`-Scans
+(`trace_pentest-ground.com_20260919_042517.json`, `final_report_pentest-ground.com_20260919_043050.md`
+u.a.) — Rohdaten-vs-Report-Abgleich + externe Recherche zu pentest-ground.com als Ground Truth. Ergebnis
+(Details im Chat-Verlauf dieser Session, hier nur die für die Umsetzung relevanten Fakten):
+
+- **Externe Ground Truth (pentest-ground.com selbst, WebFetch):** CipherHeart/Redis:6379→CVE-2022-0543
+  (✅ im Scan perfekt getroffen, versions-bestätigt), ShadowLogic/WebLogic:7001→**CVE-2023-21839**
+  (✅ von `findings`-Task korrekt in `cve_references` erfasst — sichtbar in `crew_pentest-ground.com_
+  20260919_042517.json` — aber im `final_report_*.md` durchs Versions-Gate komplett unsichtbar, weil
+  WebLogic nie eine Version preisgab). RestFlaw/API:9000 und GuardianLeaks/WebApp:81 wurden nur über
+  generische Seitentitel erkannt, nicht über ihre tatsächlichen App-Namen/Vuln-Klassen (kein Fix hierfür
+  geplant — das wäre aktives DAST/Content-Parsing, außerhalb des jetzigen Scopes, nur als Kontext notiert).
+- **`RedOutput.exploitable_findings=[]`/`confirmed_attack_surface=[]`** trotz `"Verified":"1"`-Metasploit-
+  Modul (EDB-46814, CVE-2019-2725) und funktionierendem GitHub-PoC (CVE-2022-0543) in den eigenen
+  searchsploit/ddg-Outputs des red-Tasks — Evidenz war da, wurde aber nicht in die Felder übernommen.
+- **`compliance_agent`-Output enthält CVEs ohne jede Tool-Grundlage:** `CVE-2023-44487`,
+  `CVE-2024-31079/80/81` (nginx 1.31.6), `CVE-2021-23017`, `CVE-2020-11724`, `CVE-2019-20372` (nginx
+  1.18.0) — `nvd_cpe_lookup` lieferte für BEIDE nginx-Versionen explizit "Keine CVEs". Zusätzlich ein
+  Zahlendreher (`CVE-2021-32761` statt echtem `CVE-2021-32762`) und eine Produkt-Verwechslung
+  (`CVE-2020-14145`, real eine OpenSSH-CVE, wird als Redis-CVE gelistet). Ursache: `compliance_agent/
+  compliance_flow.py`'s `run_mapping()`-Task hat **keinen** CVE-Guardrail (anders als `findings`/`red`).
+- **`threatintel_pentest-ground.com_*.md`:** 40 CVE-Header, darunter jeweils keinerlei OTX-Pulse-Daten —
+  reines Rendering-Rauschen, kein Korrektheitsproblem (Team 4 ist deterministisch, kein LLM).
+- **`risk_score_*.md`:** "Exploitable: ✓ Ja" beruht auf `has_exploitable` (irgendeine CVE beim red-Task),
+  nicht auf dem strengeren `exploitable_findings` (das leer war) — zweideutiges Label.
+- **User-Vorgabe für die Lösung:** eine nicht gefundene CVE ist akzeptabel (False Negative), eine
+  dazu-halluzinierte NICHT. Kein Weglassen/Verstecken von echten Findings — Sichtbarkeit und Zählung
+  müssen getrennt werden, damit BUG-20 (Rauschen-Inflation bei generischen versionslosen CVEs) nicht
+  wieder aufgemacht wird.
+
+**Geplante Fixes (alle target-unabhängig, nutzen nur generische Signale — CPE-Match, `Verified`-Flag,
+KEV-Heuristik, Trace-Grounding):**
+
+**1. `cve_filters.py` — Versions-Gate: 2 Buckets → 3 Buckets (sichtbar/gezählt trennen).**
+   - Neue Funktion `product_confirmed_in_scan(cve, scan_body)`: wie `version_confirmed_in_scan()`
+     (Zeile 55-73), aber OHNE die Anforderung `\d+\.\d+` nach dem Produkt-Keyword — reine
+     Produktnamens-Präsenz im Scan-Body reicht (nutzt dieselbe `cve_product_keywords()`, Zeile 33-52).
+   - `split_by_version_gate()` (Zeile 100-113) liefert neu 4 Listen statt 3:
+     `version_ok, version_unk_kev, product_confirmed_no_version, fully_dropped`
+     (`product_confirmed_no_version` = nicht in `version_ok`, nicht KEV, aber `product_confirmed_in_scan`
+     True; `fully_dropped` = der Rest — bisheriges `version_unk_dropped`, jetzt kleiner).
+   - `counted_cves()` (Zeile 116-121) bleibt **unverändert** bei `version_ok + version_unk_kev` — NUR
+     diese zählen in Critical/High (verhindert BUG-20-Regression).
+   - `reporting/reporting_flow.py::merge()` (ab Zeile 76/108): neue dritte Markdown-Sektion
+     "⚠️ Produkt bestätigt, Version nicht ermittelt" zwischen den bisherigen ✅- und
+     🔇-Sektionen, rendert `product_confirmed_no_version` — nicht in der Kopfzeilen-Zählung.
+   - **Rollback:** `git diff ea6ee5a -- cve_filters.py reporting/reporting_flow.py` zeigt die komplette
+     Änderung; `git checkout ea6ee5a -- cve_filters.py reporting/reporting_flow.py` macht sie rückgängig.
+     `risk_scorer/risk_flow.py` NICHT angefasst in diesem Punkt (nutzt weiterhin nur `counted_cves()`).
+
+**2. `agentscanit/tasks.py` — `red`-Task: `exploitable_findings` bei vorhandener Verified-Evidenz erzwingen.**
+   - Neuer Guardrail `_exploitable_evidence_completeness_guardrail` (Modul-Ebene, analog bestehendem
+     Muster), zusätzlich zu `[_cve_trace_guardrail, _searchsploit_version_guardrail,
+     _red_exploitable_poc_guardrail]` (Zeile ~1739).
+   - Scannt `run_trace.get_raw_outputs_for_tool("searchsploit")` nach JSON-Einträgen mit
+     `"Verified":"1"` UND einer `Codes`-CVE die in `RedOutput.cve_references` steht.
+   - Fehlt der zugehörige Eintrag in `exploitable_findings` → 1. Versuch: Reject mit Feedback
+     (welches EDB-ID/CVE fehlt). 2. Versuch (Fallback, da laut dieser Session 3× bestätigt: Reject+Retry
+     korrigiert beim 2. Versuch nicht zuverlässig): deterministisch anhängen (Title + EDB-ID + CVE-ID aus
+     dem strukturierten searchsploit-JSON, keine Freitext-Erfindung nötig) + `exploitable_findings_count`
+     synchronisieren (`derive_count`-Validator läuft nicht bei nachträglicher Attribut-Zuweisung).
+   - **Rollback:** `git checkout ea6ee5a -- agentscanit/tasks.py` (bei Bedarf einzelne Hunks prüfen falls
+     Punkt 3 zwischenzeitlich auch tasks.py ändert — dann `git log --oneline -- agentscanit/tasks.py`
+     nutzen um den richtigen Commit zu identifizieren statt pauschal auf Baseline zurückzuspringen).
+
+**3. `compliance_agent/compliance_flow.py` — CVE-Grounding-Guardrail für Team 5.**
+   - Neuer Guardrail auf dem `run_mapping()`-Task (Zeile ~171, aktuell keine `guardrails=`).
+   - Extrahiert alle `CVE-\d{4}-\d{4,7}` aus dem generierten Markdown, vergleicht gegen die Menge
+     `findings.cve_references ∪ red.cve_references` (liegt compliance_flow bereits als geladener
+     Kontext vor, `load_findings()`-Pfad).
+   - CVE außerhalb dieser Menge → Reject (1. Versuch), Fallback (2. Versuch): Zeile mit der
+     nicht-belegten CVE-ID deterministisch aus dem Text entfernen (nicht die ganze Sektion).
+   - Optionaler Zusatzcheck (kann getrennt verifiziert/zurückgestellt werden): Produkt-Konsistenz —
+     das im Fließtext neben einer CVE genannte Produkt muss zu `cve_filters.cve_product_keywords()`
+     für diese CVE passen (fängt die "CVE-2020-14145 fälschlich als Redis"-Klasse).
+   - **Rollback:** `git checkout ea6ee5a -- compliance_agent/compliance_flow.py`.
+
+**4. `risk_scorer/risk_flow.py` — "Exploitable"-Label entzweideutigen.**
+   - `write_report()` (ab Zeile 151): zwei getrennte Zeilen statt einer — "CVE-Treffer vorhanden"
+     (aktuelles `has_exploitable`) und "PoC-verifiziert" (`exploitable_findings` nicht leer, profitiert
+     automatisch von Punkt 2). Reines Label/Rendering, keine Logikänderung an der Score-Berechnung.
+   - **Rollback:** `git checkout ea6ee5a -- risk_scorer/risk_flow.py`.
+
+**5. `threatintel_agent/threatintel_flow.py` — leere CVE-Sektionen bündeln.**
+   - `write_report()` (Zeile 145+, CVE-Rendering-Schleife ab Zeile 161-165): CVE-Header nur rendern
+     wenn OTX-Pulse-Daten vorhanden sind; Treffer-lose CVEs in eine Summary-Zeile zusammenfassen
+     ("X/N CVEs mit OTX-Pulse-Treffer"). Reines Rendering, kein LLM/Logik betroffen.
+   - **Rollback:** `git checkout ea6ee5a -- threatintel_agent/threatintel_flow.py`.
+
+**Verifikationsplan pro Punkt (Muster wie bisher):** 1:1-Reproduktion mit den echten
+`pentest-ground.com`-Rohdaten aus dieser Session als Regressionsfall (WebLogic muss jetzt in Sektion 2
+erscheinen, Redis-Zählung darf sich nicht ändern), Negativkontrolle mit einem sauberen historischen Scan
+(kein Fehlalarm), dedizierte `testing/test_*.py`-Datei pro Punkt, danach — wo sinnvoll — ein Live-Scan
+gegen ein ANDERES Target zur Generalisierungsprobe (nicht pentest-ground.com-spezifisch fixen).
+
 ### Session-Abschluss (2026-09-19) — CrewAI-Audit (2026-09-15) abgearbeitet, 3 Commits
 
 **User-Freigabe:** alle 5 Empfehlungen aus dem CrewAI-Konformitäts-/Effizienz-Audit (2026-09-15,
