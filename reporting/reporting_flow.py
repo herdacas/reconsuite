@@ -105,10 +105,21 @@ class ReportingFlow(Flow[ReportingState]):
         # ist der Versions-Match spekulativ (potenzielles False-Positive).
         # Geteilt mit risk_scorer über cve_filters.py (Backlog-Fix 2026-09-11:
         # Critical-Count-Inkonsistenz zwischen Team 3/Team 6 — siehe CLAUDE.md).
-        version_ok, version_unk_kev, version_unk_dropped = cve_filters.split_by_version_gate(
-            valid, scan_body,
+        #
+        # Output-Qualitäts-Fix Punkt 1 (2026-09-19, CLAUDE.md-Arbeitsplan): 3 statt 2
+        # Sichtbarkeits-Stufen. Grund: eine CVE, deren Produkt der Scan nachweislich
+        # beobachtet hat (z.B. WebLogic ohne Versions-Banner — nur weil das Produkt
+        # keine Version preisgibt, heißt das nicht "nicht relevant"), wurde bisher
+        # GENAUSO versteckt wie eine reine Keyword-Dump-CVE ohne jeden Produktbezug
+        # (BUG-20-Fall). User-Vorgabe: eine nicht gefundene CVE ist akzeptabel, aber
+        # eine gefundene darf nicht unterschlagen werden — also: product_confirmed_
+        # no_version bleibt SICHTBAR (eigene Sektion), zählt aber NICHT in Critical/
+        # High (verhindert die BUG-20-Rauschen-Inflation). Nur echtes Keyword-Rauschen
+        # ohne jeden Produktbezug (fully_dropped) bleibt versteckt.
+        version_ok, version_unk_kev, product_confirmed_no_version, fully_dropped = (
+            cve_filters.split_by_version_gate(valid, scan_body)
         )
-        version_unk = version_unk_kev + version_unk_dropped
+        version_unk = version_unk_kev + product_confirmed_no_version + fully_dropped
         split_sections = bool(version_ok and version_unk)
 
         # Kopfzeilen-Zählung: nur die TATSÄCHLICH gelisteten CVEs zählen (versions-
@@ -131,20 +142,24 @@ class ReportingFlow(Flow[ReportingState]):
                 ]
             nvd_lines += _format_cve_entries(version_ok)
 
-        # Versionslose CVEs werden NICHT mehr gelistet (User-Entscheidung 2026-06-25):
-        # eine Liste produkt-generischer "alle Critical-CVEs für Apache"-Treffer ohne
-        # erkannte Version hat keinen praktischen Wert (reine Spekulation/Rauschen).
-        # AUSNAHME: aktiv ausgenutzte CVEs (CISA-KEV-Heuristik: "exploited" in der
-        # NVD-Beschreibung) werden als expliziter Hinweis behalten — die sind auch
-        # ohne Versions-Match relevant. (version_unk_kev/version_unk_dropped kommen
-        # bereits aus cve_filters.split_by_version_gate() oben.)
+        # Versionslose, produktlose CVEs werden weiterhin nicht gelistet (User-
+        # Entscheidung 2026-06-25): eine Liste produkt-generischer "alle Critical-CVEs
+        # für Apache"-Treffer ohne jeden Produktbezug hat keinen praktischen Wert.
+        # AUSNAHME 1 (seit 2026-06-25): aktiv ausgenutzte CVEs (KEV-Heuristik).
+        # AUSNAHME 2 (seit 2026-09-19): das Produkt selbst wurde im Scan beobachtet
+        # (product_confirmed_no_version) — dann wird die CVE sichtbar gehalten (siehe
+        # oben), nur eben nicht mitgezählt.
 
-        # Header-Zählung final: nur gelistete CVEs (verifiziert + KEV-Ausnahmen)
+        # Header-Zählung final: nur gelistete CVEs (verifiziert + KEV-Ausnahmen) —
+        # product_confirmed_no_version zählt bewusst NICHT mit (BUG-20-Schutz).
         _counted = version_ok + version_unk_kev
         _crit, _high = cve_filters.severity_counts(_counted)
         _hdr = (f"- Gelistet: **{len(_counted)}**  Critical: **{_crit}**  High: **{_high}**"
-                + (f"  ·  {len(version_unk_dropped)} versionslose generische CVE(s) ausgeblendet"
-                   if version_unk_dropped else "") + "\n")
+                + (f"  ·  {len(product_confirmed_no_version)} produkt-bestätigte CVE(s) ohne "
+                   f"Versions-Match zusätzlich aufgeführt (nicht gezählt)"
+                   if product_confirmed_no_version else "")
+                + (f"  ·  {len(fully_dropped)} produktlose generische CVE(s) ausgeblendet"
+                   if fully_dropped else "") + "\n")
         nvd_lines = [(_hdr if ln == "__HEADER_COUNTS__" else ln) for ln in nvd_lines]
 
         if version_unk_kev:
@@ -158,26 +173,41 @@ class ReportingFlow(Flow[ReportingState]):
             ]
             nvd_lines += _format_cve_entries(version_unk_kev)
 
-        if version_unk_dropped and not version_ok and not version_unk_kev:
+        if product_confirmed_no_version:
+            # Sichtbar, aber NICHT gezählt (siehe Header-Zählung oben) — genau das
+            # unterscheidet diese Sektion vom ausgeblendeten fully_dropped-Rauschen.
+            nvd_lines += [
+                "\n### ⚠️ Produkt bestätigt, Version nicht ermittelt\n",
+                "*Der Scan hat dieses Produkt aktiv als laufenden Dienst erkannt "
+                "(z.B. per gezieltem CPE-Lookup), aber KEINE Versionsnummer ermitteln "
+                "können (Banner unterdrückt/Admin-Konsole ohne Root-Response o.ä.). "
+                "Diese CVE(s) sind deshalb weder bestätigt noch widerlegt — nicht in "
+                "Critical/High gezählt, aber als Kandidat für manuelle Versionsprüfung "
+                "aufgeführt statt unterschlagen.*",
+                "",
+            ]
+            nvd_lines += _format_cve_entries(product_confirmed_no_version)
+
+        if fully_dropped and not version_ok and not version_unk_kev and not product_confirmed_no_version:
             # Nichts Verwertbares: klarer Hinweis statt einer Fantasie-CVE-Liste
             prods = sorted({cve_filters.cve_product_keywords(r) and sorted(cve_filters.cve_product_keywords(r))[0]
-                            for r in version_unk_dropped if cve_filters.cve_product_keywords(r)})
+                            for r in fully_dropped if cve_filters.cve_product_keywords(r)})
             prod_str = ", ".join(p for p in prods if p) or "die erkannten Dienste"
             nvd_lines += [
                 "### ℹ️ Keine versionsspezifische CVE-Analyse möglich\n",
                 f"*Für {prod_str} hat das Ziel KEINE konkrete Version preisgegeben (Banner ohne "
-                f"Versionsnummer — gehärtete Konfiguration). {len(version_unk_dropped)} produkt-"
+                f"Versionsnummer — gehärtete Konfiguration). {len(fully_dropped)} produkt-"
                 f"generische CVE(s) wurden daher NICHT gelistet (versionslose Treffer sind ohne "
                 f"Versions-Match nicht verwertbar). Nächster Angriffsschritt: Version über andere "
                 f"Wege fingerprinten (Error-Pages, Verhaltens-Unterschiede, Default-Pfade), dann "
                 f"versions-gezielter Re-Scan.*",
                 "",
             ]
-        elif version_unk_dropped:
+        elif fully_dropped:
             # Es gibt verwertbare CVEs daneben → nur knapper Vermerk über die verworfenen
             nvd_lines += [
-                f"\n*({len(version_unk_dropped)} weitere produkt-generische CVE(s) ohne "
-                f"Versions-Match wurden als nicht-verwertbar ausgeblendet.)*",
+                f"\n*({len(fully_dropped)} weitere produktlose generische CVE(s) ohne "
+                f"jeden Produktbezug wurden als nicht-verwertbar ausgeblendet.)*",
                 "",
             ]
 

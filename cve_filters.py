@@ -73,6 +73,27 @@ def version_confirmed_in_scan(cve: dict, scan_body: str) -> bool:
     return False
 
 
+def product_confirmed_in_scan(cve: dict, scan_body: str) -> bool:
+    """True wenn das CVE-Produkt selbst im Scan-Body vorkommt — OHNE Versions-Anforderung.
+
+    Schwächere Schwester von version_confirmed_in_scan(): bestätigt nur, dass der Scan
+    einen laufenden Dienst für dieses Produkt beobachtet hat (z.B. weil ein nvd_cpe_lookup
+    mit diesem Produktnamen als banner-Parameter aufgerufen wurde — das Produkt-Keyword
+    steht dann zwangsläufig im Scan-Body). Nutzt dieselben Keywords wie version_confirmed_
+    in_scan(), verlangt aber keine Versionsnummer danach (2026-09-19, Output-Qualitäts-Fix
+    Punkt 1 — trennt "sichtbar" von "gezählt", siehe CLAUDE.md-Arbeitsplan).
+    """
+    if not scan_body:
+        return False
+    body = scan_body.lower()
+    for kw in cve_product_keywords(cve):
+        if len(kw) < 3:
+            continue
+        if kw in body:
+            return True
+    return False
+
+
 def is_kev(cve: dict) -> bool:
     """CISA-KEV-Heuristik: NVD-Beschreibung nennt aktive Ausnutzung.
 
@@ -99,25 +120,37 @@ def valid_nvd_results(nvd_results: list[dict]) -> list[dict]:
 
 def split_by_version_gate(
     valid_results: list[dict], scan_body: str,
-) -> tuple[list[dict], list[dict], list[dict]]:
-    """Teilt valide NVD-CVEs in (version_ok, version_unk_kev, version_unk_dropped).
+) -> tuple[list[dict], list[dict], list[dict], list[dict]]:
+    """Teilt valide NVD-CVEs in (version_ok, version_unk_kev, product_confirmed_no_version,
+    fully_dropped).
 
-    version_ok           — Produktversion im Scan erkannt, passt zur CVE.
-    version_unk_kev       — keine Versions-Bestätigung, aber aktiv ausgenutzt (KEV-Ausnahme).
-    version_unk_dropped   — keine Versions-Bestätigung, kein KEV → nicht verwertbar.
+    version_ok                   — Produktversion im Scan erkannt, passt zur CVE.
+    version_unk_kev               — keine Versions-Bestätigung, aber aktiv ausgenutzt (KEV-Ausnahme).
+    product_confirmed_no_version  — keine Versions-Bestätigung, kein KEV, ABER das Produkt selbst
+                                     wurde im Scan beobachtet (z.B. WebLogic ohne Versions-Banner) —
+                                     wird im Report SICHTBAR gehalten, zählt aber nicht in Critical/
+                                     High (2026-09-19, Output-Qualitäts-Fix Punkt 1: "keine gefundene
+                                     CVE wird versteckt, aber Rauschen zählt nicht mit").
+    fully_dropped                 — kein Produkt-, keine Versions-Bestätigung, kein KEV → reines
+                                     Keyword-Rauschen (der ursprüngliche BUG-20-Fall), bleibt versteckt.
     """
     version_ok = [r for r in valid_results if version_confirmed_in_scan(r, scan_body)]
     version_unk = [r for r in valid_results if r not in version_ok]
     version_unk_kev = [r for r in version_unk if is_kev(r)]
-    version_unk_dropped = [r for r in version_unk if not is_kev(r)]
-    return version_ok, version_unk_kev, version_unk_dropped
+    version_unk_no_kev = [r for r in version_unk if r not in version_unk_kev]
+    product_confirmed_no_version = [
+        r for r in version_unk_no_kev if product_confirmed_in_scan(r, scan_body)
+    ]
+    fully_dropped = [r for r in version_unk_no_kev if r not in product_confirmed_no_version]
+    return version_ok, version_unk_kev, product_confirmed_no_version, fully_dropped
 
 
 def counted_cves(nvd_results: list[dict], scan_body: str) -> list[dict]:
     """CVEs, die in Kopfzeilen-/Score-Zählungen einfließen dürfen: version-verifiziert
-    + KEV-Ausnahmen. Versionslose, nicht aktiv ausgenutzte CVEs zählen NICHT (BUG-20)."""
+    + KEV-Ausnahmen. Versionslose, nicht aktiv ausgenutzte CVEs zählen NICHT (BUG-20) —
+    auch dann nicht, wenn sie in der neuen "Produkt bestätigt"-Sektion sichtbar sind."""
     valid = valid_nvd_results(nvd_results)
-    version_ok, version_unk_kev, _ = split_by_version_gate(valid, scan_body)
+    version_ok, version_unk_kev, _, _ = split_by_version_gate(valid, scan_body)
     return version_ok + version_unk_kev
 
 
