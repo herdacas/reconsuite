@@ -165,7 +165,7 @@ def run(target: str, objective: str = "", scope: str = "full", log_llm: bool = F
         f"  [dim]Target:[/]     [bold white]{target}[/]\n"
         f"  [dim]Objective:[/]  {objective}\n"
         f"  [dim]Scope:[/]      [yellow]{scope}[/]   [dim]Model:[/] {ACTIVE_ANALYSIS}\n"
-        f"  [dim]History:[/]    {db_status}   [dim]Cache:[/] [green]on[/]",
+        f"  [dim]History:[/]    {db_status}   [dim]Tool-Cache:[/] [dim]pro Lauf[/]",
         border_style="cyan",
         expand=False,
         padding=(0, 2),
