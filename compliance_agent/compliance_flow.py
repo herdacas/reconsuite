@@ -14,6 +14,7 @@ import os
 import re
 import sys
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, Field
 from crewai import Agent, Crew, Task, LLM
@@ -52,6 +53,13 @@ class ComplianceState(BaseModel):
     has_poc:          bool      = False
     exploitable_items: list[str] = Field(default_factory=list)
     poc_hits:         list[dict] = Field(default_factory=list)  # [{cve, severity, url}]
+    # CVE-Grounding (2026-09-19, Output-Qualitäts-Fix Punkt 3): die Menge der bereits
+    # trace-verifizierten CVE-IDs aus Team 1 (findings.cve_references ∪ red.cve_references,
+    # beide durch _cve_trace_guardrail geschützt) — NICHT aus dem gekürzten preview-Text
+    # gebaut (der schneidet CVEs willkürlich ab, siehe load_findings()), sondern direkt aus
+    # dem strukturierten cve_references-Feld jeder Task im crew-JSON. compliance_agent darf
+    # NUR CVE-IDs aus dieser Menge zitieren — siehe _cve_grounding_guardrail unten.
+    trusted_cves:     list[str] = Field(default_factory=list)
 
 
 # ─── PoC-Extraktion (deterministisch) ────────────────────────────────────────
@@ -105,6 +113,69 @@ def _extract_nuclei_poc(scan_json_path: str) -> list[dict]:
     return list(hits.values())
 
 
+# ─── CVE-Grounding-Guardrail (2026-09-19, Output-Qualitäts-Fix Punkt 3) ──────
+#
+# Live gefunden (pentest-ground.com-Scan, Output-Qualitäts-Review): der
+# compliance_agent nannte für nginx 1.31.6/1.18.0 mehrere CVE-IDs
+# (CVE-2023-44487, CVE-2024-31079/80/81, CVE-2021-23017, CVE-2020-11724,
+# CVE-2019-20372), obwohl nvd_cpe_lookup für BEIDE nginx-Versionen explizit
+# "Keine CVEs" zurückgegeben hatte — reine Trainingsdaten-Erfindung. Zusätzlich
+# ein Zahlendreher (CVE-2021-32761 statt echtem CVE-2021-32762). Anders als
+# findings/red hat der compliance-Task bisher KEINEN CVE-Guardrail — der
+# komplette OWASP-Mapping-Text läuft ungeprüft durch, obwohl compliance_agent
+# aus reinem LLM-Training-Wissen zitieren kann (keine eigenen Recherche-Tools).
+#
+# Fix: einfacher als bei findings/red, weil compliance keine NEUEN CVEs
+# entdecken soll, sondern nur bereits Team-1-geprüfte zitieren darf. Jede
+# CVE-ID im generierten Markdown wird gegen die Menge der bereits
+# trace-verifizierten CVE-IDs (ComplianceState.trusted_cves, aus dem
+# strukturierten cve_references-Feld jeder Task) geprüft — nicht neu gegen den
+# Trace validiert (das hat _cve_trace_guardrail auf Team 1 bereits getan).
+_CVE_ID_RE = re.compile(r"CVE-\d{4}-\d{4,7}", re.IGNORECASE)
+
+
+def _make_cve_grounding_guardrail(trusted_cves: set[str]):
+    """Factory statt Modul-Funktion: der compliance-Task hat kein globales
+    Trace-Singleton wie tasks.py — die trusted-Menge wird pro Flow-Lauf aus
+    ComplianceState gebaut und hier als Closure eingefangen. Der Reject-Zähler
+    ist ebenfalls Closure-lokal (kein run_trace-Zugriff nötig/sinnvoll, da
+    Team 5 als eigenständiger Crew-Lauf nach Team 1 läuft)."""
+    state = {"rejected_once": False}
+
+    def _guardrail(output: Any) -> tuple[bool, Any]:
+        raw = getattr(output, "raw", output) if not isinstance(output, str) else output
+        if not isinstance(raw, str) or not raw:
+            return True, raw
+
+        found = {m.upper() for m in _CVE_ID_RE.findall(raw)}
+        extra = found - trusted_cves
+        if not extra:
+            return True, raw
+
+        if not state["rejected_once"]:
+            state["rejected_once"] = True
+            return False, (
+                f"FEHLER: Folgende CVE-ID(s) sind NICHT durch die Scan-Findings belegt "
+                f"(kein Tool hat sie in dieser Session bestätigt): {', '.join(sorted(extra))}. "
+                f"Nutze AUSSCHLIESSLICH CVE-IDs die in den FINDINGS oben genannt sind. "
+                f"Entferne diese Erwähnungen oder ersetze sie durch eine belegte CVE-ID."
+            )
+
+        # Fallback (2. Versuch) — laut dieser Session mehrfach bestätigt: Reject+Retry
+        # korrigiert beim 2. Versuch nicht zuverlässig. Deterministisch markieren statt
+        # kommentarlos zu löschen (Transparenz: der Leser sieht dass hier etwas entfernt
+        # wurde, statt dass der Text lückenlos umformuliert wirkt).
+        cleaned = raw
+        for cve in extra:
+            cleaned = re.sub(
+                re.escape(cve), f"{cve} [nicht tool-bestätigt — entfernt]",
+                cleaned, flags=re.IGNORECASE,
+            )
+        return True, cleaned
+
+    return _guardrail
+
+
 # ─── LLM ─────────────────────────────────────────────────────────────────────
 
 def _make_llm() -> LLM:
@@ -139,11 +210,19 @@ class ComplianceFlow(Flow[ComplianceState]):
 
         # Findings-Text aus allen Tasks aggregieren (preview-Felder)
         parts: list[str] = []
+        trusted_cves: set[str] = set()
         for task_name, task_data in summary.get("tasks", {}).items():
             preview = task_data.get("preview", "")
             if preview:
                 parts.append(f"[{task_name}]\n{preview}")
+            # Trusted-CVE-Menge NICHT aus dem (potenziell gekürzten) preview-Text
+            # ableiten — direkt aus dem vollständigen, bereits trace-verifizierten
+            # cve_references-Feld jeder Task (2026-09-19, Output-Qualitäts-Fix Punkt 3).
+            for c in task_data.get("cve_references", []) or []:
+                if isinstance(c, str):
+                    trusted_cves.add(c.upper())
         self.state.findings_text = "\n\n".join(parts)
+        self.state.trusted_cves  = sorted(trusted_cves)
 
         # PoC-Schranke STRIKT + deterministisch: nur was nuclei AKTIV gegen DIESES
         # Target verifiziert hat zählt als nachgewiesen ausnutzbar (nicht die LLM-
@@ -251,7 +330,11 @@ class ComplianceFlow(Flow[ComplianceState]):
                 "3. Severity: Critical / High / Medium / Low\n"
                 "(Punkt 4/5 siehe oben — abhängig vom PoC-Status)\n\n"
                 "Nutze deine Knowledge Source für das Mapping. "
-                "Nur Kategorien die tatsächlich betroffen sind — keine Spekulation."
+                "Nur Kategorien die tatsächlich betroffen sind — keine Spekulation.\n\n"
+                "CVE-PFLICHT: Nenne NUR CVE-IDs die oben in den FINDINGS explizit auftauchen. "
+                "Keine CVE-IDs aus deinem eigenen Trainingswissen, auch wenn du sie für "
+                "das Produkt kennst — wenn eine CVE nicht in den FINDINGS steht, hat kein "
+                "Tool sie in dieser Session bestätigt."
             ),
             expected_output=(
                 "Strukturierter Pentest-OWASP-Report im Markdown-Format:\n"
@@ -264,6 +347,8 @@ class ComplianceFlow(Flow[ComplianceState]):
                 "Abschließend: ## Summary mit Bewertung der Angriffsfläche."
             ),
             agent=compliance_agent,
+            guardrails=[_make_cve_grounding_guardrail(set(self.state.trusted_cves))],
+            guardrail_max_retries=2,
         )
 
         crew = Crew(
