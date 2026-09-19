@@ -1,11 +1,12 @@
 """
 recon-suite/flow.py — Master-Flow
 
-Orchestriert alle Teams sequentiell:
+Orchestriert alle Teams nach dem Scan:
     1. agentscanit       → Active Recon & Enumeration
-    2. interpret-agent   → CVE Enrichment (NVD API v2)
-    3. threatintel_agent → Threat Intelligence (OTX, Shodan, VT)
-    4. compliance_agent  → Compliance Mapping (OWASP, CIS)
+    2. interpret-agent   → CVE Enrichment (NVD API v2)         ┐ parallel —
+    3. threatintel_agent → Threat Intelligence (OTX, Shodan, VT)┘ beide hängen
+       nur von scan_json_path ab, keine Datenabhängigkeit zueinander
+    4. compliance_agent  → Compliance Mapping (OWASP, CIS)       — wartet auf 2+3
     5. risk_scorer       → Asset Risk Scoring
     6. reporting         → Final Report (Merge)
 
@@ -37,7 +38,7 @@ import compliance_agent as _compliance     # Team 5: Compliance Mapper
 import risk_scorer as _risk                # Team 6: Risk Scorer
 
 from pydantic import BaseModel, Field
-from crewai.flow.flow import Flow, start, listen, router, or_
+from crewai.flow.flow import Flow, start, listen, router, or_, and_
 from crewai.flow.persistence import persist, SQLiteFlowPersistence
 from rich.console import Console
 from rich.prompt import Prompt
@@ -181,7 +182,11 @@ class ReconSuiteFlow(Flow[ScanState]):
         self.state.nvd_results = flow.state.nvd_results
         self._mark_step("run_interpret")
 
-    @listen(run_interpret)
+    # Läuft parallel zu run_interpret (beide hängen nur von scan_json_path ab,
+    # keine echte Datenabhängigkeit — vormals künstlich sequenziell verdrahtet,
+    # siehe CrewAI-Audit 2026-09-15, roadmap.md). CrewAI führt gleichzeitig
+    # getriggerte Sync-Listener über asyncio.to_thread in echten Threads aus.
+    @listen(or_("full_analysis", "cve_analysis"))
     def run_threat_intel(self):
         if self._step_done("run_threat_intel"):
             return
@@ -195,7 +200,7 @@ class ReconSuiteFlow(Flow[ScanState]):
         self.state.threat_intel_output = flow.state.threat_summary
         self._mark_step("run_threat_intel")
 
-    @listen(run_threat_intel)
+    @listen(and_(run_interpret, run_threat_intel))
     def run_compliance(self):
         if self._step_done("run_compliance"):
             return
